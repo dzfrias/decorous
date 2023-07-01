@@ -1,0 +1,15 @@
+---
+source: decorous-frontend/src/parser.rs
+expression: parser.parse_nodes()
+---
+[
+    Node {
+        loc: Location {
+            start: 3,
+            end: 7,
+        },
+        node_type: Text(
+            "hello",
+        ),
+    },
+]

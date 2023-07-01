@@ -1,0 +1,29 @@
+---
+source: decorous-frontend/src/parser.rs
+expression: parser.parse_nodes()
+---
+[
+    Node {
+        loc: Location {
+            start: 0,
+            end: 8,
+        },
+        node_type: Element(
+            Element {
+                tag: "p",
+                attrs: {},
+                children: [
+                    Node {
+                        loc: Location {
+                            start: 3,
+                            end: 4,
+                        },
+                        node_type: Text(
+                            "你好",
+                        ),
+                    },
+                ],
+            },
+        ),
+    },
+]

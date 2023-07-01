@@ -1,0 +1,70 @@
+---
+source: decorous-frontend/src/parser.rs
+expression: parser.parse_nodes()
+---
+[
+    Node {
+        loc: Location {
+            start: 0,
+            end: 48,
+        },
+        node_type: Element(
+            Element {
+                tag: "p",
+                attrs: {},
+                children: [
+                    Node {
+                        loc: Location {
+                            start: 19,
+                            end: 19,
+                        },
+                        node_type: Text(
+                            "\n",
+                        ),
+                    },
+                    Node {
+                        loc: Location {
+                            start: 20,
+                            end: 31,
+                        },
+                        node_type: Element(
+                            Element {
+                                tag: "p",
+                                attrs: {},
+                                children: [
+                                    Node {
+                                        loc: Location {
+                                            start: 23,
+                                            end: 27,
+                                        },
+                                        node_type: Text(
+                                            "hello",
+                                        ),
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                    Node {
+                        loc: Location {
+                            start: 44,
+                            end: 44,
+                        },
+                        node_type: Text(
+                            "\n",
+                        ),
+                    },
+                ],
+            },
+        ),
+    },
+    Node {
+        loc: Location {
+            start: 61,
+            end: 61,
+        },
+        node_type: Text(
+            "\n",
+        ),
+    },
+]

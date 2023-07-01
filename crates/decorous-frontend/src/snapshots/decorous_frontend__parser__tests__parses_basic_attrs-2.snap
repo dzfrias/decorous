@@ -1,0 +1,23 @@
+---
+source: decorous-frontend/src/parser.rs
+expression: parser.parse_nodes()
+---
+[
+    Node {
+        loc: Location {
+            start: 0,
+            end: 23,
+        },
+        node_type: Element(
+            Element {
+                tag: "p",
+                attrs: {
+                    "attr": Some(
+                        "attribute",
+                    ),
+                },
+                children: [],
+            },
+        ),
+    },
+]
