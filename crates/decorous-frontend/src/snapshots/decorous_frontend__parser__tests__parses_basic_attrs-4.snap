@@ -15,7 +15,7 @@ expression: tree
                     KeyValue(
                         "attr",
                         Some(
-                            Left(
+                            Literal(
                                 "你好",
                             ),
                         ),

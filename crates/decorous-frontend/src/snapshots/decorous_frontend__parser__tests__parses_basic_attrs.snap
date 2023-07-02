@@ -15,7 +15,7 @@ expression: tree
                     KeyValue(
                         "attr1",
                         Some(
-                            Left(
+                            Literal(
                                 "hello",
                             ),
                         ),

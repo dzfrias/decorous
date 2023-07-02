@@ -1,9 +1,8 @@
-use either::Either;
 use rslint_parser::{parse_text, SyntaxNode};
 use std::{collections::VecDeque, str::Chars};
 use thiserror::Error;
 
-use crate::ast::{Attribute, Element, EventHandler, Location, Node, NodeType};
+use crate::ast::{Attribute, AttributeValue, Element, EventHandler, Location, Node, NodeType};
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -265,17 +264,17 @@ impl<'a> Parser<'a> {
         attrs
     }
 
-    fn parse_attr_value(&mut self) -> Either<&'a str, SyntaxNode> {
+    fn parse_attr_value(&mut self) -> AttributeValue<'a> {
         match self.peek() {
             Some(c) if c == '"' || c == '\'' => {
                 self.consume();
-                let v = self.consume_while(|str_char| str_char != c);
+                let value = self.consume_while(|str_char| str_char != c);
                 self.consume();
-                Either::Left(v)
+                AttributeValue::Literal(value)
             }
             Some('{') => {
                 let expr = self.parse_mustache();
-                Either::Right(expr)
+                AttributeValue::JavaScript(expr)
             }
             c => {
                 self.errors.push(ParseError::ExpectedCharacterAny(
@@ -283,7 +282,7 @@ impl<'a> Parser<'a> {
                     c.unwrap_or('\0'),
                     Location::char(self.index),
                 ));
-                Either::Left("")
+                AttributeValue::Literal("")
             }
         }
     }

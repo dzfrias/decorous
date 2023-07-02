@@ -15,7 +15,7 @@ expression: tree
                     KeyValue(
                         "attr",
                         Some(
-                            Right(
+                            JavaScript(
                                 SCRIPT@0..30
                                   WHITESPACE@0..1 " "
                                   EXPR_STMT@1..29

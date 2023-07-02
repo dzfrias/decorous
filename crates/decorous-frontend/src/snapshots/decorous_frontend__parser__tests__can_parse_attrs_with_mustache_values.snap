@@ -15,7 +15,7 @@ expression: tree
                     KeyValue(
                         "attr",
                         Some(
-                            Right(
+                            JavaScript(
                                 SCRIPT@0..5
                                   EXPR_STMT@0..5
                                     NAME_REF@0..5

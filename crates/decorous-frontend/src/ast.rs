@@ -1,4 +1,3 @@
-use either::Either;
 use rslint_parser::SyntaxNode;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,7 +30,7 @@ pub struct Element<'a> {
 pub enum Attribute<'a> {
     EventHandler(EventHandler<'a>),
     Binding(&'a str),
-    KeyValue(&'a str, Option<Either<&'a str, SyntaxNode>>),
+    KeyValue(&'a str, Option<AttributeValue<'a>>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -52,6 +51,12 @@ impl<'a> EventHandler<'a> {
     pub fn expr(&self) -> &SyntaxNode {
         &self.expr
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AttributeValue<'a> {
+    Literal(&'a str),
+    JavaScript(SyntaxNode),
 }
 
 impl<'a> Element<'a> {

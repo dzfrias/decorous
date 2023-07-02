@@ -15,7 +15,7 @@ expression: tree
                     KeyValue(
                         "attr",
                         Some(
-                            Left(
+                            Literal(
                                 "one",
                             ),
                         ),
@@ -23,7 +23,7 @@ expression: tree
                     KeyValue(
                         "attr2",
                         Some(
-                            Left(
+                            Literal(
                                 "two",
                             ),
                         ),
