@@ -1,5 +1,5 @@
 ---
-source: decorous-frontend/src/parser.rs
+source: crates/decorous-frontend/src/parser.rs
 expression: tree
 ---
 [
@@ -11,7 +11,7 @@ expression: tree
         node_type: Element(
             Element {
                 tag: "p",
-                attrs: {},
+                attrs: [],
                 children: [],
             },
         ),

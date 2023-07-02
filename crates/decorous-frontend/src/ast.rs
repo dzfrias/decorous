@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use either::Either;
+use rslint_parser::SyntaxNode;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<'a> {
@@ -22,16 +23,39 @@ pub enum NodeType<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Element<'a> {
     tag: &'a str,
-    attrs: HashMap<&'a str, Option<&'a str>>,
+    attrs: Vec<Attribute<'a>>,
     children: Vec<Node<'a>>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Attribute<'a> {
+    EventHandler(EventHandler<'a>),
+    Binding(&'a str),
+    KeyValue(&'a str, Option<Either<&'a str, SyntaxNode>>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EventHandler<'a> {
+    event: &'a str,
+    expr: SyntaxNode,
+}
+
+impl<'a> EventHandler<'a> {
+    pub fn new(event: &'a str, expr: SyntaxNode) -> Self {
+        Self { event, expr }
+    }
+
+    pub fn event(&self) -> &str {
+        self.event
+    }
+
+    pub fn expr(&self) -> &SyntaxNode {
+        &self.expr
+    }
+}
+
 impl<'a> Element<'a> {
-    pub fn new(
-        tag: &'a str,
-        attrs: HashMap<&'a str, Option<&'a str>>,
-        children: Vec<Node<'a>>,
-    ) -> Self {
+    pub fn new(tag: &'a str, attrs: Vec<Attribute<'a>>, children: Vec<Node<'a>>) -> Self {
         Self {
             tag,
             attrs,
@@ -41,10 +65,6 @@ impl<'a> Element<'a> {
 
     pub fn tag(&self) -> &str {
         self.tag
-    }
-
-    pub fn attrs(&self) -> &HashMap<&'a str, Option<&'a str>> {
-        &self.attrs
     }
 
     pub fn children(&self) -> &[Node<'_>] {
@@ -69,5 +89,12 @@ impl<'a> Node<'a> {
 impl Location {
     pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
+    }
+
+    pub fn char(idx: usize) -> Self {
+        Self {
+            start: idx,
+            end: idx,
+        }
     }
 }

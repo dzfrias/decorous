@@ -1,6 +1,6 @@
 ---
-source: decorous-frontend/src/parser.rs
-expression: parser.parse_nodes()
+source: crates/decorous-frontend/src/parser.rs
+expression: tree
 ---
 [
     Node {
@@ -11,11 +11,16 @@ expression: parser.parse_nodes()
         node_type: Element(
             Element {
                 tag: "p",
-                attrs: {
-                    "attr": Some(
-                        "你好",
+                attrs: [
+                    KeyValue(
+                        "attr",
+                        Some(
+                            Left(
+                                "你好",
+                            ),
+                        ),
                     ),
-                },
+                ],
                 children: [],
             },
         ),

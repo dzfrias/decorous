@@ -1,0 +1,55 @@
+---
+source: crates/decorous-frontend/src/parser.rs
+expression: tree
+---
+[
+    Node {
+        loc: Location {
+            start: 0,
+            end: 47,
+        },
+        node_type: Element(
+            Element {
+                tag: "p",
+                attrs: [
+                    EventHandler(
+                        EventHandler {
+                            event: "click",
+                            expr: SCRIPT@0..29
+                              WHITESPACE@0..1 " "
+                              EXPR_STMT@1..28
+                                ARROW_EXPR@1..28
+                                  PARAMETER_LIST@1..3
+                                    L_PAREN@1..2 "("
+                                    R_PAREN@2..3 ")"
+                                  WHITESPACE@3..4 " "
+                                  FAT_ARROW@4..6 "=>"
+                                  WHITESPACE@6..7 " "
+                                  BLOCK_STMT@7..28
+                                    L_CURLY@7..8 "{"
+                                    WHITESPACE@8..9 " "
+                                    EXPR_STMT@9..26
+                                      CALL_EXPR@9..26
+                                        DOT_EXPR@9..20
+                                          NAME_REF@9..16
+                                            IDENT@9..16 "console"
+                                          DOT@16..17 "."
+                                          NAME@17..20
+                                            IDENT@17..20 "log"
+                                        ARG_LIST@20..26
+                                          L_PAREN@20..21 "("
+                                          LITERAL@21..25
+                                            STRING@21..25 "\"hi\""
+                                          R_PAREN@25..26 ")"
+                                    WHITESPACE@26..27 " "
+                                    R_CURLY@27..28 "}"
+                              WHITESPACE@28..29 " "
+                            ,
+                        },
+                    ),
+                ],
+                children: [],
+            },
+        ),
+    },
+]

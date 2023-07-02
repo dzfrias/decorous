@@ -6,19 +6,15 @@ expression: tree
     Node {
         loc: Location {
             start: 0,
-            end: 20,
+            end: 11,
         },
         node_type: Element(
             Element {
                 tag: "p",
                 attrs: [
                     KeyValue(
-                        "attr1",
-                        Some(
-                            Left(
-                                "hello",
-                            ),
-                        ),
+                        "attr",
+                        None,
                     ),
                 ],
                 children: [],

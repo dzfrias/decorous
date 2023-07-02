@@ -1,10 +1,9 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    str::Chars,
-};
+use either::Either;
+use rslint_parser::{parse_text, SyntaxNode};
+use std::{collections::VecDeque, str::Chars};
 use thiserror::Error;
 
-use crate::ast::{Element, Location, Node, NodeType};
+use crate::ast::{Attribute, Element, EventHandler, Location, Node, NodeType};
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -33,6 +32,8 @@ pub enum ParseError {
     InvalidClosingTag(String, Location),
     #[error("invalid character, expected {0}, got {1}")]
     ExpectedCharacter(char, char, Location),
+    #[error("invalid character, expected {0:?}, got {1}")]
+    ExpectedCharacterAny(Vec<char>, char, Location),
 }
 
 /// Zero-copy parser that takes in decorous HTML syntax.
@@ -81,14 +82,7 @@ impl<'a> Parser<'a> {
                         let close = self.parse_tag();
 
                         self.skip_whitespace();
-                        let c = self.consume();
-                        if c != Some('>') {
-                            self.errors.push(ParseError::ExpectedCharacter(
-                                '>',
-                                c.unwrap_or('\0'),
-                                Location::new(self.index, self.index),
-                            ));
-                        }
+                        self.expect_consume('>');
 
                         // Add to the closing tag queue
                         self.close_tag_queue.push_back(close);
@@ -147,6 +141,7 @@ impl<'a> Parser<'a> {
 
     fn consume(&mut self) -> Option<char> {
         if let Some(peek) = self.peek_buffer {
+            // index keeps track of how many characters we've consumed
             self.index += 1;
             self.slice_index += peek.len_utf8();
             self.peek_buffer = None;
@@ -160,6 +155,20 @@ impl<'a> Parser<'a> {
             self.slice_index += c.len_utf8();
         }
         c
+    }
+
+    fn expect_consume(&mut self, expected: char) -> bool {
+        let c = self.consume();
+        if !c.is_some_and(|c| c == expected) {
+            self.errors.push(ParseError::ExpectedCharacter(
+                expected,
+                c.unwrap_or('\0'),
+                Location::new(self.index, self.index),
+            ));
+            false
+        } else {
+            true
+        }
     }
 
     fn peek(&mut self) -> Option<char> {
@@ -211,24 +220,44 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn parse_attrs(&mut self) -> HashMap<&'a str, Option<&'a str>> {
-        let mut attrs = HashMap::new();
+    fn parse_attrs(&mut self) -> Vec<Attribute<'a>> {
+        let mut attrs = vec![];
 
         while self.peek().is_some_and(|c| c != '>') {
             self.skip_whitespace();
             let name = self.consume_while(|c| !is_control_or_delim(c));
-            self.skip_whitespace();
-            let value = if self.peek().is_some_and(|c| c == '=') {
-                self.consume();
-                self.skip_whitespace();
-                let s = self.parse_attr_value();
-                self.skip_whitespace();
-                Some(s)
-            } else {
-                None
-            };
+            match name {
+                "on" => {
+                    self.expect_consume(':');
+                    let event = self.parse_tag();
+                    self.skip_whitespace();
+                    self.expect_consume('=');
+                    self.skip_whitespace();
+                    let mustache = self.parse_mustache();
+                    attrs.push(Attribute::EventHandler(EventHandler::new(event, mustache)));
+                }
+                "bind" => {
+                    self.expect_consume(':');
+                    let binding = self.parse_tag();
+                    self.skip_whitespace();
+                    attrs.push(Attribute::Binding(binding));
+                }
+                _ => {
+                    self.skip_whitespace();
+                    let value = if self.peek().is_some_and(|c| c == '=') {
+                        // Consume the '='
+                        self.consume();
+                        self.skip_whitespace();
+                        let s = self.parse_attr_value();
+                        self.skip_whitespace();
+                        Some(s)
+                    } else {
+                        None
+                    };
 
-            attrs.insert(name, value);
+                    attrs.push(Attribute::KeyValue(name, value));
+                }
+            }
         }
 
         // Should be the '>'
@@ -236,18 +265,64 @@ impl<'a> Parser<'a> {
         attrs
     }
 
-    fn parse_attr_value(&mut self) -> &'a str {
+    fn parse_attr_value(&mut self) -> Either<&'a str, SyntaxNode> {
         match self.peek() {
             Some(c) if c == '"' || c == '\'' => {
                 self.consume();
                 let v = self.consume_while(|str_char| str_char != c);
                 self.consume();
-                v
+                Either::Left(v)
             }
-            _ => {
-                todo!("parse mustache tag");
+            Some('{') => {
+                let expr = self.parse_mustache();
+                Either::Right(expr)
+            }
+            c => {
+                self.errors.push(ParseError::ExpectedCharacterAny(
+                    vec!['{', '"', '\''],
+                    c.unwrap_or('\0'),
+                    Location::char(self.index),
+                ));
+                Either::Left("")
             }
         }
+    }
+
+    fn parse_mustache(&mut self) -> SyntaxNode {
+        self.expect_consume('{');
+
+        let start = self.slice_index;
+        // Keep track of rbraces needed to close out mustache tag. This is needed because the inner
+        // JavaScript could potentially curly braces
+        let mut rbraces_needed = 1;
+        while rbraces_needed > 0 {
+            let c = self.peek();
+            match c {
+                Some('{') => {
+                    self.consume();
+                    rbraces_needed += 1;
+                }
+                Some('}') => {
+                    rbraces_needed -= 1;
+                    if rbraces_needed != 0 {
+                        self.consume();
+                    }
+                }
+                None | Some(_) => {
+                    self.consume();
+                }
+            }
+        }
+
+        // This is not extracted into a function, because it is very much tied to the current state
+        // of the parser. A misuse of this could be bad and hard to debug
+        let expr = &self.source[start..self.source.len() - self.source[self.slice_index..].len()];
+
+        // Should be the last rbrace needed
+        self.expect_consume('}');
+
+        // Turn into rslint JavaScript syntax tree
+        parse_text(expr, 0).syntax()
     }
 }
 
@@ -256,7 +331,7 @@ fn is_control_or_delim(ch: char) -> bool {
         '\u{007F}' => true,
         c if c >= '\u{0000}' && c <= '\u{001F}' => true,
         c if c >= '\u{0080}' && c <= '\u{009F}' => true,
-        ' ' | '"' | '\'' | '>' | '/' | '=' => true,
+        ' ' | '"' | '\'' | '>' | '/' | '=' | ':' => true,
         _ => false,
     }
 }
@@ -311,7 +386,8 @@ mod tests {
             "<p attr=\"attribute\"></p>",
             "<p ></p>",
             "<p attr=\"你好\"></p>",
-            "<p attr=\"one\"     attr2=\"two\">text</p>"
+            "<p attr=\"one\"     attr2=\"two\">text</p>",
+            "<p attr></p>"
         );
     }
 
@@ -354,5 +430,26 @@ mod tests {
             "<p></p!",
             vec![ParseError::ExpectedCharacter('>', '!', Location::new(7, 7))]
         ));
+    }
+
+    #[test]
+    fn can_parse_mustache_in_event_handle_attr() {
+        insta_test_all!(
+            "<p on:click={hello}></p>",
+            "<p on:click={ () => { console.log(\"hi\") } }></p>"
+        );
+    }
+
+    #[test]
+    fn can_parse_bindings() {
+        insta_test_all!("<p bind:value></p>");
+    }
+
+    #[test]
+    fn can_parse_attrs_with_mustache_values() {
+        insta_test_all!(
+            "<p attr={value}></p>",
+            "<p attr={ () => { console.log(value) } }></p>"
+        );
     }
 }
