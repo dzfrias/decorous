@@ -33,6 +33,8 @@ pub enum ParseError {
     ExpectedCharacter(char, char, Location),
     #[error("invalid character, expected {0:?}, got {1}")]
     ExpectedCharacterAny(Vec<char>, char, Location),
+    #[error("expected end of comment")]
+    ExpectedEndOfComment(Location),
 }
 
 /// Zero-copy parser that takes in decorous HTML syntax.
@@ -86,6 +88,21 @@ impl<'a> Parser<'a> {
                         // Add to the closing tag queue
                         self.close_tag_queue.push_back(close);
                         break;
+                    } else if peek.is_some_and(|c| c == '!') {
+                        let start = self.slice_index;
+                        let start_idx = self.index;
+                        if let Some(comment) = self.try_parse_comment() {
+                            nodes.push(comment);
+                        } else {
+                            // start - 1 is safe because we know we've consumed a < up to this
+                            // point
+                            let text = &self.source[(start - 1)
+                                ..self.source.len() - self.source[self.slice_index..].len()];
+                            nodes.push(Node::new(
+                                NodeType::Text(text),
+                                Location::new(start_idx - 1, self.index.saturating_sub(1)),
+                            ));
+                        }
                     } else {
                         let node = self.parse_element();
 
@@ -209,6 +226,9 @@ impl<'a> Parser<'a> {
     fn parse_element(&mut self) -> Node<'a> {
         let start = self.index;
         let tag = self.parse_tag();
+        if tag.is_empty() {
+            return Node::new(NodeType::Text("<"), Location::char(start - 1));
+        }
         self.skip_whitespace();
         let attrs = self.parse_attrs();
         let children = self.parse_nodes();
@@ -323,6 +343,58 @@ impl<'a> Parser<'a> {
         // Turn into rslint JavaScript syntax tree
         parse_text(expr, 0).syntax()
     }
+
+    fn try_parse_comment(&mut self) -> Option<Node<'a>> {
+        // Start includes the < already consumed
+        let start = self.index - 1;
+        let (_, found) = self.try_consume("!--");
+        if !found {
+            // Returns None so calling function knows that there was no comment. A text node should
+            // be created instead
+            return None;
+        }
+
+        let start_slice = self.slice_index;
+        let mut found = false;
+        while !found && self.peek().is_some() {
+            self.consume_while(|c| c != '-');
+            let (_, successful) = self.try_consume("-->");
+            found = successful;
+        }
+
+        let text =
+            &self.source[start_slice..self.source.len() - self.source[self.slice_index..].len()];
+        if !text.ends_with("-->") {
+            self.errors
+                .push(ParseError::ExpectedEndOfComment(Location::new(
+                    start,
+                    self.index - 1,
+                )));
+            return None;
+        }
+        Some(Node::new(
+            // This slice is safe because we checked the above
+            NodeType::Comment(&text[..text.len() - 3]),
+            Location::new(start, self.index - 1),
+        ))
+    }
+
+    fn try_consume(&mut self, text: &str) -> (&'a str, bool) {
+        let start = self.slice_index;
+        let pieces_needed = text.chars();
+        for needed in pieces_needed {
+            if !self.consume().is_some_and(|c| c == needed) {
+                let t =
+                    &self.source[start..self.source.len() - self.source[self.slice_index..].len()];
+                return (t, false);
+            }
+        }
+
+        (
+            &self.source[start..self.source.len() - self.source[self.slice_index..].len()],
+            true,
+        )
+    }
 }
 
 fn is_control_or_delim(ch: char) -> bool {
@@ -363,7 +435,16 @@ mod tests {
 
     #[test]
     fn can_parse_text_node() {
-        insta_test_all!("hello", "   hello", "hello hello", "你", "你好");
+        insta_test_all!(
+            "hello",
+            "   hello",
+            "hello hello",
+            "你",
+            "你好",
+            "<",
+            ">",
+            "<>hello"
+        );
     }
 
     #[test]
@@ -449,6 +530,25 @@ mod tests {
         insta_test_all!(
             "<p attr={value}></p>",
             "<p attr={ () => { console.log(value) } }></p>"
+        );
+    }
+
+    #[test]
+    fn can_parse_comments() {
+        insta_test_all!("<!-- hello -->", "<!--hello--><p></p>", "<!-");
+    }
+
+    #[test]
+    fn gives_error_when_end_of_comment_not_found() {
+        insta_test_all_err!(
+            (
+                "<!-- hello",
+                vec![ParseError::ExpectedEndOfComment(Location::new(0, 9))]
+            ),
+            (
+                "<!-- hello<p>hello</p>",
+                vec![ParseError::ExpectedEndOfComment(Location::new(0, 21))]
+            )
         );
     }
 }

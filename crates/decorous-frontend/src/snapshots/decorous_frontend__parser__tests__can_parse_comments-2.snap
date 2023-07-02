@@ -1,0 +1,28 @@
+---
+source: crates/decorous-frontend/src/parser.rs
+expression: tree
+---
+[
+    Node {
+        loc: Location {
+            start: 0,
+            end: 11,
+        },
+        node_type: Comment(
+            "hello",
+        ),
+    },
+    Node {
+        loc: Location {
+            start: 12,
+            end: 18,
+        },
+        node_type: Element(
+            Element {
+                tag: "p",
+                attrs: [],
+                children: [],
+            },
+        ),
+    },
+]
