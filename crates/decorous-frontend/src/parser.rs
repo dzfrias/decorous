@@ -264,18 +264,25 @@ impl<'a> Parser<'a> {
         }
         self.skip_whitespace();
         let attrs = self.parse_attrs();
-        let children = self.parse_nodes();
+        self.consume_while(|c| c.is_whitespace() && c != '\n');
+        let children = if self.peek() == Some('/') {
+            self.consume();
+            self.expect_consume('>');
+            vec![]
+        } else {
+            self.parse_nodes()
+        };
 
         Node::new(
             NodeType::Element(Element::new(tag, attrs, children)),
-            Location::new(start - 1, self.index.saturating_sub(1)),
+            Location::new(start - 1, self.index - 1),
         )
     }
 
     fn parse_attrs(&mut self) -> Vec<Attribute<'a>> {
         let mut attrs = vec![];
 
-        while self.peek().is_some_and(|c| c != '>') {
+        while self.peek().is_some_and(|c| c != '>' && c != '/') {
             self.skip_whitespace();
             let name = self.consume_while(|c| !is_control_or_delim(c));
             match name {
@@ -313,6 +320,9 @@ impl<'a> Parser<'a> {
             }
         }
 
+        if self.peek() == Some('/') {
+            self.consume();
+        }
         // Should be the '>'
         self.consume();
         attrs
@@ -772,5 +782,10 @@ mod tests {
                 Location::new(0, 19)
             )]
         ));
+    }
+
+    #[test]
+    fn can_parse_self_closing_tag() {
+        insta_test_all!("<p/>", "<br/>");
     }
 }
