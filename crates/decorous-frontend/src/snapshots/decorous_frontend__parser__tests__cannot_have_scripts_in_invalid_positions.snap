@@ -7,22 +7,21 @@ DecorousAst {
         Node {
             loc: Location {
                 start: 0,
-                end: 11,
-            },
-            node_type: Comment(
-                "hello",
-            ),
-        },
-        Node {
-            loc: Location {
-                start: 12,
-                end: 18,
+                end: 29,
             },
             node_type: Element(
                 Element {
                     tag: "p",
                     attrs: [],
-                    children: [],
+                    children: [
+                        Node {
+                            loc: Location {
+                                start: 4,
+                                end: 26,
+                            },
+                            node_type: Error,
+                        },
+                    ],
                 },
             ),
         },

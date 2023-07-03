@@ -3,8 +3,8 @@ use std::{collections::VecDeque, str::Chars};
 use thiserror::Error;
 
 use crate::ast::{
-    Attribute, AttributeValue, Element, EventHandler, ForBlock, IfBlock, Location, Node, NodeType,
-    SpecialBlock,
+    Attribute, AttributeValue, DecorousAst, Element, EventHandler, ForBlock, IfBlock, Location,
+    Node, NodeType, SpecialBlock,
 };
 
 #[derive(Debug)]
@@ -44,6 +44,20 @@ pub enum ParseError {
     ExpectedString(String, String, Location),
     #[error("unrecognized special block: \"{0}\"")]
     UnrecognizedSpecialBlock(String, Location),
+    #[error("cannot have non-toplevel script")]
+    CannotHaveNonTopLevelScript(Location),
+    #[error("cannot have two scripts")]
+    CannotHaveTwoScripts(Location),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum CallingContext {
+    Toplevel { script: Option<SyntaxNode> },
+}
+
+enum ElementResult<'a> {
+    Script(SyntaxNode),
+    Node(Node<'a>),
 }
 
 /// Zero-copy parser that takes in decorous HTML syntax.
@@ -65,13 +79,18 @@ impl<'a> Parser<'a> {
 
     /// Parse the received input into a collection of nodes. Also, return the errors found while
     /// parsing.
-    pub fn parse(mut self) -> (Vec<Node<'a>>, Vec<ParseError>) {
-        let nodes = self.parse_nodes();
+    pub fn parse(mut self) -> (DecorousAst<'a>, Vec<ParseError>) {
+        let mut ctx = CallingContext::Toplevel { script: None };
+        let nodes = self.parse_nodes(Some(&mut ctx));
+        let script = match ctx {
+            CallingContext::Toplevel { script } => script,
+        };
+        let ast = DecorousAst::new(nodes, script);
 
-        (nodes, self.errors)
+        (ast, self.errors)
     }
 
-    fn parse_nodes(&mut self) -> Vec<Node<'a>> {
+    fn parse_nodes(&mut self, mut ctx: Option<&mut CallingContext>) -> Vec<Node<'a>> {
         let mut nodes = Vec::new();
 
         while self.peek().is_some() {
@@ -113,7 +132,37 @@ impl<'a> Parser<'a> {
                             ));
                         }
                     } else {
+                        let start = self.index;
                         let node = self.parse_element();
+
+                        let node = match node {
+                            ElementResult::Node(n) => n,
+                            ElementResult::Script(script) => {
+                                if let Some(ref mut ctx) = ctx {
+                                    match ctx {
+                                        CallingContext::Toplevel { script: ctx_script } => {
+                                            if ctx_script.is_some() {
+                                                self.errors.push(ParseError::CannotHaveTwoScripts(
+                                                    Location::new(start, self.index),
+                                                ));
+                                                nodes.push(Node::error(Location::new(
+                                                    start, self.index,
+                                                )));
+                                                continue;
+                                            }
+                                            *ctx_script = Some(script);
+                                            continue;
+                                        }
+                                    }
+                                } else {
+                                    self.errors.push(ParseError::CannotHaveNonTopLevelScript(
+                                        Location::new(start, self.index),
+                                    ));
+                                    nodes.push(Node::error(Location::new(start, self.index)));
+                                    continue;
+                                }
+                            }
+                        };
 
                         // If no closing tag was found (<br/>, for example), just push the tag
                         if self.close_tag_queue.is_empty() {
@@ -256,11 +305,14 @@ impl<'a> Parser<'a> {
         self.consume_while(|c| c.is_digit(36))
     }
 
-    fn parse_element(&mut self) -> Node<'a> {
+    fn parse_element(&mut self) -> ElementResult<'a> {
         let start = self.index;
         let tag = self.parse_tag();
         if tag.is_empty() {
-            return Node::new(NodeType::Text("<"), Location::char(start - 1));
+            return ElementResult::Node(Node::new(NodeType::Text("<"), Location::char(start - 1)));
+        } else if tag == "script" {
+            let script = self.parse_script_tag();
+            return ElementResult::Script(script);
         }
         self.skip_whitespace();
         let attrs = self.parse_attrs();
@@ -270,13 +322,13 @@ impl<'a> Parser<'a> {
             self.expect_consume('>');
             vec![]
         } else {
-            self.parse_nodes()
+            self.parse_nodes(None)
         };
 
-        Node::new(
+        ElementResult::Node(Node::new(
             NodeType::Element(Element::new(tag, attrs, children)),
             Location::new(start - 1, self.index - 1),
-        )
+        ))
     }
 
     fn parse_attrs(&mut self) -> Vec<Attribute<'a>> {
@@ -479,7 +531,7 @@ impl<'a> Parser<'a> {
                 }
                 self.skip_whitespace();
                 let expr = self.parse_mustache();
-                let inner = self.parse_nodes();
+                let inner = self.parse_nodes(None);
                 self.expect_consume('/');
                 {
                     let start = self.index;
@@ -514,7 +566,7 @@ impl<'a> Parser<'a> {
                 let mut error = false;
                 self.skip_whitespace();
                 let expr = self.parse_mustache();
-                let inner = self.parse_nodes();
+                let inner = self.parse_nodes(None);
                 self.expect_consume('/');
                 {
                     let start = self.index;
@@ -552,6 +604,26 @@ impl<'a> Parser<'a> {
                 Node::error(Location::new(start, self.index))
             }
         }
+    }
+
+    fn parse_script_tag(&mut self) -> SyntaxNode {
+        self.expect_consume('>');
+        let start = self.slice_index;
+        let mut end_found = false;
+        while !end_found {
+            if self.consume() == Some('<') {
+                if self.consume() == Some('/') {
+                    let rest = self.consume_while(|c| c.is_ascii_alphabetic());
+                    if rest == "script" {
+                        self.expect_consume('>');
+                        end_found = true
+                    }
+                }
+            }
+        }
+
+        let source = &self.source[start..self.source.len() - self.source[self.slice_index..].len()];
+        rslint_parser::parse_text(source, 0).syntax()
     }
 }
 
@@ -787,5 +859,29 @@ mod tests {
     #[test]
     fn can_parse_self_closing_tag() {
         insta_test_all!("<p/>", "<br/>");
+    }
+
+    #[test]
+    fn can_parse_script() {
+        insta_test_all!(
+            "<script>x = 3;</script>",
+            "<script>x = 3;</script><p>hello</p>"
+        );
+    }
+
+    #[test]
+    fn cannot_have_scripts_in_invalid_positions() {
+        insta_test_all_err!(
+            (
+                "<p><script>x = 3;</script></p>",
+                vec![ParseError::CannotHaveNonTopLevelScript(Location::new(
+                    4, 26
+                ))]
+            ),
+            (
+                "<script>x = 3;</script><script>x = 3;</script>",
+                vec![ParseError::CannotHaveTwoScripts(Location::new(24, 46))]
+            )
+        );
     }
 }

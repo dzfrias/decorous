@@ -2,44 +2,47 @@
 source: crates/decorous-frontend/src/parser.rs
 expression: tree
 ---
-[
-    Node {
-        loc: Location {
-            start: 0,
-            end: 12,
-        },
-        node_type: Error,
-    },
-    Node {
-        loc: Location {
-            start: 25,
-            end: 25,
-        },
-        node_type: Text(
-            "\n",
-        ),
-    },
-    Node {
-        loc: Location {
-            start: 26,
-            end: 43,
-        },
-        node_type: Element(
-            Element {
-                tag: "span",
-                attrs: [],
-                children: [
-                    Node {
-                        loc: Location {
-                            start: 32,
-                            end: 36,
-                        },
-                        node_type: Text(
-                            "hello",
-                        ),
-                    },
-                ],
+DecorousAst {
+    nodes: [
+        Node {
+            loc: Location {
+                start: 0,
+                end: 12,
             },
-        ),
-    },
-]
+            node_type: Error,
+        },
+        Node {
+            loc: Location {
+                start: 25,
+                end: 25,
+            },
+            node_type: Text(
+                "\n",
+            ),
+        },
+        Node {
+            loc: Location {
+                start: 26,
+                end: 43,
+            },
+            node_type: Element(
+                Element {
+                    tag: "span",
+                    attrs: [],
+                    children: [
+                        Node {
+                            loc: Location {
+                                start: 32,
+                                end: 36,
+                            },
+                            node_type: Text(
+                                "hello",
+                            ),
+                        },
+                    ],
+                },
+            ),
+        },
+    ],
+    script: None,
+}

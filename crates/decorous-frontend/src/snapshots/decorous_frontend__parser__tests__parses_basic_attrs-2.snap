@@ -2,27 +2,30 @@
 source: crates/decorous-frontend/src/parser.rs
 expression: tree
 ---
-[
-    Node {
-        loc: Location {
-            start: 0,
-            end: 23,
-        },
-        node_type: Element(
-            Element {
-                tag: "p",
-                attrs: [
-                    KeyValue(
-                        "attr",
-                        Some(
-                            Literal(
-                                "attribute",
+DecorousAst {
+    nodes: [
+        Node {
+            loc: Location {
+                start: 0,
+                end: 23,
+            },
+            node_type: Element(
+                Element {
+                    tag: "p",
+                    attrs: [
+                        KeyValue(
+                            "attr",
+                            Some(
+                                Literal(
+                                    "attribute",
+                                ),
                             ),
                         ),
-                    ),
-                ],
-                children: [],
-            },
-        ),
-    },
-]
+                    ],
+                    children: [],
+                },
+            ),
+        },
+    ],
+    script: None,
+}

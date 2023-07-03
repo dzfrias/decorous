@@ -2,45 +2,48 @@
 source: crates/decorous-frontend/src/parser.rs
 expression: tree
 ---
-[
-    Node {
-        loc: Location {
-            start: 0,
-            end: 37,
-        },
-        node_type: Element(
-            Element {
-                tag: "p",
-                attrs: [
-                    KeyValue(
-                        "attr",
-                        Some(
-                            Literal(
-                                "one",
-                            ),
-                        ),
-                    ),
-                    KeyValue(
-                        "attr2",
-                        Some(
-                            Literal(
-                                "two",
-                            ),
-                        ),
-                    ),
-                ],
-                children: [
-                    Node {
-                        loc: Location {
-                            start: 30,
-                            end: 33,
-                        },
-                        node_type: Text(
-                            "text",
-                        ),
-                    },
-                ],
+DecorousAst {
+    nodes: [
+        Node {
+            loc: Location {
+                start: 0,
+                end: 37,
             },
-        ),
-    },
-]
+            node_type: Element(
+                Element {
+                    tag: "p",
+                    attrs: [
+                        KeyValue(
+                            "attr",
+                            Some(
+                                Literal(
+                                    "one",
+                                ),
+                            ),
+                        ),
+                        KeyValue(
+                            "attr2",
+                            Some(
+                                Literal(
+                                    "two",
+                                ),
+                            ),
+                        ),
+                    ],
+                    children: [
+                        Node {
+                            loc: Location {
+                                start: 30,
+                                end: 33,
+                            },
+                            node_type: Text(
+                                "text",
+                            ),
+                        },
+                    ],
+                },
+            ),
+        },
+    ],
+    script: None,
+}

@@ -2,64 +2,67 @@
 source: crates/decorous-frontend/src/parser.rs
 expression: tree
 ---
-[
-    Node {
-        loc: Location {
-            start: 0,
-            end: 37,
-        },
-        node_type: SpecialBlock(
-            For(
-                ForBlock {
-                    binding: "i",
-                    index: None,
-                    expr: SCRIPT@0..9
-                      EXPR_STMT@0..9
-                        ARRAY_EXPR@0..9
-                          L_BRACK@0..1 "["
-                          LITERAL@1..2
-                            NUMBER@1..2 "1"
-                          COMMA@2..3 ","
-                          WHITESPACE@3..4 " "
-                          LITERAL@4..5
-                            NUMBER@4..5 "2"
-                          COMMA@5..6 ","
-                          WHITESPACE@6..7 " "
-                          LITERAL@7..8
-                            NUMBER@7..8 "3"
-                          R_BRACK@8..9 "]"
-                    ,
-                    inner: [
-                        Node {
-                            loc: Location {
-                                start: 21,
-                                end: 30,
-                            },
-                            node_type: Element(
-                                Element {
-                                    tag: "p",
-                                    attrs: [],
-                                    children: [
-                                        Node {
-                                            loc: Location {
-                                                start: 24,
-                                                end: 26,
-                                            },
-                                            node_type: Mustache(
-                                                SCRIPT@0..1
-                                                  EXPR_STMT@0..1
-                                                    NAME_REF@0..1
-                                                      IDENT@0..1 "i"
-                                                ,
-                                            ),
-                                        },
-                                    ],
+DecorousAst {
+    nodes: [
+        Node {
+            loc: Location {
+                start: 0,
+                end: 37,
+            },
+            node_type: SpecialBlock(
+                For(
+                    ForBlock {
+                        binding: "i",
+                        index: None,
+                        expr: SCRIPT@0..9
+                          EXPR_STMT@0..9
+                            ARRAY_EXPR@0..9
+                              L_BRACK@0..1 "["
+                              LITERAL@1..2
+                                NUMBER@1..2 "1"
+                              COMMA@2..3 ","
+                              WHITESPACE@3..4 " "
+                              LITERAL@4..5
+                                NUMBER@4..5 "2"
+                              COMMA@5..6 ","
+                              WHITESPACE@6..7 " "
+                              LITERAL@7..8
+                                NUMBER@7..8 "3"
+                              R_BRACK@8..9 "]"
+                        ,
+                        inner: [
+                            Node {
+                                loc: Location {
+                                    start: 21,
+                                    end: 30,
                                 },
-                            ),
-                        },
-                    ],
-                },
+                                node_type: Element(
+                                    Element {
+                                        tag: "p",
+                                        attrs: [],
+                                        children: [
+                                            Node {
+                                                loc: Location {
+                                                    start: 24,
+                                                    end: 26,
+                                                },
+                                                node_type: Mustache(
+                                                    SCRIPT@0..1
+                                                      EXPR_STMT@0..1
+                                                        NAME_REF@0..1
+                                                          IDENT@0..1 "i"
+                                                    ,
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                ),
+                            },
+                        ],
+                    },
+                ),
             ),
-        ),
-    },
-]
+        },
+    ],
+    script: None,
+}

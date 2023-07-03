@@ -1,15 +1,18 @@
 ---
-source: decorous-frontend/src/parser.rs
-expression: parser.parse_nodes()
+source: crates/decorous-frontend/src/parser.rs
+expression: tree
 ---
-[
-    Node {
-        loc: Location {
-            start: 0,
-            end: 10,
+DecorousAst {
+    nodes: [
+        Node {
+            loc: Location {
+                start: 0,
+                end: 10,
+            },
+            node_type: Text(
+                "hello hello",
+            ),
         },
-        node_type: Text(
-            "hello hello",
-        ),
-    },
-]
+    ],
+    script: None,
+}

@@ -1,6 +1,12 @@
 use rslint_parser::SyntaxNode;
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct DecorousAst<'a> {
+    nodes: Vec<Node<'a>>,
+    script: Option<SyntaxNode>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Node<'a> {
     loc: Location,
     node_type: NodeType<'a>,
@@ -155,5 +161,11 @@ impl<'a> IfBlock<'a> {
             inner,
             else_block,
         }
+    }
+}
+
+impl<'a> DecorousAst<'a> {
+    pub fn new(nodes: Vec<Node<'a>>, script: Option<SyntaxNode>) -> Self {
+        Self { nodes, script }
     }
 }
