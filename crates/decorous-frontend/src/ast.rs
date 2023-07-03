@@ -93,6 +93,10 @@ impl<'a> Element<'a> {
     pub fn children(&self) -> &[Node<'_>] {
         self.children.as_ref()
     }
+
+    pub fn attrs(&self) -> &[Attribute<'_>] {
+        self.attrs.as_ref()
+    }
 }
 
 impl<'a> Node<'a> {
@@ -124,6 +128,14 @@ impl Location {
             end: idx,
         }
     }
+
+    pub fn start(&self) -> usize {
+        self.start
+    }
+
+    pub fn end(&self) -> usize {
+        self.end
+    }
 }
 
 impl<'a> ForBlock<'a> {
@@ -139,6 +151,22 @@ impl<'a> ForBlock<'a> {
             expr,
             inner,
         }
+    }
+
+    pub fn binding(&self) -> &str {
+        self.binding
+    }
+
+    pub fn index(&self) -> Option<&str> {
+        self.index
+    }
+
+    pub fn expr(&self) -> &SyntaxNode {
+        &self.expr
+    }
+
+    pub fn inner(&self) -> &[Node<'_>] {
+        self.inner.as_ref()
     }
 }
 
@@ -164,6 +192,18 @@ impl<'a> IfBlock<'a> {
             else_block,
         }
     }
+
+    pub fn expr(&self) -> &SyntaxNode {
+        &self.expr
+    }
+
+    pub fn inner(&self) -> &[Node<'a>] {
+        self.inner.as_ref()
+    }
+
+    pub fn else_block(&self) -> Option<&[Node<'a>]> {
+        self.else_block.as_ref().map(|block| block.as_slice())
+    }
 }
 
 impl<'a> DecorousAst<'a> {
@@ -173,5 +213,17 @@ impl<'a> DecorousAst<'a> {
         css: Option<StyleSheet<'a, 'a>>,
     ) -> Self {
         Self { nodes, script, css }
+    }
+
+    pub fn nodes(&self) -> &[Node<'_>] {
+        self.nodes.as_ref()
+    }
+
+    pub fn script(&self) -> Option<&SyntaxNode> {
+        self.script.as_ref()
+    }
+
+    pub fn css(&self) -> Option<&StyleSheet<'a, 'a>> {
+        self.css.as_ref()
     }
 }
