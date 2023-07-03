@@ -1,0 +1,105 @@
+---
+source: crates/decorous-frontend/src/parser.rs
+expression: tree
+---
+DecorousAst {
+    nodes: [
+        Node {
+            loc: Location {
+                start: 59,
+                end: 70,
+            },
+            node_type: Element(
+                Element {
+                    tag: "p",
+                    attrs: [],
+                    children: [
+                        Node {
+                            loc: Location {
+                                start: 62,
+                                end: 66,
+                            },
+                            node_type: Text(
+                                "hello",
+                            ),
+                        },
+                    ],
+                },
+            ),
+        },
+    ],
+    script: Some(
+        SCRIPT@0..6
+          EXPR_STMT@0..6
+            ASSIGN_EXPR@0..5
+              NAME_REF@0..1
+                IDENT@0..1 "x"
+              WHITESPACE@1..2 " "
+              EQ@2..3 "="
+              WHITESPACE@3..4 " "
+              LITERAL@4..5
+                NUMBER@4..5 "3"
+            SEMICOLON@5..6 ";"
+        ,
+    ),
+    css: Some(
+        StyleSheet {
+            rules: CssRuleList(
+                [
+                    Style(
+                        StyleRule {
+                            selectors: SelectorList(
+                                [
+                                    Selector(hello, specificity = 0x1),
+                                ],
+                            ),
+                            vendor_prefix: VendorPrefix(
+                                0x0,
+                            ),
+                            declarations: DeclarationBlock {
+                                important_declarations: [],
+                                declarations: [
+                                    Color(
+                                        RGBA(
+                                            RGBA {
+                                                red: 255,
+                                                green: 0,
+                                                blue: 0,
+                                                alpha: 255,
+                                            },
+                                        ),
+                                    ),
+                                ],
+                            },
+                            rules: CssRuleList(
+                                [],
+                            ),
+                            loc: Location {
+                                source_index: 0,
+                                line: 0,
+                                column: 1,
+                            },
+                        },
+                    ),
+                ],
+            ),
+            sources: [
+                "",
+            ],
+            source_map_urls: [
+                None,
+            ],
+            license_comments: [],
+            options: ParserOptions {
+                filename: "",
+                css_modules: None,
+                source_index: 0,
+                error_recovery: false,
+                warnings: None,
+                flags: ParserFlags(
+                    0x0,
+                ),
+            },
+        },
+    ),
+}

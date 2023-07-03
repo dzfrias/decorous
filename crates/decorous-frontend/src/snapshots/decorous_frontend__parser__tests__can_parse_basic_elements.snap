@@ -29,4 +29,5 @@ DecorousAst {
         },
     ],
     script: None,
+    css: None,
 }

@@ -1,3 +1,4 @@
+use lightningcss::stylesheet::StyleSheet;
 use rslint_parser::SyntaxNode;
 use std::{collections::VecDeque, str::Chars};
 use thiserror::Error;
@@ -25,11 +26,11 @@ pub struct Parser<'a> {
     // we take a slice of `source`, which operates in bytes, not code points
     slice_index: usize,
 
-    errors: Vec<ParseError>,
+    errors: Vec<ParseError<'a>>,
 }
 
 #[derive(Debug, Error, PartialEq)]
-pub enum ParseError {
+pub enum ParseError<'a> {
     #[error("invalid closing tag, expected {0}")]
     InvalidClosingTag(String, Location),
     #[error("invalid character, expected {0}, got {1}")]
@@ -48,16 +49,27 @@ pub enum ParseError {
     CannotHaveNonTopLevelScript(Location),
     #[error("cannot have two scripts")]
     CannotHaveTwoScripts(Location),
+    #[error("error parsing css: {0}")]
+    CssParseError(lightningcss::error::ParserError<'a>),
+    #[error("cannot have two style tags")]
+    CannotHaveTwoStyleTags(Location),
+    #[error("cannot have non-toplevel style tag")]
+    CannotHaveNonTopLevelStyle(Location),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum CallingContext {
-    Toplevel { script: Option<SyntaxNode> },
+#[derive(Debug)]
+enum CallingContext<'a> {
+    Toplevel {
+        script: Option<SyntaxNode>,
+        css: Option<StyleSheet<'a, 'a>>,
+    },
 }
 
+#[derive(Debug)]
 enum ElementResult<'a> {
     Script(SyntaxNode),
     Node(Node<'a>),
+    Css(StyleSheet<'a, 'a>),
 }
 
 /// Zero-copy parser that takes in decorous HTML syntax.
@@ -79,18 +91,21 @@ impl<'a> Parser<'a> {
 
     /// Parse the received input into a collection of nodes. Also, return the errors found while
     /// parsing.
-    pub fn parse(mut self) -> (DecorousAst<'a>, Vec<ParseError>) {
-        let mut ctx = CallingContext::Toplevel { script: None };
-        let nodes = self.parse_nodes(Some(&mut ctx));
-        let script = match ctx {
-            CallingContext::Toplevel { script } => script,
+    pub fn parse(mut self) -> (DecorousAst<'a>, Vec<ParseError<'a>>) {
+        let mut ctx = CallingContext::Toplevel {
+            script: None,
+            css: None,
         };
-        let ast = DecorousAst::new(nodes, script);
+        let nodes = self.parse_nodes(Some(&mut ctx));
+        let (script, css) = match ctx {
+            CallingContext::Toplevel { script, css } => (script, css),
+        };
+        let ast = DecorousAst::new(nodes, script, css);
 
         (ast, self.errors)
     }
 
-    fn parse_nodes(&mut self, mut ctx: Option<&mut CallingContext>) -> Vec<Node<'a>> {
+    fn parse_nodes(&mut self, mut ctx: Option<&mut CallingContext<'a>>) -> Vec<Node<'a>> {
         let mut nodes = Vec::new();
 
         while self.peek().is_some() {
@@ -140,7 +155,9 @@ impl<'a> Parser<'a> {
                             ElementResult::Script(script) => {
                                 if let Some(ref mut ctx) = ctx {
                                     match ctx {
-                                        CallingContext::Toplevel { script: ctx_script } => {
+                                        CallingContext::Toplevel {
+                                            script: ctx_script, ..
+                                        } => {
                                             if ctx_script.is_some() {
                                                 self.errors.push(ParseError::CannotHaveTwoScripts(
                                                     Location::new(start, self.index),
@@ -156,6 +173,33 @@ impl<'a> Parser<'a> {
                                     }
                                 } else {
                                     self.errors.push(ParseError::CannotHaveNonTopLevelScript(
+                                        Location::new(start, self.index),
+                                    ));
+                                    nodes.push(Node::error(Location::new(start, self.index)));
+                                    continue;
+                                }
+                            }
+                            ElementResult::Css(stylesheet) => {
+                                if let Some(ref mut ctx) = ctx {
+                                    match ctx {
+                                        CallingContext::Toplevel { css, .. } => {
+                                            if css.is_some() {
+                                                self.errors.push(
+                                                    ParseError::CannotHaveTwoStyleTags(
+                                                        Location::new(start, self.index),
+                                                    ),
+                                                );
+                                                nodes.push(Node::error(Location::new(
+                                                    start, self.index,
+                                                )));
+                                                continue;
+                                            }
+                                            *css = Some(stylesheet);
+                                            continue;
+                                        }
+                                    }
+                                } else {
+                                    self.errors.push(ParseError::CannotHaveNonTopLevelStyle(
                                         Location::new(start, self.index),
                                     ));
                                     nodes.push(Node::error(Location::new(start, self.index)));
@@ -313,6 +357,11 @@ impl<'a> Parser<'a> {
         } else if tag == "script" {
             let script = self.parse_script_tag();
             return ElementResult::Script(script);
+        } else if tag == "style" {
+            return match self.parse_style_tag() {
+                Some(css) => ElementResult::Css(css),
+                None => ElementResult::Node(Node::error(Location::new(start, self.index))),
+            };
         }
         self.skip_whitespace();
         let attrs = self.parse_attrs();
@@ -606,15 +655,14 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_script_tag(&mut self) -> SyntaxNode {
-        self.expect_consume('>');
+    fn consume_until_end_tag(&mut self, name: &'static str) -> &'a str {
         let start = self.slice_index;
         let mut end_found = false;
-        while !end_found {
+        while !end_found && self.peek().is_some() {
             if self.consume() == Some('<') {
                 if self.consume() == Some('/') {
                     let rest = self.consume_while(|c| c.is_ascii_alphabetic());
-                    if rest == "script" {
+                    if rest == name {
                         self.expect_consume('>');
                         end_found = true
                     }
@@ -622,8 +670,32 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let source = &self.source[start..self.source.len() - self.source[self.slice_index..].len()];
+        let consumed =
+            &self.source[start..self.source.len() - self.source[self.slice_index..].len()];
+
+        consumed
+            .strip_suffix(&format!("</{name}>"))
+            .unwrap_or(consumed)
+    }
+
+    fn parse_script_tag(&mut self) -> SyntaxNode {
+        self.expect_consume('>');
+        let source = self.consume_until_end_tag("script");
         rslint_parser::parse_text(source, 0).syntax()
+    }
+
+    fn parse_style_tag(&mut self) -> Option<StyleSheet<'a, 'a>> {
+        self.expect_consume('>');
+        let source = self.consume_until_end_tag("style");
+        let result = StyleSheet::parse(source, lightningcss::stylesheet::ParserOptions::default());
+
+        match result {
+            Ok(css) => Some(css),
+            Err(err) => {
+                self.errors.push(ParseError::CssParseError(err.kind));
+                return None;
+            }
+        }
     }
 }
 
@@ -882,6 +954,15 @@ mod tests {
                 "<script>x = 3;</script><script>x = 3;</script>",
                 vec![ParseError::CannotHaveTwoScripts(Location::new(24, 46))]
             )
+        );
+    }
+
+    #[test]
+    fn can_parse_css() {
+        insta_test_all!(
+            "<style>hello { color: red; }</style>",
+            "<style>hello { color: red; }</style><p>Hello</p>",
+            "<style>hello { color: red; }</style><script>x = 3;</script><p>hello</p>"
         );
     }
 }

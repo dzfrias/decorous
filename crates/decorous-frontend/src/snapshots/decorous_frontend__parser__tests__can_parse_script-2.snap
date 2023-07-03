@@ -29,7 +29,7 @@ DecorousAst {
         },
     ],
     script: Some(
-        SCRIPT@0..15
+        SCRIPT@0..6
           EXPR_STMT@0..6
             ASSIGN_EXPR@0..5
               NAME_REF@0..1
@@ -40,16 +40,7 @@ DecorousAst {
               LITERAL@4..5
                 NUMBER@4..5 "3"
             SEMICOLON@5..6 ";"
-          EXPR_STMT@6..15
-            BIN_EXPR@6..15
-              ERROR@6..14
-                L_ANGLE@6..7 "<"
-                ERROR@7..8
-                  SLASH@7..8 "/"
-                NAME_REF@8..14
-                  IDENT@8..14 "script"
-              R_ANGLE@14..15 ">"
-              ERROR@15..15
         ,
     ),
+    css: None,
 }

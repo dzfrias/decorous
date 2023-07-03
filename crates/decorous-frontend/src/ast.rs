@@ -1,9 +1,11 @@
+use lightningcss::stylesheet::StyleSheet;
 use rslint_parser::SyntaxNode;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub struct DecorousAst<'a> {
     nodes: Vec<Node<'a>>,
     script: Option<SyntaxNode>,
+    css: Option<StyleSheet<'a, 'a>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -165,7 +167,11 @@ impl<'a> IfBlock<'a> {
 }
 
 impl<'a> DecorousAst<'a> {
-    pub fn new(nodes: Vec<Node<'a>>, script: Option<SyntaxNode>) -> Self {
-        Self { nodes, script }
+    pub fn new(
+        nodes: Vec<Node<'a>>,
+        script: Option<SyntaxNode>,
+        css: Option<StyleSheet<'a, 'a>>,
+    ) -> Self {
+        Self { nodes, script, css }
     }
 }
