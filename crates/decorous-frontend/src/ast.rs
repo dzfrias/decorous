@@ -17,6 +17,9 @@ pub enum NodeType<'a> {
     Element(Element<'a>),
     Text(&'a str),
     Comment(&'a str),
+    SpecialBlock(SpecialBlock<'a>),
+    Mustache(SyntaxNode),
+    Error,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -24,6 +27,27 @@ pub struct Element<'a> {
     tag: &'a str,
     attrs: Vec<Attribute<'a>>,
     children: Vec<Node<'a>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SpecialBlock<'a> {
+    For(ForBlock<'a>),
+    If(IfBlock<'a>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForBlock<'a> {
+    binding: &'a str,
+    index: Option<&'a str>,
+    expr: SyntaxNode,
+    inner: Vec<Node<'a>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IfBlock<'a> {
+    expr: SyntaxNode,
+    inner: Vec<Node<'a>>,
+    else_block: Option<Vec<Node<'a>>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -37,20 +61,6 @@ pub enum Attribute<'a> {
 pub struct EventHandler<'a> {
     event: &'a str,
     expr: SyntaxNode,
-}
-
-impl<'a> EventHandler<'a> {
-    pub fn new(event: &'a str, expr: SyntaxNode) -> Self {
-        Self { event, expr }
-    }
-
-    pub fn event(&self) -> &str {
-        self.event
-    }
-
-    pub fn expr(&self) -> &SyntaxNode {
-        &self.expr
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,6 +99,10 @@ impl<'a> Node<'a> {
     pub fn loc(&self) -> Location {
         self.loc
     }
+
+    pub fn error(loc: Location) -> Self {
+        Self::new(NodeType::Error, loc)
+    }
 }
 
 impl Location {
@@ -100,6 +114,46 @@ impl Location {
         Self {
             start: idx,
             end: idx,
+        }
+    }
+}
+
+impl<'a> ForBlock<'a> {
+    pub fn new(
+        binding: &'a str,
+        index: Option<&'a str>,
+        expr: SyntaxNode,
+        inner: Vec<Node<'a>>,
+    ) -> Self {
+        Self {
+            binding,
+            index,
+            expr,
+            inner,
+        }
+    }
+}
+
+impl<'a> EventHandler<'a> {
+    pub fn new(event: &'a str, expr: SyntaxNode) -> Self {
+        Self { event, expr }
+    }
+
+    pub fn event(&self) -> &str {
+        self.event
+    }
+
+    pub fn expr(&self) -> &SyntaxNode {
+        &self.expr
+    }
+}
+
+impl<'a> IfBlock<'a> {
+    pub fn new(expr: SyntaxNode, inner: Vec<Node<'a>>, else_block: Option<Vec<Node<'a>>>) -> Self {
+        Self {
+            expr,
+            inner,
+            else_block,
         }
     }
 }

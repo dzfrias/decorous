@@ -1,0 +1,127 @@
+---
+source: crates/decorous-frontend/src/parser.rs
+expression: tree
+---
+[
+    Node {
+        loc: Location {
+            start: 0,
+            end: 128,
+        },
+        node_type: SpecialBlock(
+            For(
+                ForBlock {
+                    binding: "i",
+                    index: None,
+                    expr: SCRIPT@0..9
+                      EXPR_STMT@0..9
+                        ARRAY_EXPR@0..9
+                          L_BRACK@0..1 "["
+                          LITERAL@1..2
+                            NUMBER@1..2 "1"
+                          COMMA@2..3 ","
+                          WHITESPACE@3..4 " "
+                          LITERAL@4..5
+                            NUMBER@4..5 "2"
+                          COMMA@5..6 ","
+                          WHITESPACE@6..7 " "
+                          LITERAL@7..8
+                            NUMBER@7..8 "3"
+                          R_BRACK@8..9 "]"
+                    ,
+                    inner: [
+                        Node {
+                            loc: Location {
+                                start: 37,
+                                end: 37,
+                            },
+                            node_type: Text(
+                                "\n",
+                            ),
+                        },
+                        Node {
+                            loc: Location {
+                                start: 38,
+                                end: 109,
+                            },
+                            node_type: SpecialBlock(
+                                If(
+                                    IfBlock {
+                                        expr: SCRIPT@0..6
+                                          EXPR_STMT@0..6
+                                            BIN_EXPR@0..6
+                                              NAME_REF@0..1
+                                                IDENT@0..1 "i"
+                                              WHITESPACE@1..2 " "
+                                              EQ2@2..4 "=="
+                                              WHITESPACE@4..5 " "
+                                              LITERAL@5..6
+                                                NUMBER@5..6 "1"
+                                        ,
+                                        inner: [
+                                            Node {
+                                                loc: Location {
+                                                    start: 70,
+                                                    end: 70,
+                                                },
+                                                node_type: Text(
+                                                    "\n",
+                                                ),
+                                            },
+                                            Node {
+                                                loc: Location {
+                                                    start: 71,
+                                                    end: 86,
+                                                },
+                                                node_type: Element(
+                                                    Element {
+                                                        tag: "span",
+                                                        attrs: [],
+                                                        children: [
+                                                            Node {
+                                                                loc: Location {
+                                                                    start: 77,
+                                                                    end: 79,
+                                                                },
+                                                                node_type: Mustache(
+                                                                    SCRIPT@0..1
+                                                                      EXPR_STMT@0..1
+                                                                        NAME_REF@0..1
+                                                                          IDENT@0..1 "i"
+                                                                    ,
+                                                                ),
+                                                            },
+                                                        ],
+                                                    },
+                                                ),
+                                            },
+                                            Node {
+                                                loc: Location {
+                                                    start: 103,
+                                                    end: 103,
+                                                },
+                                                node_type: Text(
+                                                    "\n",
+                                                ),
+                                            },
+                                        ],
+                                        else_block: None,
+                                    },
+                                ),
+                            ),
+                        },
+                        Node {
+                            loc: Location {
+                                start: 121,
+                                end: 121,
+                            },
+                            node_type: Text(
+                                "\n",
+                            ),
+                        },
+                    ],
+                },
+            ),
+        ),
+    },
+]

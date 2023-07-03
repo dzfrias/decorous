@@ -1,8 +1,11 @@
-use rslint_parser::{parse_text, SyntaxNode};
+use rslint_parser::SyntaxNode;
 use std::{collections::VecDeque, str::Chars};
 use thiserror::Error;
 
-use crate::ast::{Attribute, AttributeValue, Element, EventHandler, Location, Node, NodeType};
+use crate::ast::{
+    Attribute, AttributeValue, Element, EventHandler, ForBlock, IfBlock, Location, Node, NodeType,
+    SpecialBlock,
+};
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -35,6 +38,12 @@ pub enum ParseError {
     ExpectedCharacterAny(Vec<char>, char, Location),
     #[error("expected end of comment")]
     ExpectedEndOfComment(Location),
+    #[error("invalid closing block, expected {0}, got {1}")]
+    InvalidClosingBlock(String, String, Location),
+    #[error("expected string {0}, got {1}")]
+    ExpectedString(String, String, Location),
+    #[error("unrecognized special block: \"{0}\"")]
+    UnrecognizedSpecialBlock(String, Location),
 }
 
 /// Zero-copy parser that takes in decorous HTML syntax.
@@ -124,10 +133,34 @@ impl<'a> Parser<'a> {
                         if close_tag != tag {
                             self.errors
                                 .push(ParseError::InvalidClosingTag(tag.to_owned(), node.loc()));
+                            nodes.push(Node::error(node.loc()));
                             continue;
                         }
 
                         nodes.push(node);
+                    }
+                }
+                Some('{') => {
+                    // Should be the {
+                    self.consume();
+                    // Accounting for the { we consumed
+                    let start = self.index - 1;
+
+                    match self.peek() {
+                        Some('#') => {
+                            let node = self.parse_special_block();
+                            nodes.push(node);
+                        }
+                        Some('/') => {
+                            break;
+                        }
+                        _ => {
+                            let mustache = self.parse_mustache();
+                            nodes.push(Node::new(
+                                NodeType::Mustache(mustache),
+                                Location::new(start, self.index - 1),
+                            ))
+                        }
                     }
                 }
                 _ => {
@@ -205,7 +238,7 @@ impl<'a> Parser<'a> {
     fn parse_text_node(&mut self) -> Node<'a> {
         self.consume_while(|c| c.is_whitespace() && c != '\n');
         let mut start = self.index;
-        let mut text = self.consume_while(|c| c != '<');
+        let mut text = self.consume_while(|c| c != '<' && c != '{');
         if text.get(0..=0).is_some_and(|c| c == "\n") {
             start = self.index.saturating_sub(1);
             text = &text[..1];
@@ -252,6 +285,7 @@ impl<'a> Parser<'a> {
                     self.skip_whitespace();
                     self.expect_consume('=');
                     self.skip_whitespace();
+                    self.expect_consume('{');
                     let mustache = self.parse_mustache();
                     attrs.push(Attribute::EventHandler(EventHandler::new(event, mustache)));
                 }
@@ -293,6 +327,8 @@ impl<'a> Parser<'a> {
                 AttributeValue::Literal(value)
             }
             Some('{') => {
+                // Should be the {
+                self.consume();
                 let expr = self.parse_mustache();
                 AttributeValue::JavaScript(expr)
             }
@@ -308,11 +344,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_mustache(&mut self) -> SyntaxNode {
-        self.expect_consume('{');
-
         let start = self.slice_index;
         // Keep track of rbraces needed to close out mustache tag. This is needed because the inner
-        // JavaScript could potentially curly braces
+        // JavaScript could potentially have curly braces
         let mut rbraces_needed = 1;
         while rbraces_needed > 0 {
             let c = self.peek();
@@ -341,7 +375,7 @@ impl<'a> Parser<'a> {
         self.expect_consume('}');
 
         // Turn into rslint JavaScript syntax tree
-        parse_text(expr, 0).syntax()
+        rslint_parser::parse_text(expr, 0).syntax()
     }
 
     fn try_parse_comment(&mut self) -> Option<Node<'a>> {
@@ -394,6 +428,120 @@ impl<'a> Parser<'a> {
             &self.source[start..self.source.len() - self.source[self.slice_index..].len()],
             true,
         )
+    }
+
+    fn parse_special_block(&mut self) -> Node<'a> {
+        let start = self.index - 1;
+        self.expect_consume('#');
+        let block_type = self.consume_while(|c| !c.is_whitespace() && c != '}');
+
+        match block_type {
+            "for" => {
+                let mut error = false;
+
+                self.skip_whitespace();
+                let mut ident =
+                    self.consume_while(|c| !c.is_whitespace() && c != ',' && c.is_digit(36));
+                self.skip_whitespace();
+                let mut index_ident = None;
+                if self.peek().is_some_and(|c| c == ',') {
+                    // Should be the ','
+                    self.consume();
+                    self.skip_whitespace();
+                    // First one found should be index ident
+                    index_ident = Some(ident);
+                    ident = self.consume_while(|c| !c.is_whitespace() && c.is_digit(36));
+                }
+                self.skip_whitespace();
+                {
+                    let start = self.index;
+                    let (got, found) = self.try_consume("in");
+                    if !found {
+                        let mut full_got = got.to_owned();
+                        full_got.push_str(self.consume_while(|c| !c.is_whitespace() && c != '}'));
+                        self.errors.push(ParseError::ExpectedString(
+                            "in".to_owned(),
+                            full_got,
+                            Location::new(start, self.index),
+                        ));
+                        error = true;
+                    }
+                }
+                self.skip_whitespace();
+                let expr = self.parse_mustache();
+                let inner = self.parse_nodes();
+                self.expect_consume('/');
+                {
+                    let start = self.index;
+                    let (got, found) = self.try_consume(block_type);
+                    if !found {
+                        let mut full_got = got.to_owned();
+                        full_got.push_str(self.consume_while(|c| c != '}'));
+                        self.errors.push(ParseError::InvalidClosingBlock(
+                            "for".to_owned(),
+                            full_got,
+                            Location::new(start, self.index),
+                        ));
+                        error = true;
+                    }
+                }
+                self.expect_consume('}');
+                if error {
+                    Node::error(Location::new(start, self.index))
+                } else {
+                    Node::new(
+                        NodeType::SpecialBlock(SpecialBlock::For(ForBlock::new(
+                            ident,
+                            index_ident,
+                            expr,
+                            inner,
+                        ))),
+                        Location::new(start, self.index),
+                    )
+                }
+            }
+            "if" => {
+                let mut error = false;
+                self.skip_whitespace();
+                let expr = self.parse_mustache();
+                let inner = self.parse_nodes();
+                self.expect_consume('/');
+                {
+                    let start = self.index;
+                    let (got, found) = self.try_consume(block_type);
+                    if !found {
+                        let mut full_got = got.to_owned();
+                        full_got.push_str(self.consume_while(|c| c != '}'));
+                        self.errors.push(ParseError::InvalidClosingBlock(
+                            "if".to_owned(),
+                            full_got,
+                            Location::new(start, self.index),
+                        ));
+                        error = true;
+                    }
+                }
+                self.expect_consume('}');
+                if error {
+                    Node::error(Location::new(start, self.index))
+                } else {
+                    Node::new(
+                        NodeType::SpecialBlock(SpecialBlock::If(IfBlock::new(expr, inner, None))),
+                        Location::new(start, self.index),
+                    )
+                }
+            }
+            _ => {
+                self.consume_while(|c| c != '}');
+                self.consume();
+                self.consume_while(|c| c != '}');
+                self.consume();
+                self.errors.push(ParseError::UnrecognizedSpecialBlock(
+                    block_type.to_owned(),
+                    Location::new(start, self.index),
+                ));
+                Node::error(Location::new(start, self.index))
+            }
+        }
     }
 }
 
@@ -550,5 +698,79 @@ mod tests {
                 vec![ParseError::ExpectedEndOfComment(Location::new(0, 21))]
             )
         );
+    }
+
+    #[test]
+    fn can_parse_mustache_tags() {
+        insta_test_all!(
+            "   {hello}",
+            "{ () => { console.log(\"HI\") } }",
+            "hello, {hello}"
+        );
+    }
+
+    #[test]
+    fn can_parse_if_block() {
+        insta_test_all!("{#if x == 3}<p>hello</p>{/if}");
+    }
+
+    #[test]
+    fn can_parse_for_block() {
+        insta_test_all!(
+            "{#for i in [1, 2, 3]}<p>{i}</p>{/for}",
+            "{#for i, elem in [1, 2, 3]}<p>Index: {i}. Elem: {elem}</p>{/for}",
+            "{#for i in [1, 2, 3]}<p>{i}</p>{/for}
+            <p>Text</p>",
+            "{#for i in [1, 2, 3]}
+                {#if i == 1}
+                    <span>{i}</span>
+                {/if}
+            {/for}"
+        );
+    }
+
+    #[test]
+    fn errors_on_invalid_closing_special_block() {
+        insta_test_all_err!(
+            (
+                "{#for i in [1, 2, 3]}{i}{/if}",
+                vec![ParseError::InvalidClosingBlock(
+                    "for".to_owned(),
+                    "if".to_owned(),
+                    Location::new(26, 28)
+                )]
+            ),
+            (
+                "{#if i == 3}{i}{/for}",
+                vec![ParseError::InvalidClosingBlock(
+                    "if".to_owned(),
+                    "for".to_owned(),
+                    Location::new(17, 20)
+                )]
+            )
+        );
+    }
+
+    #[test]
+    fn error_when_no_in_token_found_in_for_block() {
+        insta_test_all_err!((
+            "{#for i bin [1, 2, 3]}{i}{/for}",
+            vec![ParseError::ExpectedString(
+                "in".to_owned(),
+                "bin".to_owned(),
+                Location::new(8, 11)
+            )]
+        ));
+    }
+
+    #[test]
+    fn error_on_unrecognized_special_block() {
+        insta_test_all_err!((
+            "{#what}stuff{/what}",
+            vec![ParseError::UnrecognizedSpecialBlock(
+                "what".to_owned(),
+                Location::new(0, 19)
+            )]
+        ));
     }
 }

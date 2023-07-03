@@ -1,0 +1,55 @@
+---
+source: crates/decorous-frontend/src/parser.rs
+expression: tree
+---
+[
+    Node {
+        loc: Location {
+            start: 0,
+            end: 29,
+        },
+        node_type: SpecialBlock(
+            If(
+                IfBlock {
+                    expr: SCRIPT@0..6
+                      EXPR_STMT@0..6
+                        BIN_EXPR@0..6
+                          NAME_REF@0..1
+                            IDENT@0..1 "x"
+                          WHITESPACE@1..2 " "
+                          EQ2@2..4 "=="
+                          WHITESPACE@4..5 " "
+                          LITERAL@5..6
+                            NUMBER@5..6 "3"
+                    ,
+                    inner: [
+                        Node {
+                            loc: Location {
+                                start: 12,
+                                end: 23,
+                            },
+                            node_type: Element(
+                                Element {
+                                    tag: "p",
+                                    attrs: [],
+                                    children: [
+                                        Node {
+                                            loc: Location {
+                                                start: 15,
+                                                end: 19,
+                                            },
+                                            node_type: Text(
+                                                "hello",
+                                            ),
+                                        },
+                                    ],
+                                },
+                            ),
+                        },
+                    ],
+                    else_block: None,
+                },
+            ),
+        ),
+    },
+]
