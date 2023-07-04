@@ -5,7 +5,7 @@ expression: tree
 DecorousAst {
     nodes: [
         Node {
-            loc: Location {
+            metadata: Location {
                 start: 0,
                 end: 30,
             },
@@ -15,7 +15,7 @@ DecorousAst {
                     attrs: [],
                     children: [
                         Node {
-                            loc: Location {
+                            metadata: Location {
                                 start: 9,
                                 end: 20,
                             },
@@ -25,7 +25,7 @@ DecorousAst {
                                     attrs: [],
                                     children: [
                                         Node {
-                                            loc: Location {
+                                            metadata: Location {
                                                 start: 12,
                                                 end: 16,
                                             },

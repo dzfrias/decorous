@@ -25,11 +25,11 @@ pub struct Parser<'a> {
     // we take a slice of `source`, which operates in bytes, not code points
     slice_index: usize,
 
-    errors: Vec<ParseError<'a>>,
+    errors: Vec<ParseError>,
 }
 
 #[derive(Debug, Error, PartialEq)]
-pub enum ParseError<'a> {
+pub enum ParseError {
     #[error("invalid closing tag, expected {0}")]
     InvalidClosingTag(String, Location),
     #[error("invalid character, expected {0}, got {1}")]
@@ -48,8 +48,6 @@ pub enum ParseError<'a> {
     CannotHaveNonTopLevelScript(Location),
     #[error("cannot have two scripts")]
     CannotHaveTwoScripts(Location),
-    #[error("error parsing css: {0}")]
-    CssParseError(lightningcss::error::ParserError<'a>),
     #[error("cannot have two style tags")]
     CannotHaveTwoStyleTags(Location),
     #[error("cannot have non-toplevel style tag")]
@@ -67,7 +65,7 @@ enum CallingContext<'a> {
 #[derive(Debug)]
 enum ElementResult<'a> {
     Script(SyntaxNode),
-    Node(Node<'a>),
+    Node(Node<'a, Location>),
     Css(&'a str),
 }
 
@@ -90,7 +88,7 @@ impl<'a> Parser<'a> {
 
     /// Parse the received input into a collection of nodes. Also, return the errors found while
     /// parsing.
-    pub fn parse(mut self) -> (DecorousAst<'a>, Vec<ParseError<'a>>) {
+    pub fn parse(mut self) -> (DecorousAst<'a>, Vec<ParseError>) {
         let mut ctx = CallingContext::Toplevel {
             script: None,
             css: None,
@@ -104,7 +102,7 @@ impl<'a> Parser<'a> {
         (ast, self.errors)
     }
 
-    fn parse_nodes(&mut self, mut ctx: Option<&mut CallingContext<'a>>) -> Vec<Node<'a>> {
+    fn parse_nodes(&mut self, mut ctx: Option<&mut CallingContext<'a>>) -> Vec<Node<'a, Location>> {
         let mut nodes = Vec::new();
 
         while self.peek().is_some() {
@@ -223,9 +221,11 @@ impl<'a> Parser<'a> {
                             unreachable!("checked if empty at top of block");
                         };
                         if close_tag != tag {
-                            self.errors
-                                .push(ParseError::InvalidClosingTag(tag.to_owned(), node.loc()));
-                            nodes.push(Node::error(node.loc()));
+                            self.errors.push(ParseError::InvalidClosingTag(
+                                tag.to_owned(),
+                                *node.metadata(),
+                            ));
+                            nodes.push(Node::error(*node.metadata()));
                             continue;
                         }
 
@@ -327,7 +327,7 @@ impl<'a> Parser<'a> {
         self.consume_while(|c| c.is_whitespace())
     }
 
-    fn parse_text_node(&mut self) -> Node<'a> {
+    fn parse_text_node(&mut self) -> Node<'a, Location> {
         self.consume_while(|c| c.is_whitespace() && c != '\n');
         let mut start = self.index;
         let mut text = self.consume_while(|c| c != '<' && c != '{');
@@ -485,7 +485,7 @@ impl<'a> Parser<'a> {
         rslint_parser::parse_text(expr, 0).syntax()
     }
 
-    fn try_parse_comment(&mut self) -> Option<Node<'a>> {
+    fn try_parse_comment(&mut self) -> Option<Node<'a, Location>> {
         // Start includes the < already consumed
         let start = self.index - 1;
         let (_, found) = self.try_consume("!--");
@@ -537,7 +537,7 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn parse_special_block(&mut self) -> Node<'a> {
+    fn parse_special_block(&mut self) -> Node<'a, Location> {
         let start = self.index - 1;
         self.expect_consume('#');
         let block_type = self.consume_while(|c| !c.is_whitespace() && c != '}');

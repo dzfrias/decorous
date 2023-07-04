@@ -1,4 +1,8 @@
 [workspace]
 members = [
     "crates/decorous-frontend",
+    "crates/decorous-backend",
 ]
+
+[workspace.dependencies]
+rslint_parser = "0.3.1"

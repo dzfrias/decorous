@@ -5,7 +5,7 @@ expression: tree
 DecorousAst {
     nodes: [
         Node {
-            loc: Location {
+            metadata: Location {
                 start: 0,
                 end: 64,
             },
@@ -34,7 +34,7 @@ DecorousAst {
                         ,
                         inner: [
                             Node {
-                                loc: Location {
+                                metadata: Location {
                                     start: 27,
                                     end: 57,
                                 },
@@ -44,7 +44,7 @@ DecorousAst {
                                         attrs: [],
                                         children: [
                                             Node {
-                                                loc: Location {
+                                                metadata: Location {
                                                     start: 30,
                                                     end: 36,
                                                 },
@@ -53,7 +53,7 @@ DecorousAst {
                                                 ),
                                             },
                                             Node {
-                                                loc: Location {
+                                                metadata: Location {
                                                     start: 37,
                                                     end: 39,
                                                 },
@@ -66,7 +66,7 @@ DecorousAst {
                                                 ),
                                             },
                                             Node {
-                                                loc: Location {
+                                                metadata: Location {
                                                     start: 40,
                                                     end: 47,
                                                 },
@@ -75,7 +75,7 @@ DecorousAst {
                                                 ),
                                             },
                                             Node {
-                                                loc: Location {
+                                                metadata: Location {
                                                     start: 48,
                                                     end: 53,
                                                 },
