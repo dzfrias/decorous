@@ -1,4 +1,3 @@
-use lightningcss::stylesheet::StyleSheet;
 use rslint_parser::SyntaxNode;
 use std::{collections::VecDeque, str::Chars};
 use thiserror::Error;
@@ -61,7 +60,7 @@ pub enum ParseError<'a> {
 enum CallingContext<'a> {
     Toplevel {
         script: Option<SyntaxNode>,
-        css: Option<StyleSheet<'a, 'a>>,
+        css: Option<&'a str>,
     },
 }
 
@@ -69,7 +68,7 @@ enum CallingContext<'a> {
 enum ElementResult<'a> {
     Script(SyntaxNode),
     Node(Node<'a>),
-    Css(StyleSheet<'a, 'a>),
+    Css(&'a str),
 }
 
 /// Zero-copy parser that takes in decorous HTML syntax.
@@ -358,10 +357,7 @@ impl<'a> Parser<'a> {
             let script = self.parse_script_tag();
             return ElementResult::Script(script);
         } else if tag == "style" {
-            return match self.parse_style_tag() {
-                Some(css) => ElementResult::Css(css),
-                None => ElementResult::Node(Node::error(Location::new(start, self.index))),
-            };
+            return ElementResult::Css(self.parse_style_tag());
         }
         self.skip_whitespace();
         let attrs = self.parse_attrs();
@@ -684,18 +680,9 @@ impl<'a> Parser<'a> {
         rslint_parser::parse_text(source, 0).syntax()
     }
 
-    fn parse_style_tag(&mut self) -> Option<StyleSheet<'a, 'a>> {
+    fn parse_style_tag(&mut self) -> &'a str {
         self.expect_consume('>');
-        let source = self.consume_until_end_tag("style");
-        let result = StyleSheet::parse(source, lightningcss::stylesheet::ParserOptions::default());
-
-        match result {
-            Ok(css) => Some(css),
-            Err(err) => {
-                self.errors.push(ParseError::CssParseError(err.kind));
-                return None;
-            }
-        }
+        self.consume_until_end_tag("style")
     }
 }
 

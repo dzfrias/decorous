@@ -6,63 +6,6 @@ DecorousAst {
     nodes: [],
     script: None,
     css: Some(
-        StyleSheet {
-            rules: CssRuleList(
-                [
-                    Style(
-                        StyleRule {
-                            selectors: SelectorList(
-                                [
-                                    Selector(hello, specificity = 0x1),
-                                ],
-                            ),
-                            vendor_prefix: VendorPrefix(
-                                0x0,
-                            ),
-                            declarations: DeclarationBlock {
-                                important_declarations: [],
-                                declarations: [
-                                    Color(
-                                        RGBA(
-                                            RGBA {
-                                                red: 255,
-                                                green: 0,
-                                                blue: 0,
-                                                alpha: 255,
-                                            },
-                                        ),
-                                    ),
-                                ],
-                            },
-                            rules: CssRuleList(
-                                [],
-                            ),
-                            loc: Location {
-                                source_index: 0,
-                                line: 0,
-                                column: 1,
-                            },
-                        },
-                    ),
-                ],
-            ),
-            sources: [
-                "",
-            ],
-            source_map_urls: [
-                None,
-            ],
-            license_comments: [],
-            options: ParserOptions {
-                filename: "",
-                css_modules: None,
-                source_index: 0,
-                error_recovery: false,
-                warnings: None,
-                flags: ParserFlags(
-                    0x0,
-                ),
-            },
-        },
+        "hello { color: red; }",
     ),
 }

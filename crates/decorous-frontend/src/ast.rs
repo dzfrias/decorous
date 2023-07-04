@@ -1,11 +1,10 @@
-use lightningcss::stylesheet::StyleSheet;
 use rslint_parser::SyntaxNode;
 
 #[derive(Debug)]
 pub struct DecorousAst<'a> {
     nodes: Vec<Node<'a>>,
     script: Option<SyntaxNode>,
-    css: Option<StyleSheet<'a, 'a>>,
+    css: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -207,11 +206,7 @@ impl<'a> IfBlock<'a> {
 }
 
 impl<'a> DecorousAst<'a> {
-    pub fn new(
-        nodes: Vec<Node<'a>>,
-        script: Option<SyntaxNode>,
-        css: Option<StyleSheet<'a, 'a>>,
-    ) -> Self {
+    pub fn new(nodes: Vec<Node<'a>>, script: Option<SyntaxNode>, css: Option<&'a str>) -> Self {
         Self { nodes, script, css }
     }
 
@@ -223,7 +218,39 @@ impl<'a> DecorousAst<'a> {
         self.script.as_ref()
     }
 
-    pub fn css(&self) -> Option<&StyleSheet<'a, 'a>> {
-        self.css.as_ref()
+    pub fn css(&self) -> Option<&'a str> {
+        self.css
+    }
+
+    pub fn iter_nodes(&'a self) -> NodeIter<'a> {
+        let nodes = self.nodes().iter().collect::<Vec<&'a Node<'a>>>();
+        NodeIter::new(nodes)
+    }
+}
+
+#[derive(Debug)]
+pub struct NodeIter<'a> {
+    stack: Vec<&'a Node<'a>>,
+}
+
+impl<'a> NodeIter<'a> {
+    fn new(node: Vec<&'a Node<'a>>) -> NodeIter<'a> {
+        let mut stack = Vec::new();
+        stack.extend(node);
+        Self { stack }
+    }
+}
+
+impl<'a> Iterator for NodeIter<'a> {
+    type Item = &'a Node<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.stack.pop().map(|node| {
+            if let NodeType::Element(elem) = node.node_type() {
+                self.stack.extend(elem.children().iter().rev());
+            }
+
+            node
+        })
     }
 }
