@@ -1,5 +1,14 @@
 use rslint_parser::SyntaxNode;
 
+/// The collection of the three main parts of decorous syntax: the HTML-like template (`nodes`),
+/// the script (`script`), and styling (`css`). The main way to obtain a `DecorousAst` is to use the
+/// [`Parser`](super::Parser).
+///
+/// One of the best uses of `DecorousAst` is to hold data, read some parts, and eventually use
+/// [`into_components()`](DecorousAst::into_components()) when the time has come to apply more
+/// complex transformations that require ownership.
+///
+/// Note that by design, `DecorousAst` [`Node`]s only hold [`Location`]s for their metadata.
 #[derive(Debug)]
 pub struct DecorousAst<'a> {
     nodes: Vec<Node<'a, Location>>,
@@ -7,6 +16,9 @@ pub struct DecorousAst<'a> {
     css: Option<&'a str>,
 }
 
+/// A node of the AST. It contains [metadata](`Self::metadata()`) (of type `T`), and the
+/// actual node data, retrieved by [`node_type()`](`Self::node_type()`). A node is commonly created
+/// by the [parser](`super::Parser`), which produces an [abstract syntax tree](`DecorousAst`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<'a, T> {
     metadata: T,
@@ -104,6 +116,16 @@ impl<'a, T> Element<'a, T> {
 }
 
 impl<'a, T> Node<'a, T> {
+    /// Create a new node with some metadata. [`NodeType`] contains actual data about the node,
+    /// such as its children (if it's an element) or the underlying expression (if it's in a
+    /// mustache `{}` tag).
+    ///
+    /// ```
+    /// # use decorous_frontend::ast::*;
+    /// // A new text node with no metadata.
+    /// let node = Node::new(NodeType::Text("hello"), ());
+    /// assert_eq!(&NodeType::Text("hello"), node.node_type());
+    /// ```
     pub fn new(ty: NodeType<'a, T>, metadata: T) -> Self {
         Self {
             metadata,
@@ -111,54 +133,68 @@ impl<'a, T> Node<'a, T> {
         }
     }
 
-    pub fn node_type(&self) -> &NodeType<'a, T> {
-        &self.node_type
-    }
-
-    pub fn node_type_mut(&mut self) -> &mut NodeType<'a, T> {
-        &mut self.node_type
-    }
-
-    pub fn metadata(&self) -> &T {
-        &self.metadata
-    }
-
-    pub fn metadata_mut(&mut self) -> &mut T {
-        &mut self.metadata
-    }
-
+    /// Create a new error node. Shorthand for [`Self::new()`] and passing in [`NodeType::Error`].
     pub fn error(metadata: T) -> Self {
         Self::new(NodeType::Error, metadata)
     }
 
+    /// Obtain an shared reference to the node's type. See [`NodeType`] for more.
+    pub fn node_type(&self) -> &NodeType<'a, T> {
+        &self.node_type
+    }
+
+    /// Obtain an exclusive reference to the node's type. See [`NodeType`] for more.
+    pub fn node_type_mut(&mut self) -> &mut NodeType<'a, T> {
+        &mut self.node_type
+    }
+
+    /// Obtain a shared reference to the metadata of the node.
+    pub fn metadata(&self) -> &T {
+        &self.metadata
+    }
+
+    /// Obtain an exclusive reference to the metadata of the node.
+    pub fn metadata_mut(&mut self) -> &mut T {
+        &mut self.metadata
+    }
+
+    /// Recursively cast each the metadata field of each node into a new type. The provided
+    /// function receives the previous metadata of the node, and should return the corresponding new
+    /// metadata.
+    ///
+    /// ```
+    /// # use decorous_frontend::ast::*;
+    /// // Some random metadata
+    /// let node = Node::new(NodeType::Error, 11);
+    /// assert_eq!(Node::new(NodeType::Error, true), node.cast_meta(&mut |meta| meta > 10));
+    /// ```
     pub fn cast_meta<U, F>(self, transfer_func: &mut F) -> Node<'a, U>
     where
         F: FnMut(T) -> U,
     {
+        macro_rules! cast_children {
+            ($children_vec:expr, $transfer:expr) => {
+                $children_vec
+                    .into_iter()
+                    .map(|node| node.cast_meta($transfer))
+                    .collect()
+            };
+        }
+
+        // A bit verbose, but it's the only way to do a full tyep cast throughout the entire AST
         match self.node_type {
             NodeType::SpecialBlock(block) => Node {
                 metadata: transfer_func(self.metadata),
                 node_type: NodeType::SpecialBlock(match block {
                     SpecialBlock::If(if_block) => SpecialBlock::If(IfBlock {
                         expr: if_block.expr,
-                        inner: if_block
-                            .inner
-                            .into_iter()
-                            .map(|node| node.cast_meta(transfer_func))
-                            .collect(),
-                        else_block: if_block.else_block.map(|nodes| {
-                            nodes
-                                .into_iter()
-                                .map(|node| node.cast_meta(transfer_func))
-                                .collect()
-                        }),
+                        inner: cast_children!(if_block.inner, transfer_func),
+                        else_block: if_block
+                            .else_block
+                            .map(|nodes| cast_children!(nodes, transfer_func)),
                     }),
                     SpecialBlock::For(for_block) => SpecialBlock::For(ForBlock {
-                        inner: for_block
-                            .inner
-                            .into_iter()
-                            .map(|node| node.cast_meta(transfer_func))
-                            .collect(),
+                        inner: cast_children!(for_block.inner, transfer_func),
                         binding: for_block.binding,
                         index: for_block.index,
                         expr: for_block.expr,
@@ -170,11 +206,7 @@ impl<'a, T> Node<'a, T> {
                 node_type: NodeType::Element(Element {
                     tag: elem.tag,
                     attrs: elem.attrs,
-                    children: elem
-                        .children
-                        .into_iter()
-                        .map(|child| child.cast_meta(transfer_func))
-                        .collect(),
+                    children: cast_children!(elem.children, transfer_func),
                 }),
             },
             NodeType::Text(text) => Node {
@@ -299,6 +331,10 @@ impl<'a, T> IfBlock<'a, T> {
 }
 
 impl<'a> DecorousAst<'a> {
+    /// Create a new `DecorousAst`. Note that this is usually not something done by hand, as ASTs
+    /// are usually produced by the [`Parser`](super::Parser). The components of the three passed
+    /// in arguments can be retrieved with [`nodes()`](`Self::nodes()`), [`script()`](`Self::script`),
+    /// and [`css()`](`Self::css()`).
     pub fn new(
         nodes: Vec<Node<'a, Location>>,
         script: Option<SyntaxNode>,
@@ -307,18 +343,34 @@ impl<'a> DecorousAst<'a> {
         Self { nodes, script, css }
     }
 
+    /// Obtain a shared reference to the template AST.
     pub fn nodes(&self) -> &[Node<'_, Location>] {
         self.nodes.as_ref()
     }
 
+    /// Gives a shared reference to the JavaScript AST, if it exists. The `DecorousAst` will have
+    /// no JavaScript AST if no `<script>` tag is specified in the template.
     pub fn script(&self) -> Option<&SyntaxNode> {
         self.script.as_ref()
     }
 
+    /// Gives a a shared reference to the CSS AST, if it exists. The `DecorousAst` will have
+    /// no CSS AST if no `<style>` tag is specified in the template.
     pub fn css(&self) -> Option<&'a str> {
         self.css
     }
 
+    /// Creates a recursive iterator over the nodes of the template.
+    ///
+    /// ```
+    /// # use decorous_frontend::ast::*;
+    /// let ast = DecorousAst::new(vec![Node::new(NodeType::Text("hello"), Location::new(0, 5))], None, None);
+    /// for node in ast.iter_nodes() {
+    ///     if node.metadata().start() == 0 {
+    ///         println!("This node starts at the first character!");
+    ///     }
+    /// }
+    /// ```
     pub fn iter_nodes(&'a self) -> NodeIter<'a, Location> {
         let nodes = self.nodes().iter().collect::<Vec<&'a Node<'a, Location>>>();
         NodeIter::new(nodes)
