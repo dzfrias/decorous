@@ -1,98 +1,94 @@
 ---
 source: crates/decorous-frontend/src/component/mod.rs
-expression: component
+expression: component.fragment_tree
 ---
-Component {
-    fragment_tree: [
-        Node {
-            metadata: FragmentMetadata {
-                id: 0,
-                parent_id: None,
-                location: Location {
-                    start: 0,
-                    end: 47,
-                },
+[
+    Node {
+        metadata: FragmentMetadata {
+            id: 0,
+            parent_id: None,
+            location: Location {
+                start: 0,
+                end: 47,
             },
-            node_type: Element(
-                Element {
-                    tag: "div",
-                    attrs: [],
-                    children: [
-                        Node {
-                            metadata: FragmentMetadata {
-                                id: 1,
-                                parent_id: Some(
-                                    0,
-                                ),
-                                location: Location {
-                                    start: 5,
-                                    end: 22,
-                                },
-                            },
-                            node_type: Element(
-                                Element {
-                                    tag: "span",
-                                    attrs: [],
-                                    children: [
-                                        Node {
-                                            metadata: FragmentMetadata {
-                                                id: 2,
-                                                parent_id: Some(
-                                                    1,
-                                                ),
-                                                location: Location {
-                                                    start: 11,
-                                                    end: 15,
-                                                },
-                                            },
-                                            node_type: Text(
-                                                "hello",
-                                            ),
-                                        },
-                                    ],
-                                },
-                            ),
-                        },
-                        Node {
-                            metadata: FragmentMetadata {
-                                id: 3,
-                                parent_id: Some(
-                                    0,
-                                ),
-                                location: Location {
-                                    start: 23,
-                                    end: 41,
-                                },
-                            },
-                            node_type: Element(
-                                Element {
-                                    tag: "span",
-                                    attrs: [],
-                                    children: [
-                                        Node {
-                                            metadata: FragmentMetadata {
-                                                id: 4,
-                                                parent_id: Some(
-                                                    3,
-                                                ),
-                                                location: Location {
-                                                    start: 29,
-                                                    end: 34,
-                                                },
-                                            },
-                                            node_type: Text(
-                                                "hello2",
-                                            ),
-                                        },
-                                    ],
-                                },
-                            ),
-                        },
-                    ],
-                },
-            ),
         },
-    ],
-    declared_vars: [],
-    current_id: 5,
-}
+        node_type: Element(
+            Element {
+                tag: "div",
+                attrs: [],
+                children: [
+                    Node {
+                        metadata: FragmentMetadata {
+                            id: 1,
+                            parent_id: Some(
+                                0,
+                            ),
+                            location: Location {
+                                start: 5,
+                                end: 22,
+                            },
+                        },
+                        node_type: Element(
+                            Element {
+                                tag: "span",
+                                attrs: [],
+                                children: [
+                                    Node {
+                                        metadata: FragmentMetadata {
+                                            id: 2,
+                                            parent_id: Some(
+                                                1,
+                                            ),
+                                            location: Location {
+                                                start: 11,
+                                                end: 15,
+                                            },
+                                        },
+                                        node_type: Text(
+                                            "hello",
+                                        ),
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                    Node {
+                        metadata: FragmentMetadata {
+                            id: 3,
+                            parent_id: Some(
+                                0,
+                            ),
+                            location: Location {
+                                start: 23,
+                                end: 41,
+                            },
+                        },
+                        node_type: Element(
+                            Element {
+                                tag: "span",
+                                attrs: [],
+                                children: [
+                                    Node {
+                                        metadata: FragmentMetadata {
+                                            id: 4,
+                                            parent_id: Some(
+                                                3,
+                                            ),
+                                            location: Location {
+                                                start: 29,
+                                                end: 34,
+                                            },
+                                        },
+                                        node_type: Text(
+                                            "hello2",
+                                        ),
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ],
+            },
+        ),
+    },
+]

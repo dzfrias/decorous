@@ -8,4 +8,4 @@ rslint_parser = { workspace = true }
 thiserror = "1.0.40"
 
 [dev-dependencies]
-insta = "1.30.0"
+insta = { workspace = true }

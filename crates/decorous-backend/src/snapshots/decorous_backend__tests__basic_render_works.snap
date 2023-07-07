@@ -1,0 +1,44 @@
+---
+source: crates/decorous-backend/src/lib.rs
+expression: "String::from_utf8(out).unwrap()"
+---
+function make_fragment(ctx) {
+let e0;
+let e1;
+return {
+c() {
+e0 = document.createElement("p");
+e1 = document.createTextNode(`${ctx[0]}hello`);
+},
+m(target) {
+target.appendChild(e0);
+e0.appendChild(e1);
+},
+u(ctx) {
+e1.data = `${ctx[0]}hello`;
+},
+d() {
+e0.parentNode.removeChild(e0);
+},
+}
+}
+function __init_ctx() {
+let x = 3;
+function remake_x() { __schedule_update(0, x = 44); }
+return [x,remake_x];
+}
+const ctx = __init_ctx();
+const fragment = make_fragment(ctx);
+fragment.c();
+fragment.m(document.getElementById("app"));
+let updating = false;
+function __schedule_update(ctx_idx, val) {
+if (updating) return;
+updating = true;
+Promise.resolve().then(() => {
+ctx[ctx_idx] = val;
+fragment.u(ctx);
+updating = false;
+});
+}
+

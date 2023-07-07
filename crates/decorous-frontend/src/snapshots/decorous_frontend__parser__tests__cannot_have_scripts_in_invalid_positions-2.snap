@@ -13,7 +13,7 @@ DecorousAst {
         },
     ],
     script: Some(
-        SCRIPT@0..6
+        MODULE@0..6
           EXPR_STMT@0..6
             ASSIGN_EXPR@0..5
               NAME_REF@0..1

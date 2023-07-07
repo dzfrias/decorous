@@ -52,6 +52,8 @@ pub enum ParseError {
     CannotHaveTwoStyleTags(Location),
     #[error("cannot have non-toplevel style tag")]
     CannotHaveNonTopLevelStyle(Location),
+    #[error("javascript parsing error: {}", 0.to_string())]
+    JavaScriptParseError(rslint_parser::ParserError),
 }
 
 #[derive(Debug)]
@@ -482,7 +484,12 @@ impl<'a> Parser<'a> {
         self.expect_consume('}');
 
         // Turn into rslint JavaScript syntax tree
-        rslint_parser::parse_text(expr, 0).syntax()
+        let script = rslint_parser::parse_text(expr, 0).syntax();
+        if let Some(child) = script.first_child() {
+            child
+        } else {
+            script
+        }
     }
 
     fn try_parse_comment(&mut self) -> Option<Node<'a, Location>> {
@@ -676,8 +683,37 @@ impl<'a> Parser<'a> {
 
     fn parse_script_tag(&mut self) -> SyntaxNode {
         self.expect_consume('>');
+        let script_start = self.slice_index;
         let source = self.consume_until_end_tag("script");
-        rslint_parser::parse_text(source, 0).syntax()
+        let res = rslint_parser::parse_module(source, 0);
+        let syntax = res.syntax();
+
+        if res.errors().is_empty() {
+            syntax
+        } else {
+            // A bit of a weird way to get owned rslint_parser::ParserErrors...
+            for mut err in res
+                .ok()
+                .expect_err("should have errors")
+                .into_iter()
+                .filter(|diag| diag.primary.is_some())
+            {
+                err.primary
+                    .as_mut()
+                    .expect("primary should be something")
+                    .span
+                    .range
+                    .start += script_start;
+                err.primary
+                    .as_mut()
+                    .expect("primary should be something")
+                    .span
+                    .range
+                    .end += script_start;
+                self.errors.push(ParseError::JavaScriptParseError(err))
+            }
+            syntax
+        }
     }
 
     fn parse_style_tag(&mut self) -> &'a str {

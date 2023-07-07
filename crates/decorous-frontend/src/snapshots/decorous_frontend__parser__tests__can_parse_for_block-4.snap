@@ -14,21 +14,20 @@ DecorousAst {
                     ForBlock {
                         binding: "i",
                         index: None,
-                        expr: SCRIPT@0..9
-                          EXPR_STMT@0..9
-                            ARRAY_EXPR@0..9
-                              L_BRACK@0..1 "["
-                              LITERAL@1..2
-                                NUMBER@1..2 "1"
-                              COMMA@2..3 ","
-                              WHITESPACE@3..4 " "
-                              LITERAL@4..5
-                                NUMBER@4..5 "2"
-                              COMMA@5..6 ","
-                              WHITESPACE@6..7 " "
-                              LITERAL@7..8
-                                NUMBER@7..8 "3"
-                              R_BRACK@8..9 "]"
+                        expr: EXPR_STMT@0..9
+                          ARRAY_EXPR@0..9
+                            L_BRACK@0..1 "["
+                            LITERAL@1..2
+                              NUMBER@1..2 "1"
+                            COMMA@2..3 ","
+                            WHITESPACE@3..4 " "
+                            LITERAL@4..5
+                              NUMBER@4..5 "2"
+                            COMMA@5..6 ","
+                            WHITESPACE@6..7 " "
+                            LITERAL@7..8
+                              NUMBER@7..8 "3"
+                            R_BRACK@8..9 "]"
                         ,
                         inner: [
                             Node {
@@ -48,16 +47,15 @@ DecorousAst {
                                 node_type: SpecialBlock(
                                     If(
                                         IfBlock {
-                                            expr: SCRIPT@0..6
-                                              EXPR_STMT@0..6
-                                                BIN_EXPR@0..6
-                                                  NAME_REF@0..1
-                                                    IDENT@0..1 "i"
-                                                  WHITESPACE@1..2 " "
-                                                  EQ2@2..4 "=="
-                                                  WHITESPACE@4..5 " "
-                                                  LITERAL@5..6
-                                                    NUMBER@5..6 "1"
+                                            expr: EXPR_STMT@0..6
+                                              BIN_EXPR@0..6
+                                                NAME_REF@0..1
+                                                  IDENT@0..1 "i"
+                                                WHITESPACE@1..2 " "
+                                                EQ2@2..4 "=="
+                                                WHITESPACE@4..5 " "
+                                                LITERAL@5..6
+                                                  NUMBER@5..6 "1"
                                             ,
                                             inner: [
                                                 Node {
@@ -85,10 +83,9 @@ DecorousAst {
                                                                         end: 79,
                                                                     },
                                                                     node_type: Mustache(
-                                                                        SCRIPT@0..1
-                                                                          EXPR_STMT@0..1
-                                                                            NAME_REF@0..1
-                                                                              IDENT@0..1 "i"
+                                                                        EXPR_STMT@0..1
+                                                                          NAME_REF@0..1
+                                                                            IDENT@0..1 "i"
                                                                         ,
                                                                     ),
                                                                 },

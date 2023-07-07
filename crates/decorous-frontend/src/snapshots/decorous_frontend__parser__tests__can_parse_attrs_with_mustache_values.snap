@@ -17,10 +17,9 @@ DecorousAst {
                             "attr",
                             Some(
                                 JavaScript(
-                                    SCRIPT@0..5
-                                      EXPR_STMT@0..5
-                                        NAME_REF@0..5
-                                          IDENT@0..5 "value"
+                                    EXPR_STMT@0..5
+                                      NAME_REF@0..5
+                                        IDENT@0..5 "value"
                                     ,
                                 ),
                             ),

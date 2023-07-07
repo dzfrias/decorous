@@ -166,11 +166,11 @@ impl<'a, T> Node<'a, T> {
     /// # use decorous_frontend::ast::*;
     /// // Some random metadata
     /// let node = Node::new(NodeType::Error, 11);
-    /// assert_eq!(Node::new(NodeType::Error, true), node.cast_meta(&mut |meta| meta > 10));
+    /// assert_eq!(Node::new(NodeType::Error, true), node.cast_meta(&mut |node| *node.metadata() > 10));
     /// ```
     pub fn cast_meta<U, F>(self, transfer_func: &mut F) -> Node<'a, U>
     where
-        F: FnMut(T) -> U,
+        F: FnMut(&Node<'a, T>) -> U,
     {
         macro_rules! cast_children {
             ($children_vec:expr, $transfer:expr) => {
@@ -181,10 +181,12 @@ impl<'a, T> Node<'a, T> {
             };
         }
 
+        let new_meta = transfer_func(&self);
+
         // A bit verbose, but it's the only way to do a full tyep cast throughout the entire AST
         match self.node_type {
             NodeType::SpecialBlock(block) => Node {
-                metadata: transfer_func(self.metadata),
+                metadata: new_meta,
                 node_type: NodeType::SpecialBlock(match block {
                     SpecialBlock::If(if_block) => SpecialBlock::If(IfBlock {
                         expr: if_block.expr,
@@ -202,7 +204,7 @@ impl<'a, T> Node<'a, T> {
                 }),
             },
             NodeType::Element(elem) => Node {
-                metadata: transfer_func(self.metadata),
+                metadata: new_meta,
                 node_type: NodeType::Element(Element {
                     tag: elem.tag,
                     attrs: elem.attrs,
@@ -210,19 +212,19 @@ impl<'a, T> Node<'a, T> {
                 }),
             },
             NodeType::Text(text) => Node {
-                metadata: transfer_func(self.metadata),
+                metadata: new_meta,
                 node_type: NodeType::Text(text),
             },
             NodeType::Comment(comment) => Node {
-                metadata: transfer_func(self.metadata),
+                metadata: new_meta,
                 node_type: NodeType::Comment(comment),
             },
             NodeType::Mustache(syntax_node) => Node {
-                metadata: transfer_func(self.metadata),
+                metadata: new_meta,
                 node_type: NodeType::Mustache(syntax_node),
             },
             NodeType::Error => Node {
-                metadata: transfer_func(self.metadata),
+                metadata: new_meta,
                 node_type: NodeType::Error,
             },
         }
