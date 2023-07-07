@@ -171,13 +171,7 @@ fn get_unbound_refs_from_block(
                     let name_ref = node.to::<NameRef>();
                     if let Some(ident) = name_ref.ident_token() {
                         let s = ident.text();
-                        if !already_declared.contains(s)
-                            && !all.iter().any(|name_ref| {
-                                name_ref
-                                    .ident_token()
-                                    .is_some_and(|token| token.text() == s)
-                            })
-                        {
+                        if !already_declared.contains(s) {
                             all.push(name_ref);
                         }
                     }
@@ -275,7 +269,7 @@ mod tests {
     fn can_get_unbound_refs_from_blocks() {
         let input =
             "{ console.log(x); console.log(y); if (3 === 3) { let z = 1; console.log(z); } }";
-        let expected = ["console", "x", "y"];
+        let expected = ["console", "x", "console", "y", "console"];
 
         test_unbound!(input, expected, get_unbound_refs);
     }
