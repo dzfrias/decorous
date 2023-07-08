@@ -270,7 +270,7 @@ mod tests {
         test_lifecycle!(
             node,
             create,
-            "e0 = document.createTextNode(\"hello\");\n",
+            "e0 = document.createTextNode(String.raw`hello`);\n",
             &HashMap::new()
         );
         test_lifecycle!(node, mount, "target.appendChild(e0);\n", &HashMap::new());
@@ -362,7 +362,7 @@ mod tests {
         test_lifecycle!(
             node,
             create,
-            "e0 = document.createElement(\"span\");\ne0.textContent = \"hello\";\n",
+            "e0 = document.createElement(\"span\");\ne0.textContent = String.raw`hello`;\n",
             &HashMap::new()
         );
         test_lifecycle!(node, mount, "target.appendChild(e0);\n", &HashMap::new());
