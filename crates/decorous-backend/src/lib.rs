@@ -92,7 +92,7 @@ updating = true;
 Promise.resolve().then(() => {{
 fragment.u(ctx, dirty);
 updating = false;
-ctx.fill(0);
+dirty.fill(0);
 }});
 }}"
     )?;
