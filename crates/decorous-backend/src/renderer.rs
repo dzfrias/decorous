@@ -61,7 +61,8 @@ where
                             Some(AttributeValue::Literal(literal)) => {
                                 writeln!(
                                     f,
-                                    "e{}.setAttribute(\"{key}\", \"{literal}\");",
+                                    "e{}.setAttribute(\"{key}\", \"{}\");",
+                                    literal.replace("\n", "\\n"),
                                     self.metadata().id(),
                                 )?;
                             }
@@ -101,7 +102,12 @@ where
                 if let Some(collapsed) = element.inner_collapsed() {
                     return match collapsed {
                         CollapsedChildrenType::Text(t) => {
-                            writeln!(f, "e{}.textContent = \"{t}\";", self.metadata().id())
+                            writeln!(
+                                f,
+                                "e{}.textContent = \"{}\";",
+                                self.metadata().id(),
+                                t.replace("\n", "\\n")
+                            )
                         }
                         CollapsedChildrenType::Html(html) => {
                             writeln!(f, "e{}.innerHtml = \"{html}\"", self.metadata().id())
@@ -119,7 +125,7 @@ where
                     f,
                     "e{} = document.createTextNode(\"{}\");",
                     self.metadata().id(),
-                    text
+                    text.replace("\n", "\\n"),
                 )
             }
             NodeType::Mustache(mustache) => {

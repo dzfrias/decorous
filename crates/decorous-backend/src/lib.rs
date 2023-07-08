@@ -86,7 +86,7 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
         render_to,
         "function __schedule_update(ctx_idx, val) {{
 ctx[ctx_idx] = val;
-dirty[Math.max(((ctx_idx + 7) // 8) - 1, 0)] |= 1 << (ctx_idx % 8);
+dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
 if (updating) return;
 updating = true;
 Promise.resolve().then(() => {{
