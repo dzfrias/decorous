@@ -1,0 +1,11 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.3.11", features = ["derive"] }
+decorous-frontend = { path = "../decorous-frontend" }
+decorous-backend = { path = "../decorous-backend" }
+clap-stdin = "0.2.0"
+anyhow = "1.0.71"
