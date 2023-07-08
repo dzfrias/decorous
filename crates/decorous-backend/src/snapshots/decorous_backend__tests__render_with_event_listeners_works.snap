@@ -13,7 +13,7 @@ e0 = document.createElement("p");
 e1 = document.createTextNode(ctx[0]);
 e2 = document.createElement("button");
 e2.addEventListener("click", () => {if (ctx[0] == 3) { __schedule_update(0, x = 44); }});
-e2.textContent = String.raw`Clickme`;
+e2.textContent = "Clickme";
 },
 m(target) {
 target.appendChild(e0);

@@ -4,7 +4,7 @@ use decorous_frontend::{
 };
 use itertools::Itertools;
 use rslint_parser::SmolStr;
-use std::{collections::HashMap, io};
+use std::{borrow::Cow, collections::HashMap, io};
 
 use crate::replace;
 
@@ -59,9 +59,12 @@ where
                     match attr {
                         Attribute::KeyValue(key, value) => match value {
                             Some(AttributeValue::Literal(literal)) => {
+                                let (s, use_quotes) = collapse_whitespace(literal);
                                 writeln!(
                                     f,
-                                    "e{}.setAttribute(\"{key}\", String.raw`{literal}`);",
+                                    "e{}.setAttribute(\"{key}\", {}{}{1});",
+                                    use_quotes.then(|| "\"").unwrap_or_default(),
+                                    s,
                                     self.metadata().id(),
                                 )?;
                             }
@@ -101,10 +104,12 @@ where
                 if let Some(collapsed) = element.inner_collapsed() {
                     return match collapsed {
                         CollapsedChildrenType::Text(t) => {
+                            let (s, use_qutoes) = collapse_whitespace(t);
                             writeln!(
                                 f,
-                                "e{}.textContent = String.raw`{t}`;",
+                                "e{}.textContent = {}{s}{1};",
                                 self.metadata().id(),
+                                use_qutoes.then(|| "\"").unwrap_or_default()
                             )
                         }
                         CollapsedChildrenType::Html(html) => {
@@ -119,10 +124,12 @@ where
                 Ok(())
             }
             NodeType::Text(text) => {
+                let (s, use_qutoes) = collapse_whitespace(text);
                 writeln!(
                     f,
-                    "e{} = document.createTextNode(String.raw`{text}`);",
+                    "e{} = document.createTextNode({}{s}{1});",
                     self.metadata().id(),
+                    use_qutoes.then(|| "\"").unwrap_or_default()
                 )
             }
             NodeType::Mustache(mustache) => {
@@ -245,6 +252,16 @@ where
     }
 }
 
+fn collapse_whitespace(input: &str) -> (Cow<str>, bool) {
+    if input == "\n" {
+        (Cow::Borrowed(" "), true)
+    } else if input.contains('\n') {
+        (Cow::Owned(format!("String.raw`{input}`")), false)
+    } else {
+        (Cow::Borrowed(input), true)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,7 +287,7 @@ mod tests {
         test_lifecycle!(
             node,
             create,
-            "e0 = document.createTextNode(String.raw`hello`);\n",
+            "e0 = document.createTextNode(\"hello\");\n",
             &HashMap::new()
         );
         test_lifecycle!(node, mount, "target.appendChild(e0);\n", &HashMap::new());
@@ -362,7 +379,7 @@ mod tests {
         test_lifecycle!(
             node,
             create,
-            "e0 = document.createElement(\"span\");\ne0.textContent = String.raw`hello`;\n",
+            "e0 = document.createElement(\"span\");\ne0.textContent = \"hello\";\n",
             &HashMap::new()
         );
         test_lifecycle!(node, mount, "target.appendChild(e0);\n", &HashMap::new());

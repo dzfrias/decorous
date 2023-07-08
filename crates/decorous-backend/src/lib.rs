@@ -119,7 +119,6 @@ mod tests {
             let mut out = vec![];
             render(&component, &mut out).unwrap();
 
-            println!("{}", String::from_utf8(out.clone()).unwrap());
             insta::assert_snapshot!(String::from_utf8(out).unwrap());
         };
     }
