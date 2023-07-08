@@ -1,3 +1,6 @@
+use std::fmt;
+
+use itertools::Itertools;
 use rslint_parser::SyntaxNode;
 
 /// The collection of the three main parts of decorous syntax: the HTML-like template (`nodes`),
@@ -89,6 +92,12 @@ pub enum AttributeValue<'a> {
     JavaScript(SyntaxNode),
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum CollapsedChildrenType<'a> {
+    Text(&'a str),
+    Html(String),
+}
+
 impl<'a, T> Element<'a, T> {
     pub fn new(tag: &'a str, attrs: Vec<Attribute<'a>>, children: Vec<Node<'a, T>>) -> Self {
         Self {
@@ -112,6 +121,46 @@ impl<'a, T> Element<'a, T> {
 
     pub fn children_mut(&mut self) -> &mut Vec<Node<'a, T>> {
         &mut self.children
+    }
+
+    pub fn descendents(&'a self) -> NodeIter<'a, T> {
+        NodeIter::new(self.children())
+    }
+
+    /// Attempts to collapse the Element. This is useful for optimization, as `<span>Text</span>`
+    /// can be represented in the DOM as `elem.textContent = "Text"` instead of as a tree. The same
+    /// goes for regular html, as it can be rendered with `elem.innerHtml`. If the element cannot
+    /// be collapsed, this method returns [`None`].
+    ///
+    /// [`CollapsedChildrenType`] denotes the type of the collapse.
+    pub fn inner_collapsed(&self) -> Option<CollapsedChildrenType<'_>> {
+        if self.children().len() == 1 {
+            if let NodeType::Text(t) = *self.children().first().unwrap().node_type() {
+                return Some(CollapsedChildrenType::Text(t));
+            }
+        }
+
+        // Test if the inner descendants are normal HTML (no mustaches or special blocks)
+        if !self.children().is_empty()
+            && self.descendents().all(|node| match node.node_type() {
+                NodeType::Text(_) => true,
+                // For elements, check if any attributes have mustache tags
+                NodeType::Element(elem) => elem.attrs().iter().all(|attr| match attr {
+                    Attribute::KeyValue(_, None) => true,
+                    Attribute::KeyValue(_, Some(val)) => matches!(val, AttributeValue::Literal(_)),
+                    Attribute::Binding(_) => false,
+                    Attribute::EventHandler(_) => false,
+                }),
+                NodeType::Comment(_) => true,
+                NodeType::Mustache(_) => false,
+                NodeType::SpecialBlock(_) => false,
+                NodeType::Error => panic!("should not call with error nodes"),
+            })
+        {
+            return Some(CollapsedChildrenType::Html(self.children().iter().join("")));
+        }
+
+        None
     }
 }
 
@@ -183,7 +232,7 @@ impl<'a, T> Node<'a, T> {
 
         let new_meta = transfer_func(&self);
 
-        // A bit verbose, but it's the only way to do a full tyep cast throughout the entire AST
+        // A bit verbose, but it's the only way to do a full type cast throughout the entire AST
         match self.node_type {
             NodeType::SpecialBlock(block) => Node {
                 metadata: new_meta,
@@ -374,8 +423,7 @@ impl<'a> DecorousAst<'a> {
     /// }
     /// ```
     pub fn iter_nodes(&'a self) -> NodeIter<'a, Location> {
-        let nodes = self.nodes().iter().collect::<Vec<&'a Node<'a, Location>>>();
-        NodeIter::new(nodes)
+        NodeIter::new(self.nodes())
     }
 
     pub fn into_components(self) -> (Vec<Node<'a, Location>>, Option<SyntaxNode>, Option<&'a str>) {
@@ -389,7 +437,7 @@ pub struct NodeIter<'a, T> {
 }
 
 impl<'a, T> NodeIter<'a, T> {
-    fn new(node: Vec<&'a Node<'a, T>>) -> NodeIter<'a, T> {
+    fn new(node: &'a [Node<'a, T>]) -> NodeIter<'a, T> {
         let mut stack = Vec::new();
         stack.extend(node);
         Self { stack }
@@ -407,5 +455,93 @@ impl<'a, T> Iterator for NodeIter<'a, T> {
 
             node
         })
+    }
+}
+
+impl<'a, T> fmt::Display for Node<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.node_type() {
+            NodeType::Text(t) => write!(f, "{t}"),
+            NodeType::Comment(c) => write!(f, "<!--{c}-->"),
+            NodeType::Element(elem) => write!(f, "{elem}"),
+            NodeType::Mustache(js) => write!(f, "{{{js}}}"),
+            NodeType::SpecialBlock(block) => write!(f, "{block}"),
+            NodeType::Error => write!(f, "ERROR"),
+        }
+    }
+}
+
+impl<'a, T> fmt::Display for Element<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "<{}{}>{}</{0}>",
+            self.tag(),
+            self.attrs().iter().join(" "),
+            self.children()
+                .iter()
+                .map(|elem| format!("  {elem}"))
+                .join("")
+        )
+    }
+}
+
+impl<'a> fmt::Display for Attribute<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Attribute::KeyValue(key, Some(val)) => write!(f, "{key}={val}"),
+            Attribute::KeyValue(key, None) => write!(f, "{key}"),
+            Attribute::EventHandler(event_handler) => write!(f, "{event_handler}"),
+            Attribute::Binding(binding) => write!(f, "bind:{binding}"),
+        }
+    }
+}
+
+impl<'a> fmt::Display for AttributeValue<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AttributeValue::Literal(literal) => write!(f, "\"{literal}\""),
+            AttributeValue::JavaScript(js) => write!(f, "{{{js}}}"),
+        }
+    }
+}
+
+impl<'a> fmt::Display for EventHandler<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "on:{}={{{}}}", self.event(), self.expr())
+    }
+}
+
+impl<'a, T> fmt::Display for SpecialBlock<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SpecialBlock::If(if_block) => write!(f, "{if_block}"),
+            SpecialBlock::For(for_block) => write!(f, "{for_block}"),
+        }
+    }
+}
+
+impl<'a, T> fmt::Display for IfBlock<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{#if {}}}\n{}\n{{/if}}",
+            self.expr(),
+            self.inner().iter().map(|elem| format!("  {elem}")).join(""),
+        )
+    }
+}
+
+impl<'a, T> fmt::Display for ForBlock<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{#for {} in {}}}\n{}\n{{/for}}",
+            self.index()
+                .map(|idx| format!("{idx}, {}", self.binding))
+                .unwrap_or_else(|| self.binding().to_string()),
+            self.expr(),
+            self.inner().iter().map(|elem| format!("  {elem}")).join(""),
+        )
     }
 }

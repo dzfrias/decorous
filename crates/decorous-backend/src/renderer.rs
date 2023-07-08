@@ -1,5 +1,5 @@
 use decorous_frontend::{
-    ast::{Attribute, AttributeValue, Node, NodeType},
+    ast::{Attribute, AttributeValue, CollapsedChildrenType, Node, NodeType},
     FragmentMetadata,
 };
 use rslint_parser::SmolStr;
@@ -27,14 +27,7 @@ where
             NodeType::Element(element) => {
                 writeln!(f, "let e{};", self.metadata().id())?;
 
-                // TODO: Write similar optimization for elements that have no mustache tags in
-                // them, as well as no mustache attrs. Abstract into method on Element.
-                if element.children().len() == 1
-                    && element
-                        .children()
-                        .first()
-                        .is_some_and(|child| matches!(child.node_type(), NodeType::Text(_)))
-                {
+                if element.inner_collapsed().is_some() {
                     return Ok(());
                 }
                 for child in element.children() {
@@ -96,10 +89,15 @@ where
                     }
                 }
 
-                if element.children().len() == 1 {
-                    if let NodeType::Text(text) = element.children().first().unwrap().node_type() {
-                        return writeln!(f, "e{}.textContent = \"{text}\";", self.metadata().id());
-                    }
+                if let Some(collapsed) = element.inner_collapsed() {
+                    return match collapsed {
+                        CollapsedChildrenType::Text(t) => {
+                            writeln!(f, "e{}.textContent = \"{t}\";", self.metadata().id())
+                        }
+                        CollapsedChildrenType::Html(html) => {
+                            writeln!(f, "e{}.innerHtml = \"{html}\"", self.metadata().id())
+                        }
+                    };
                 }
                 for child in element.children() {
                     child.create(f, toplevel_vars)?;
@@ -141,13 +139,7 @@ where
         }
 
         match self.node_type() {
-            NodeType::Element(element)
-                if !(element.children().len() == 1
-                    && element
-                        .children()
-                        .first()
-                        .is_some_and(|child| matches!(child.node_type(), NodeType::Text(_)))) =>
-            {
+            NodeType::Element(element) if element.inner_collapsed().is_none() => {
                 for child in element.children() {
                     child.mount(f, toplevel_vars)?;
                 }
@@ -175,8 +167,10 @@ where
                     }
                 }
 
-                for child in elem.children() {
-                    child.update(f, toplevel_vars)?;
+                if elem.inner_collapsed().is_none() {
+                    for child in elem.children() {
+                        child.update(f, toplevel_vars)?;
+                    }
                 }
                 Ok(())
             }
@@ -240,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn can_write_basic_elements_and_their_children() {
+    fn basic_elements_and_html_are_collapsed() {
         let node = Node::new(
             NodeType::Element(Element::new(
                 "div",
@@ -259,14 +253,14 @@ mod tests {
             FragmentMetadata::new(0, None, Location::new(0, 0)),
         );
 
-        test_lifecycle!(node, init, "let e0;\nlet e1;\nlet e2;\n", &HashMap::new());
-        test_lifecycle!(node, create, "e0 = document.createElement(\"div\");\ne1 = document.createTextNode(\"text\");\ne2 = document.createElement(\"div\");\n", &HashMap::new());
+        test_lifecycle!(node, init, "let e0;\n", &HashMap::new());
         test_lifecycle!(
             node,
-            mount,
-            "target.appendChild(e0);\ne0.appendChild(e1);\ne0.appendChild(e2);\n",
+            create,
+            "e0 = document.createElement(\"div\");\ne0.innerHtml = \"text<div></div>\"\n",
             &HashMap::new()
         );
+        test_lifecycle!(node, mount, "target.appendChild(e0);\n", &HashMap::new());
         test_lifecycle!(
             node,
             detach,

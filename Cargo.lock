@@ -85,6 +85,7 @@ name = "decorous-frontend"
 version = "0.1.0"
 dependencies = [
  "insta",
+ "itertools",
  "rslint_parser",
  "thiserror",
 ]
