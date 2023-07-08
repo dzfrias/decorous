@@ -61,8 +61,7 @@ where
                             Some(AttributeValue::Literal(literal)) => {
                                 writeln!(
                                     f,
-                                    "e{}.setAttribute(\"{key}\", \"{}\");",
-                                    literal.replace("\n", "\\n"),
+                                    "e{}.setAttribute(\"{key}\", String.raw`{literal}`);",
                                     self.metadata().id(),
                                 )?;
                             }
@@ -104,9 +103,8 @@ where
                         CollapsedChildrenType::Text(t) => {
                             writeln!(
                                 f,
-                                "e{}.textContent = \"{}\";",
+                                "e{}.textContent = String.raw`{t}`;",
                                 self.metadata().id(),
-                                t.replace("\n", "\\n")
                             )
                         }
                         CollapsedChildrenType::Html(html) => {
@@ -123,9 +121,8 @@ where
             NodeType::Text(text) => {
                 writeln!(
                     f,
-                    "e{} = document.createTextNode(\"{}\");",
+                    "e{} = document.createTextNode(String.raw`{text}`);",
                     self.metadata().id(),
-                    text.replace("\n", "\\n"),
                 )
             }
             NodeType::Mustache(mustache) => {
