@@ -3,6 +3,10 @@ name = "cli"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "decorous"
+path = "src/main.rs"
+
 [dependencies]
 clap = { version = "4.3.11", features = ["derive"] }
 decorous-frontend = { path = "../decorous-frontend" }
