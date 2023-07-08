@@ -1,15 +1,20 @@
 use std::collections::HashMap;
 
-use decorous_frontend::utils;
-use rslint_parser::{ast::AssignExpr, AstNode, SmolStr, SyntaxNode, SyntaxNodeExt};
+use rslint_parser::{
+    ast::{AssignExpr, NameRef},
+    AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
+};
 use rslint_text_edit::{apply_indels, Indel, TextRange};
 
-pub fn replace_namerefs(syntax_node: &SyntaxNode, toplevel_vars: &HashMap<SmolStr, u64>) -> String {
-    let unbound_refs = utils::get_unbound_refs(syntax_node);
+pub fn replace_namerefs(
+    syntax_node: &SyntaxNode,
+    name_refs: &[NameRef],
+    toplevel_vars: &HashMap<SmolStr, u32>,
+) -> String {
     let mut node_text = syntax_node.to_string();
 
     let mut indels = vec![];
-    for unbound in unbound_refs.into_iter().filter_map(|n| n.ident_token()) {
+    for unbound in name_refs.iter().filter_map(|n| n.ident_token()) {
         if unbound
             .parent()
             .parent()
@@ -29,7 +34,11 @@ pub fn replace_namerefs(syntax_node: &SyntaxNode, toplevel_vars: &HashMap<SmolSt
         );
         indels.push(indel);
     }
-    indels.extend(replace_assignments_indels(syntax_node, toplevel_vars));
+    indels.extend(replace_assignments_indels(
+        syntax_node,
+        name_refs,
+        toplevel_vars,
+    ));
     apply_indels(&indels, &mut node_text);
 
     node_text
@@ -37,10 +46,11 @@ pub fn replace_namerefs(syntax_node: &SyntaxNode, toplevel_vars: &HashMap<SmolSt
 
 pub fn replace_assignments(
     syntax_node: &SyntaxNode,
-    toplevel_vars: &HashMap<SmolStr, u64>,
+    name_refs: &[NameRef],
+    toplevel_vars: &HashMap<SmolStr, u32>,
 ) -> String {
     let mut node_text = syntax_node.to_string();
-    let indels = replace_assignments_indels(syntax_node, toplevel_vars);
+    let indels = replace_assignments_indels(syntax_node, name_refs, toplevel_vars);
     apply_indels(&indels, &mut node_text);
 
     node_text
@@ -48,12 +58,11 @@ pub fn replace_assignments(
 
 fn replace_assignments_indels(
     syntax_node: &SyntaxNode,
-    toplevel_vars: &HashMap<SmolStr, u64>,
+    name_refs: &[NameRef],
+    toplevel_vars: &HashMap<SmolStr, u32>,
 ) -> Vec<Indel> {
-    let unbound_refs = utils::get_unbound_refs(syntax_node);
-
     let mut indels = vec![];
-    for name_ref in unbound_refs {
+    for name_ref in name_refs {
         let Some(assignment) = name_ref.syntax().parent().and_then(|parent| parent.try_to::<AssignExpr>()) else {
             continue;
         };

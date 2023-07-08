@@ -2,6 +2,7 @@
 source: crates/decorous-backend/src/lib.rs
 expression: "String::from_utf8(out).unwrap()"
 ---
+const dirty = new Uint8Array(new ArrayBuffer(1));
 function make_fragment(ctx) {
 let e0;
 let e1;
@@ -14,8 +15,8 @@ m(target) {
 target.appendChild(e0);
 e0.appendChild(e1);
 },
-u(ctx) {
-e1.data = `${ctx[0]}hello`;
+u(ctx, dirty) {
+if (dirty[0] & 1) e1.data = `${ctx[0]}hello`;
 },
 d() {
 e0.parentNode.removeChild(e0);
@@ -33,11 +34,12 @@ fragment.c();
 fragment.m(document.getElementById("app"));
 let updating = false;
 function __schedule_update(ctx_idx, val) {
+ctx[ctx_idx] = val;
+dirty[Math.max(((ctx_idx + 7) // 8) - 1, 0)] |= 1 << (ctx_idx % 8);
 if (updating) return;
 updating = true;
 Promise.resolve().then(() => {
-ctx[ctx_idx] = val;
-fragment.u(ctx);
+fragment.u(ctx, dirty);
 updating = false;
 });
 }

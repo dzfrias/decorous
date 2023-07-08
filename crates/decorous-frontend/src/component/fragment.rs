@@ -2,13 +2,13 @@ use crate::ast::Location;
 
 #[derive(Debug)]
 pub struct FragmentMetadata {
-    id: u64,
-    parent_id: Option<u64>,
+    id: u32,
+    parent_id: Option<u32>,
     location: Location,
 }
 
 impl FragmentMetadata {
-    pub fn new(id: u64, parent_id: Option<u64>, location: Location) -> Self {
+    pub fn new(id: u32, parent_id: Option<u32>, location: Location) -> Self {
         Self {
             id,
             parent_id,
@@ -16,15 +16,15 @@ impl FragmentMetadata {
         }
     }
 
-    pub fn id(&self) -> u64 {
+    pub fn id(&self) -> u32 {
         self.id
     }
 
-    pub fn parent_id(&self) -> Option<u64> {
+    pub fn parent_id(&self) -> Option<u32> {
         self.parent_id
     }
 
-    pub fn set_parent_id(&mut self, parent_id: Option<u64>) {
+    pub fn set_parent_id(&mut self, parent_id: Option<u32>) {
         self.parent_id = parent_id;
     }
 

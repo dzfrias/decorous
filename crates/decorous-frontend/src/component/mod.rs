@@ -16,12 +16,12 @@ pub use fragment::FragmentMetadata;
 #[derive(Debug)]
 pub struct Component<'a> {
     fragment_tree: Vec<Node<'a, FragmentMetadata>>,
-    declared_vars: HashMap<SmolStr, u64>,
+    declared_vars: HashMap<SmolStr, u32>,
     toplevel_nodes: Vec<ToplevelNodeData>,
     hoist: Vec<SyntaxNode>,
 
-    current_id: u64,
-    current_var_id: u64,
+    current_id: u32,
+    current_var_id: u32,
 }
 
 #[derive(Debug)]
@@ -45,7 +45,7 @@ impl<'a> Component<'a> {
         c
     }
 
-    pub fn declared_vars(&self) -> &HashMap<SmolStr, u64> {
+    pub fn declared_vars(&self) -> &HashMap<SmolStr, u32> {
         &self.declared_vars
     }
 
@@ -114,7 +114,7 @@ impl<'a> Component<'a> {
     fn build_fragment_tree(&mut self, ast: Vec<Node<'a, Location>>) {
         fn build_fragment_tree_from_node<'a>(
             node: &'a mut Node<'_, FragmentMetadata>,
-            parent_id: u64,
+            parent_id: u32,
         ) {
             node.metadata_mut().set_parent_id(Some(parent_id));
 
@@ -155,13 +155,13 @@ impl<'a> Component<'a> {
             .collect();
     }
 
-    fn generate_id(&mut self) -> u64 {
+    fn generate_id(&mut self) -> u32 {
         let old = self.current_id;
         self.current_id += 1;
         old
     }
 
-    fn generate_var_id(&mut self) -> u64 {
+    fn generate_var_id(&mut self) -> u32 {
         let old = self.current_var_id;
         self.current_var_id += 1;
         old
@@ -193,7 +193,7 @@ mod tests {
                 (SmolStr::from("l"), 3)
             ]
             .into_iter()
-            .collect::<HashMap<SmolStr, u64>>(),
+            .collect::<HashMap<SmolStr, u32>>(),
             component.declared_vars()
         );
     }

@@ -1,5 +1,5 @@
 use crate::renderer::Renderer;
-use decorous_frontend::Component;
+use decorous_frontend::{utils, Component};
 use itertools::Itertools;
 use std::io;
 
@@ -20,6 +20,12 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
         writeln!(render_to, "{hoist}")?;
     }
 
+    writeln!(
+        render_to,
+        "const dirty = new Uint8Array(new ArrayBuffer({}));",
+        // Ceiling division to get the amount of bytes needed in the ArrayBuffer
+        ((component.declared_vars().len() + 8 - 1) / 8)
+    )?;
     writeln!(render_to, "function make_fragment(ctx) {{")?;
     render!(init);
 
@@ -32,7 +38,7 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
     render!(mount);
     writeln!(render_to, "}},")?;
 
-    writeln!(render_to, "u(ctx) {{")?;
+    writeln!(render_to, "u(ctx, dirty) {{")?;
     render!(update);
     writeln!(render_to, "}},")?;
 
@@ -52,7 +58,11 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
             .iter()
             .map(|node| {
                 if node.substitute_assign_refs {
-                    replace::replace_assignments(&node.node, component.declared_vars())
+                    replace::replace_assignments(
+                        &node.node,
+                        &utils::get_unbound_refs(&node.node),
+                        component.declared_vars(),
+                    )
                 } else {
                     node.node.to_string()
                 }
@@ -75,12 +85,14 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
     writeln!(
         render_to,
         "function __schedule_update(ctx_idx, val) {{
+ctx[ctx_idx] = val;
+dirty[Math.max(((ctx_idx + 7) // 8) - 1, 0)] |= 1 << (ctx_idx % 8);
 if (updating) return;
 updating = true;
 Promise.resolve().then(() => {{
-ctx[ctx_idx] = val;
-fragment.u(ctx);
+fragment.u(ctx, dirty);
 updating = false;
+ctx.fill(0);
 }});
 }}"
     )?;
@@ -107,6 +119,7 @@ mod tests {
             let mut out = vec![];
             render(&component, &mut out).unwrap();
 
+            println!("{}", String::from_utf8(out.clone()).unwrap());
             insta::assert_snapshot!(String::from_utf8(out).unwrap());
         };
     }
