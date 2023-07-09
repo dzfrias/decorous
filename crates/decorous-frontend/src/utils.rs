@@ -6,7 +6,7 @@ use rslint_parser::{
     AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
 };
 
-/// Get unbound variable references from a syntax element of the rslint_parser tree. This function
+/// Get unbound variable references from a syntax element of the `rslint_parser` tree. This function
 /// also takes scoped variables into account, so it is always correct.
 pub fn get_unbound_refs(syntax_node: &SyntaxNode) -> Vec<NameRef> {
     if syntax_node.is::<ExprStmt>() {
@@ -134,7 +134,7 @@ fn get_unbound_refs_from_block(
                     continue;
                 };
 
-                already_declared.push(ident.text().to_owned());
+                already_declared.push(ident.text().clone());
             }
             // If a variable declaration, add to list of declared items
             Stmt::Decl(Decl::VarDecl(var_decl)) => {
@@ -148,7 +148,7 @@ fn get_unbound_refs_from_block(
                 }
             }
             Stmt::ExprStmt(expr) if expr.expr().is_some() => {
-                get_unbound_refs_from_expr(expr.expr().unwrap(), already_declared, all)
+                get_unbound_refs_from_expr(expr.expr().unwrap(), already_declared, all);
             }
             stmt => stmt.syntax().descendants_with(&mut |node| {
                 if node.is::<BlockStmt>() {
@@ -196,19 +196,19 @@ pub fn get_idents_from_pattern(pat: Pattern) -> Vec<SmolStr> {
             if let Some(ident) = single
                 .name()
                 .and_then(|name| name.ident_token())
-                .map(|ident| ident.text().to_owned())
+                .map(|ident| ident.text().clone())
             {
                 idents.push(ident);
             }
         }
         Pattern::ArrayPattern(array) => {
-            idents.extend(array.elements().flat_map(get_idents_from_pattern))
+            idents.extend(array.elements().flat_map(get_idents_from_pattern));
         }
         Pattern::RestPattern(rest) if rest.pat().is_some() => {
-            idents.extend(get_idents_from_pattern(rest.pat().unwrap()))
+            idents.extend(get_idents_from_pattern(rest.pat().unwrap()));
         }
         Pattern::AssignPattern(assign) if assign.key().is_some() => {
-            idents.extend(get_idents_from_pattern(assign.key().unwrap()))
+            idents.extend(get_idents_from_pattern(assign.key().unwrap()));
         }
         Pattern::ObjectPattern(obj) => {
             for elem in obj.elements() {

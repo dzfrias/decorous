@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use decorous_frontend::DeclaredVariables;
 use rslint_parser::{
     ast::{ArrowExpr, AssignExpr, NameRef},
@@ -19,8 +21,8 @@ pub fn replace_namerefs(
                 return node_text;
             };
 
-            node_text.drain(..);
-            node_text.push_str(&format!("ctx[{idx}]"));
+            node_text.clear();
+            write!(&mut node_text, "ctx[{idx}]").expect("should be able to write to string");
             return node_text;
         }
     }

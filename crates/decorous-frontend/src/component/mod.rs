@@ -91,7 +91,7 @@ impl<'a> Component<'a> {
                     continue;
                 };
 
-                self.declared_vars.insert_var(ident.text().to_owned());
+                self.declared_vars.insert_var(ident.text().clone());
                 self.toplevel_nodes.push(ToplevelNodeData {
                     node: child,
                     substitute_assign_refs: true,

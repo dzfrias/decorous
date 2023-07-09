@@ -253,7 +253,7 @@ impl<'a> Parser<'a> {
                             nodes.push(Node::new(
                                 NodeType::Mustache(mustache),
                                 Location::new(start, self.index - 1),
-                            ))
+                            ));
                         }
                     }
                 }
@@ -272,7 +272,7 @@ impl<'a> Parser<'a> {
         F: Fn(char) -> bool,
     {
         let start = self.slice_index;
-        while self.peek().is_some_and(|c| predicate(c)) {
+        while self.peek().is_some_and(&predicate) {
             self.consume();
         }
 
@@ -485,11 +485,7 @@ impl<'a> Parser<'a> {
 
         // Turn into rslint JavaScript syntax tree
         let script = rslint_parser::parse_text(expr, 0).syntax();
-        if let Some(child) = script.first_child() {
-            child
-        } else {
-            script
-        }
+        script.first_child().map_or(script, |child| child)
     }
 
     fn try_parse_comment(&mut self) -> Option<Node<'a, Location>> {
@@ -662,13 +658,11 @@ impl<'a> Parser<'a> {
         let start = self.slice_index;
         let mut end_found = false;
         while !end_found && self.peek().is_some() {
-            if self.consume() == Some('<') {
-                if self.consume() == Some('/') {
-                    let rest = self.consume_while(|c| c.is_ascii_alphabetic());
-                    if rest == name {
-                        self.expect_consume('>');
-                        end_found = true
-                    }
+            if self.consume() == Some('<') && self.consume() == Some('/') {
+                let rest = self.consume_while(|c| c.is_ascii_alphabetic());
+                if rest == name {
+                    self.expect_consume('>');
+                    end_found = true;
                 }
             }
         }
@@ -710,7 +704,7 @@ impl<'a> Parser<'a> {
                     .span
                     .range
                     .end += script_start;
-                self.errors.push(ParseError::JavaScriptParseError(err))
+                self.errors.push(ParseError::JavaScriptParseError(err));
             }
             syntax
         }
@@ -725,8 +719,8 @@ impl<'a> Parser<'a> {
 fn is_control_or_delim(ch: char) -> bool {
     match ch {
         '\u{007F}' => true,
-        c if c >= '\u{0000}' && c <= '\u{001F}' => true,
-        c if c >= '\u{0080}' && c <= '\u{009F}' => true,
+        c if ('\u{0000}'..'\u{001F}').contains(&c) => true,
+        c if ('\u{0080}'..'\u{009F}').contains(&c) => true,
         ' ' | '"' | '\'' | '>' | '/' | '=' | ':' => true,
         _ => false,
     }

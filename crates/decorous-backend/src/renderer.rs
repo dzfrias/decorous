@@ -22,7 +22,7 @@ impl<'a, T> Renderer<T> for Node<'a, FragmentMetadata>
 where
     T: io::Write,
 {
-    fn init(&self, f: &mut T, toplevel_vars: &DeclaredVariables) -> io::Result<()> {
+    fn init(&self, f: &mut T, _toplevel_vars: &DeclaredVariables) -> io::Result<()> {
         match self.node_type() {
             NodeType::Element(element) => {
                 writeln!(f, "let e{};", self.metadata().id())?;
@@ -31,7 +31,7 @@ where
                     return Ok(());
                 }
                 for child in element.children() {
-                    child.init(f, toplevel_vars)?;
+                    child.init(f, _toplevel_vars)?;
                 }
                 Ok(())
             }
@@ -62,7 +62,7 @@ where
                                 writeln!(
                                     f,
                                     "e{}.setAttribute(\"{key}\", {}{}{1});",
-                                    use_quotes.then(|| "\"").unwrap_or_default(),
+                                    use_quotes.then_some("\"").unwrap_or_default(),
                                     s,
                                     self.metadata().id(),
                                 )?;
@@ -72,8 +72,8 @@ where
                                 "e{}.setAttribute(\"{key}\", {});",
                                 self.metadata().id(),
                                 replace::replace_namerefs(
-                                    &js,
-                                    &utils::get_unbound_refs(&js),
+                                    js,
+                                    &utils::get_unbound_refs(js),
                                     toplevel_vars
                                 )
                             )?,
@@ -108,7 +108,7 @@ where
                                 f,
                                 "e{}.textContent = {}{s}{1};",
                                 self.metadata().id(),
-                                use_qutoes.then(|| "\"").unwrap_or_default()
+                                use_qutoes.then_some("\"").unwrap_or_default()
                             )
                         }
                         CollapsedChildrenType::Html(html) => {
@@ -128,7 +128,7 @@ where
                     f,
                     "e{} = document.createTextNode({}{s}{1});",
                     self.metadata().id(),
-                    use_qutoes.then(|| "\"").unwrap_or_default()
+                    use_qutoes.then_some("\"").unwrap_or_default()
                 )
             }
             NodeType::Mustache(mustache) => {
@@ -149,7 +149,7 @@ where
         }
     }
 
-    fn mount(&self, f: &mut T, toplevel_vars: &DeclaredVariables) -> io::Result<()> {
+    fn mount(&self, f: &mut T, _toplevel_vars: &DeclaredVariables) -> io::Result<()> {
         if matches!(self.node_type(), NodeType::Comment(_)) {
             return Ok(());
         }
@@ -163,7 +163,7 @@ where
         match self.node_type() {
             NodeType::Element(element) if element.inner_collapsed().is_none() => {
                 for child in element.children() {
-                    child.mount(f, toplevel_vars)?;
+                    child.mount(f, _toplevel_vars)?;
                 }
             }
             NodeType::Error => panic!("should not have an error node during rendering phase"),
@@ -178,8 +178,9 @@ where
         match self.node_type() {
             NodeType::Element(elem) => {
                 for attr in elem.attrs() {
-                    match attr {
-                        Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) => writeln!(
+                    // TODO: Update to use dirty
+                    if let Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) = attr {
+                        writeln!(
                             f,
                             "e{}.setAttribute(\"{key}\", {});",
                             self.metadata().id(),
@@ -188,8 +189,7 @@ where
                                 &utils::get_unbound_refs(js),
                                 toplevel_vars
                             )
-                        )?,
-                        _ => {}
+                        )?;
                     }
                 }
 
@@ -204,7 +204,7 @@ where
                 let unbound = utils::get_unbound_refs(mustache);
                 let mut dirty_indices: Vec<(usize, u8)> = vec![];
                 for unbound in &unbound {
-                    let Some(ident) = unbound.ident_token().map(|tok| tok.text().to_owned()) else {
+                    let Some(ident) = unbound.ident_token().map(|tok| tok.text().clone()) else {
                         continue;
                     };
                     let Some(idx) = toplevel_vars.get_var(&ident) else {
@@ -219,7 +219,7 @@ where
                     if let Some(pos) = dirty_indices.iter().position(|(idx, _)| *idx == dirty_idx) {
                         dirty_indices[pos].1 |= bitmask;
                     } else {
-                        dirty_indices.push((dirty_idx, bitmask))
+                        dirty_indices.push((dirty_idx, bitmask));
                     }
                 }
                 let new_text = replace::replace_namerefs(mustache, &unbound, toplevel_vars);

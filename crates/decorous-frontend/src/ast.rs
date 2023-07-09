@@ -143,17 +143,14 @@ impl<'a, T> Element<'a, T> {
         // Test if the inner descendants are normal HTML (no mustaches or special blocks)
         if !self.children().is_empty()
             && self.descendents().all(|node| match node.node_type() {
-                NodeType::Text(_) => true,
+                NodeType::Text(_) | NodeType::Comment(_) => true,
                 // For elements, check if any attributes have mustache tags
                 NodeType::Element(elem) => elem.attrs().iter().all(|attr| match attr {
                     Attribute::KeyValue(_, None) => true,
                     Attribute::KeyValue(_, Some(val)) => matches!(val, AttributeValue::Literal(_)),
-                    Attribute::Binding(_) => false,
-                    Attribute::EventHandler(_) => false,
+                    Attribute::Binding(_) | Attribute::EventHandler(_) => false,
                 }),
-                NodeType::Comment(_) => true,
-                NodeType::Mustache(_) => false,
-                NodeType::SpecialBlock(_) => false,
+                NodeType::Mustache(_) | NodeType::SpecialBlock(_) => false,
                 NodeType::Error => panic!("should not call with error nodes"),
             })
         {
@@ -373,7 +370,7 @@ impl<'a, T> IfBlock<'a, T> {
     }
 
     pub fn else_block(&self) -> Option<&[Node<'a, T>]> {
-        self.else_block.as_ref().map(|block| block.as_slice())
+        self.else_block.as_deref()
     }
 
     pub fn inner_mut(&mut self) -> &mut Vec<Node<'a, T>> {
@@ -537,9 +534,10 @@ impl<'a, T> fmt::Display for ForBlock<'a, T> {
         write!(
             f,
             "{{#for {} in {}}}\n{}\n{{/for}}",
-            self.index()
-                .map(|idx| format!("{idx}, {}", self.binding))
-                .unwrap_or_else(|| self.binding().to_string()),
+            self.index().map_or_else(
+                || self.binding().to_owned(),
+                |idx| format!("{idx}, {}", self.binding)
+            ),
             self.expr(),
             self.inner().iter().map(|elem| format!("  {elem}")).join(""),
         )

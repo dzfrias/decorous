@@ -1,0 +1,136 @@
+# This is a configuration file for the bacon tool
+
+default_job = "check"
+
+[jobs.check]
+command = ["cargo", "check", "--color", "always"]
+need_stdout = false
+
+[jobs.check-all]
+command = ["cargo", "check", "--all-targets", "--color", "always"]
+need_stdout = false
+
+[jobs.clippy]
+command = [
+    "cargo", "clippy",
+    "--all-targets",
+    "--color", "always",
+    "--",
+    "-F", "unsafe_code",
+    "-W", "clippy::all",
+    "-W", "clippy::char_lit_as_u8",
+    "-W", "clippy::perf",
+    "-W", "clippy::exit",
+    "-W", "clippy::dbg_macro",
+    "-W", "clippy::checked_conversions",
+    "-W", "clippy::dbg_macro",
+    "-W", "clippy::debug_assert_with_mut_call",
+    "-W", "clippy::doc_markdown",
+    "-W", "clippy::empty_enum",
+    "-W", "clippy::enum_glob_use",
+    "-W", "clippy::exit",
+    "-W", "clippy::expl_impl_clone_on_copy",
+    "-W", "clippy::explicit_deref_methods",
+    "-W", "clippy::explicit_into_iter_loop",
+    "-W", "clippy::filter_map_next",
+    "-W", "clippy::filetype_is_file",
+    "-W", "clippy::flat_map_option",
+    "-W", "clippy::equatable_if_let",
+    "-W", "clippy::float_cmp_const",
+    "-W", "clippy::from_iter_instead_of_collect",
+    "-W", "clippy::fallible_impl_from",
+    "-W", "clippy::if_let_mutex",
+    "-W", "clippy::implicit_clone",
+    "-W", "clippy::imprecise_flops",
+    "-W", "clippy::inefficient_to_string",
+    "-W", "clippy::invalid_upcast_comparisons",
+    "-W", "clippy::large_digit_groups",
+    "-W", "clippy::large_stack_arrays",
+    "-W", "clippy::large_types_passed_by_value",
+    "-W", "clippy::let_unit_value",
+    "-W", "clippy::lossy_float_literal",
+    "-W", "clippy::macro_use_imports",
+    "-W", "clippy::manual_ok_or",
+    "-W", "clippy::map_err_ignore",
+    "-W", "clippy::map_flatten",
+    "-W", "clippy::map_unwrap_or",
+    "-W", "clippy::match_on_vec_items",
+    "-W", "clippy::match_same_arms",
+    "-W", "clippy::match_wild_err_arm",
+    "-W", "clippy::match_wildcard_for_single_variants",
+    "-W", "clippy::mem_forget",
+    "-W", "clippy::mismatched_target_os",
+    "-W", "clippy::missing_enforced_import_renames",
+    "-W", "clippy::mut_mut",
+    "-W", "clippy::mutex_integer",
+    "-W", "clippy::manual_let_else",
+    "-W", "clippy::manual_string_new",
+    "-W", "clippy::manual_ok_or",
+    "-W", "clippy::needless_borrow",
+    "-W", "clippy::mem_forget",
+    "-W", "clippy::needless_continue",
+    "-W", "clippy::needless_collect",
+    "-W", "clippy::option_if_let_else",
+    "-W", "clippy::ref_option_ref",
+    "-W", "clippy::needless_for_each",
+    "-W", "clippy::option_option",
+    "-W", "clippy::path_buf_push_overwrite",
+    "-W", "clippy::ptr_as_ptr",
+    "-W", "clippy::rc_mutex",
+    "-W", "clippy::rest_pat_in_fully_bound_structs",
+    "-W", "clippy::unused_self",
+    "-W", "clippy::unreadable_literal",
+    "-W", "clippy::same_functions_in_if_condition",
+    "-W", "clippy::semicolon_if_nothing_returned",
+    "-W", "clippy::single_match_else",
+    "-W", "clippy::string_add_assign",
+    "-W", "clippy::string_add",
+    "-W", "clippy::string_lit_as_bytes",
+    "-W", "clippy::string_to_string",
+    "-W", "clippy::trait_duplication_in_bounds",
+    "-W", "clippy::unimplemented",
+    "-W", "clippy::unnested_or_patterns",
+    "-W", "clippy::useless_transmute",
+    "-W", "clippy::string_add",
+    "-W", "clippy::str_to_string",
+    "-W", "clippy::fn_params_excessive_bools",
+    "-W", "clippy::format_push_string",
+    "-W", "clippy::verbose_file_reads",
+    "-W", "clippy::zero_sized_map_values",
+    "-W", "clippy::as_underscore",
+    "-W", "clippy::linkedlist",
+    "-W", "future_incompatible",
+    "-W", "nonstandard_style",
+]
+need_stdout = false
+
+[jobs.test]
+command = [
+    "cargo", "test", "--color", "always",
+    "--", "--color", "always", # see https://github.com/Canop/bacon/issues/124
+]
+need_stdout = true
+
+[jobs.doc]
+command = ["cargo", "doc", "--color", "always", "--no-deps"]
+need_stdout = false
+
+# If the doc compiles, then it opens in your browser and bacon switches
+# to the previous job
+[jobs.doc-open]
+command = ["cargo", "doc", "--color", "always", "--no-deps", "--open"]
+need_stdout = false
+on_success = "back" # so that we don't open the browser at each change
+
+# You can run your application and have the result displayed in bacon,
+# *if* it makes sense for this crate. You can run an example the same
+# way. Don't forget the `--color always` part or the errors won't be
+# properly parsed.
+[jobs.run]
+command = [
+    "cargo", "run",
+    "--color", "always",
+    # put launch parameters for your program behind a `--` separator
+]
+need_stdout = true
+allow_warnings = true

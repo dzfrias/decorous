@@ -48,6 +48,10 @@ impl DeclaredVariables {
         self.vars.len() + self.arrow_exprs.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     fn generate_id(&mut self) -> u32 {
         let old = self.current_id;
         self.current_id += 1;
