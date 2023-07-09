@@ -12,7 +12,7 @@ c() {
 e0 = document.createElement("p");
 e1 = document.createTextNode(ctx[0]);
 e2 = document.createElement("button");
-e2.addEventListener("click", () => {if (ctx[0] == 3) { __schedule_update(0, x = 44); }});
+e2.addEventListener("click", ctx[1]);
 e2.textContent = "Clickme";
 },
 m(target) {
@@ -31,7 +31,8 @@ e2.parentNode.removeChild(e2);
 }
 function __init_ctx() {
 let x = 3;
-return [x];
+let __closure1 = () => {if (x == 3) { __schedule_update(0, x = 44); }};
+return [x,__closure1];
 }
 const ctx = __init_ctx();
 const fragment = make_fragment(ctx);

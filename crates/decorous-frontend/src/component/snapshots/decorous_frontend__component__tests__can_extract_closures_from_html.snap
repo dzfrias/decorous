@@ -1,0 +1,32 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component.declared_vars()
+---
+DeclaredVariables {
+    vars: {},
+    arrow_exprs: {
+        ArrowExpr {
+            syntax: ARROW_EXPR@0..26
+              PARAMETER_LIST@0..2
+                L_PAREN@0..1 "("
+                R_PAREN@1..2 ")"
+              WHITESPACE@2..3 " "
+              FAT_ARROW@3..5 "=>"
+              WHITESPACE@5..6 " "
+              CALL_EXPR@6..26
+                DOT_EXPR@6..17
+                  NAME_REF@6..13
+                    IDENT@6..13 "console"
+                  DOT@13..14 "."
+                  NAME@14..17
+                    IDENT@14..17 "log"
+                ARG_LIST@17..26
+                  L_PAREN@17..18 "("
+                  LITERAL@18..25
+                    STRING@18..25 "\"hello\""
+                  R_PAREN@25..26 ")"
+            ,
+        }: 0,
+    },
+    current_id: 1,
+}

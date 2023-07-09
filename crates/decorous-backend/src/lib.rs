@@ -1,7 +1,8 @@
 use crate::renderer::Renderer;
 use decorous_frontend::{utils, Component};
 use itertools::Itertools;
-use std::io;
+use rslint_parser::AstNode;
+use std::{borrow::Cow, io};
 
 mod renderer;
 pub mod replace;
@@ -24,7 +25,7 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
         render_to,
         "const dirty = new Uint8Array(new ArrayBuffer({}));",
         // Ceiling division to get the amount of bytes needed in the ArrayBuffer
-        ((component.declared_vars().len() + 8 - 1) / 8)
+        ((component.declared_vars().len() + 7) / 8)
     )?;
     writeln!(render_to, "function make_fragment(ctx) {{")?;
     render!(init);
@@ -70,9 +71,24 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
             .join("\n")
     )?;
 
-    let mut ctx = vec![""; component.declared_vars().len()];
-    for (name, idx) in component.declared_vars() {
-        ctx[*idx as usize] = name;
+    for (arrow_expr, idx) in component.declared_vars().all_arrow_exprs() {
+        writeln!(
+            render_to,
+            "let __closure{idx} = {};",
+            replace::replace_assignments(
+                arrow_expr.syntax(),
+                &utils::get_unbound_refs(arrow_expr.syntax()),
+                component.declared_vars()
+            )
+        )?;
+    }
+
+    let mut ctx = vec![Cow::Borrowed(""); component.declared_vars().len()];
+    for (name, idx) in component.declared_vars().all_vars() {
+        ctx[*idx as usize] = Cow::Borrowed(name);
+    }
+    for idx in component.declared_vars().all_arrow_exprs().values() {
+        ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
     }
     writeln!(render_to, "return [{}];", ctx.join(","))?;
     writeln!(render_to, "}}")?;

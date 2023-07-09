@@ -1,10 +1,9 @@
 use decorous_frontend::{
     ast::{Attribute, AttributeValue, CollapsedChildrenType, Node, NodeType},
-    utils, FragmentMetadata,
+    utils, DeclaredVariables, FragmentMetadata,
 };
 use itertools::Itertools;
-use rslint_parser::SmolStr;
-use std::{borrow::Cow, collections::HashMap, io};
+use std::{borrow::Cow, io};
 
 use crate::replace;
 
@@ -12,18 +11,18 @@ pub trait Renderer<T>
 where
     T: io::Write,
 {
-    fn init(&self, f: &mut T, toplevel_vars: &HashMap<SmolStr, u32>) -> io::Result<()>;
-    fn create(&self, f: &mut T, toplevel_vars: &HashMap<SmolStr, u32>) -> io::Result<()>;
-    fn mount(&self, f: &mut T, toplevel_vars: &HashMap<SmolStr, u32>) -> io::Result<()>;
-    fn update(&self, f: &mut T, toplevel_vars: &HashMap<SmolStr, u32>) -> io::Result<()>;
-    fn detach(&self, f: &mut T, toplevel_vars: &HashMap<SmolStr, u32>) -> io::Result<()>;
+    fn init(&self, f: &mut T, toplevel_vars: &DeclaredVariables) -> io::Result<()>;
+    fn create(&self, f: &mut T, toplevel_vars: &DeclaredVariables) -> io::Result<()>;
+    fn mount(&self, f: &mut T, toplevel_vars: &DeclaredVariables) -> io::Result<()>;
+    fn update(&self, f: &mut T, toplevel_vars: &DeclaredVariables) -> io::Result<()>;
+    fn detach(&self, f: &mut T, toplevel_vars: &DeclaredVariables) -> io::Result<()>;
 }
 
 impl<'a, T> Renderer<T> for Node<'a, FragmentMetadata>
 where
     T: io::Write,
 {
-    fn init(&self, f: &mut T, toplevel_vars: &HashMap<SmolStr, u32>) -> io::Result<()> {
+    fn init(&self, f: &mut T, toplevel_vars: &DeclaredVariables) -> io::Result<()> {
         match self.node_type() {
             NodeType::Element(element) => {
                 writeln!(f, "let e{};", self.metadata().id())?;
@@ -45,7 +44,7 @@ where
         }
     }
 
-    fn create(&self, f: &mut T, toplevel_vars: &HashMap<SmolStr, u32>) -> io::Result<()> {
+    fn create(&self, f: &mut T, toplevel_vars: &DeclaredVariables) -> io::Result<()> {
         match self.node_type() {
             NodeType::Element(element) => {
                 writeln!(
@@ -150,7 +149,7 @@ where
         }
     }
 
-    fn mount(&self, f: &mut T, toplevel_vars: &HashMap<SmolStr, u32>) -> io::Result<()> {
+    fn mount(&self, f: &mut T, toplevel_vars: &DeclaredVariables) -> io::Result<()> {
         if matches!(self.node_type(), NodeType::Comment(_)) {
             return Ok(());
         }
@@ -175,7 +174,7 @@ where
         Ok(())
     }
 
-    fn update(&self, f: &mut T, toplevel_vars: &HashMap<SmolStr, u32>) -> io::Result<()> {
+    fn update(&self, f: &mut T, toplevel_vars: &DeclaredVariables) -> io::Result<()> {
         match self.node_type() {
             NodeType::Element(elem) => {
                 for attr in elem.attrs() {
@@ -208,7 +207,7 @@ where
                     let Some(ident) = unbound.ident_token().map(|tok| tok.text().to_owned()) else {
                         continue;
                     };
-                    let Some(idx) = toplevel_vars.get(&ident) else {
+                    let Some(idx) = toplevel_vars.get_var(&ident) else {
                         continue;
                     };
                     // Get the byte index for the dirty bitmap. Need to subtract one because
@@ -216,7 +215,7 @@ where
                     let dirty_idx = ((idx + 7) / 8).saturating_sub(1) as usize;
 
                     // Modulo 8 so it wraps every byte. The byte is tracked by dirty_idx
-                    let bitmask = 1 << (*idx % 8);
+                    let bitmask = 1 << (idx % 8);
                     if let Some(pos) = dirty_indices.iter().position(|(idx, _)| *idx == dirty_idx) {
                         dirty_indices[pos].1 |= bitmask;
                     } else {
@@ -238,7 +237,7 @@ where
         }
     }
 
-    fn detach(&self, f: &mut T, _toplevel_vars: &HashMap<SmolStr, u32>) -> io::Result<()> {
+    fn detach(&self, f: &mut T, _toplevel_vars: &DeclaredVariables) -> io::Result<()> {
         if matches!(self.node_type(), NodeType::Comment(_)) {
             return Ok(());
         }
@@ -252,6 +251,9 @@ where
     }
 }
 
+// Boolean also returned because I really didn't want to allocate a new String here... maybe
+// there's a better way? The bool denotes if the caller should use quotes when surrounding the
+// text.
 fn collapse_whitespace(input: &str) -> (Cow<str>, bool) {
     if input == "\n" {
         (Cow::Borrowed(" "), true)
@@ -266,7 +268,7 @@ fn collapse_whitespace(input: &str) -> (Cow<str>, bool) {
 mod tests {
     use super::*;
     use decorous_frontend::ast::{Element, Location};
-    use rslint_parser::parse_text;
+    use rslint_parser::{parse_text, SmolStr};
 
     macro_rules! test_lifecycle {
         ($node:expr, $cycle_func:ident, $expected:expr, $unbound_refs:expr) => {
@@ -283,19 +285,24 @@ mod tests {
             FragmentMetadata::new(0, None, Location::new(0, 1)),
         );
 
-        test_lifecycle!(node, init, "let e0;\n", &HashMap::new());
+        test_lifecycle!(node, init, "let e0;\n", &DeclaredVariables::new());
         test_lifecycle!(
             node,
             create,
             "e0 = document.createTextNode(\"hello\");\n",
-            &HashMap::new()
+            &DeclaredVariables::new()
         );
-        test_lifecycle!(node, mount, "target.appendChild(e0);\n", &HashMap::new());
+        test_lifecycle!(
+            node,
+            mount,
+            "target.appendChild(e0);\n",
+            &DeclaredVariables::new()
+        );
         test_lifecycle!(
             node,
             detach,
             "e0.parentNode.removeChild(e0);\n",
-            &HashMap::new()
+            &DeclaredVariables::new()
         );
     }
 
@@ -319,19 +326,24 @@ mod tests {
             FragmentMetadata::new(0, None, Location::new(0, 0)),
         );
 
-        test_lifecycle!(node, init, "let e0;\n", &HashMap::new());
+        test_lifecycle!(node, init, "let e0;\n", &DeclaredVariables::new());
         test_lifecycle!(
             node,
             create,
             "e0 = document.createElement(\"div\");\ne0.innerHtml = \"text<div></div>\"\n",
-            &HashMap::new()
+            &DeclaredVariables::new()
         );
-        test_lifecycle!(node, mount, "target.appendChild(e0);\n", &HashMap::new());
+        test_lifecycle!(
+            node,
+            mount,
+            "target.appendChild(e0);\n",
+            &DeclaredVariables::new()
+        );
         test_lifecycle!(
             node,
             detach,
             "e0.parentNode.removeChild(e0);\n",
-            &HashMap::new()
+            &DeclaredVariables::new()
         );
     }
 
@@ -343,7 +355,11 @@ mod tests {
             FragmentMetadata::new(0, None, Location::new(0, 0)),
         );
 
-        let declared = HashMap::from([(SmolStr::new("hi"), 0)]);
+        let declared = {
+            let mut vars = DeclaredVariables::new();
+            vars.insert_var(SmolStr::new("hi"));
+            vars
+        };
         test_lifecycle!(node, init, "let e0;\n", &declared);
         test_lifecycle!(
             node,
@@ -375,19 +391,24 @@ mod tests {
             FragmentMetadata::new(0, None, Location::new(0, 0)),
         );
 
-        test_lifecycle!(node, init, "let e0;\n", &HashMap::new());
+        test_lifecycle!(node, init, "let e0;\n", &DeclaredVariables::new());
         test_lifecycle!(
             node,
             create,
             "e0 = document.createElement(\"span\");\ne0.textContent = \"hello\";\n",
-            &HashMap::new()
+            &DeclaredVariables::new()
         );
-        test_lifecycle!(node, mount, "target.appendChild(e0);\n", &HashMap::new());
+        test_lifecycle!(
+            node,
+            mount,
+            "target.appendChild(e0);\n",
+            &DeclaredVariables::new()
+        );
         test_lifecycle!(
             node,
             detach,
             "e0.parentNode.removeChild(e0);\n",
-            &HashMap::new()
+            &DeclaredVariables::new()
         );
     }
 
@@ -402,7 +423,12 @@ mod tests {
             FragmentMetadata::new(0, None, Location::new(0, 0)),
         );
 
-        let declared = HashMap::from([(SmolStr::new("hello"), 0), (SmolStr::new("test"), 1)]);
+        let declared = {
+            let mut vars = DeclaredVariables::new();
+            vars.insert_var(SmolStr::new("hello"));
+            vars.insert_var(SmolStr::new("test"));
+            vars
+        };
         test_lifecycle!(
             node,
             update,

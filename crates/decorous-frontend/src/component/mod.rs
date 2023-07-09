@@ -1,27 +1,26 @@
+mod declared_vars;
 mod fragment;
 
-use std::collections::HashMap;
-
 use rslint_parser::{
-    ast::{FnDecl, ImportDecl, VarDecl},
-    SmolStr, SyntaxNode, SyntaxNodeExt,
+    ast::{ArrowExpr, FnDecl, ImportDecl, VarDecl},
+    SyntaxNode, SyntaxNodeExt,
 };
 
 use crate::{
-    ast::{DecorousAst, Location, Node, NodeType, SpecialBlock},
+    ast::{Attribute, DecorousAst, Location, Node, NodeType, SpecialBlock},
     utils,
 };
+pub use declared_vars::DeclaredVariables;
 pub use fragment::FragmentMetadata;
 
 #[derive(Debug)]
 pub struct Component<'a> {
     fragment_tree: Vec<Node<'a, FragmentMetadata>>,
-    declared_vars: HashMap<SmolStr, u32>,
+    declared_vars: DeclaredVariables,
     toplevel_nodes: Vec<ToplevelNodeData>,
     hoist: Vec<SyntaxNode>,
 
     current_id: u32,
-    current_var_id: u32,
 }
 
 #[derive(Debug)]
@@ -35,17 +34,16 @@ impl<'a> Component<'a> {
     pub fn new(ast: DecorousAst<'a>) -> Self {
         let mut c = Self {
             fragment_tree: vec![],
-            declared_vars: HashMap::new(),
+            declared_vars: DeclaredVariables::new(),
             toplevel_nodes: vec![],
             hoist: vec![],
             current_id: 0,
-            current_var_id: 0,
         };
         c.compute(ast);
         c
     }
 
-    pub fn declared_vars(&self) -> &HashMap<SmolStr, u32> {
+    pub fn declared_vars(&self) -> &DeclaredVariables {
         &self.declared_vars
     }
 
@@ -80,8 +78,7 @@ impl<'a> Component<'a> {
                 for pattern in var_decl.declared().filter_map(|decl| decl.pattern()) {
                     let idents = utils::get_idents_from_pattern(pattern);
                     for ident in idents {
-                        let id = self.generate_var_id();
-                        self.declared_vars.insert(ident, id);
+                        self.declared_vars.insert_var(ident);
                     }
                 }
                 self.toplevel_nodes.push(ToplevelNodeData {
@@ -94,8 +91,7 @@ impl<'a> Component<'a> {
                     continue;
                 };
 
-                let id = self.generate_var_id();
-                self.declared_vars.insert(ident.text().to_owned(), id);
+                self.declared_vars.insert_var(ident.text().to_owned());
                 self.toplevel_nodes.push(ToplevelNodeData {
                     node: child,
                     substitute_assign_refs: true,
@@ -112,64 +108,74 @@ impl<'a> Component<'a> {
     }
 
     fn build_fragment_tree(&mut self, ast: Vec<Node<'a, Location>>) {
-        fn build_fragment_tree_from_node<'a>(
-            node: &'a mut Node<'_, FragmentMetadata>,
-            parent_id: u32,
-        ) {
-            node.metadata_mut().set_parent_id(Some(parent_id));
+        let mut fragment_tree = vec![];
+
+        for node in ast {
+            let mut node = node.cast_meta(&mut |node| {
+                let id = self.generate_elem_id();
+                FragmentMetadata::new(id, None, *node.metadata())
+            });
 
             let id = node.metadata().id();
-            match node.node_type_mut() {
-                NodeType::Element(elem) => elem
-                    .children_mut()
-                    .iter_mut()
-                    .for_each(|child| build_fragment_tree_from_node(child, id)),
-                NodeType::SpecialBlock(block) => match block {
-                    SpecialBlock::If(if_block) => if_block
-                        .inner_mut()
-                        .iter_mut()
-                        .for_each(|child| build_fragment_tree_from_node(child, id)),
-                    SpecialBlock::For(for_block) => for_block
-                        .inner_mut()
-                        .iter_mut()
-                        .for_each(|child| build_fragment_tree_from_node(child, id)),
-                },
-                _ => {}
-            }
-        }
+            self.build_fragment_tree_from_node(&mut node, id);
+            node.metadata_mut().set_parent_id(None);
 
-        self.fragment_tree = ast
-            .into_iter()
-            .map(|node| {
-                node.cast_meta(&mut |node| {
-                    let id = self.generate_id();
-                    FragmentMetadata::new(id, None, *node.metadata())
-                })
-            })
-            .map(|mut node| {
-                let id = node.metadata().id();
-                build_fragment_tree_from_node(&mut node, id);
-                node.metadata_mut().set_parent_id(None);
-                node
-            })
-            .collect();
+            fragment_tree.push(node);
+        }
+        self.fragment_tree = fragment_tree;
     }
 
-    fn generate_id(&mut self) -> u32 {
+    fn build_fragment_tree_from_node(
+        &mut self,
+        node: &mut Node<'_, FragmentMetadata>,
+        parent_id: u32,
+    ) {
+        node.metadata_mut().set_parent_id(Some(parent_id));
+
+        let id = node.metadata().id();
+        match node.node_type_mut() {
+            NodeType::Element(elem) => {
+                for attr in elem.attrs() {
+                    if let Attribute::EventHandler(handler) = attr {
+                        if let Some(first_child) = handler.expr().first_child() {
+                            if first_child.is::<ArrowExpr>() {
+                                self.declared_vars.insert_arrow_expr(first_child.to());
+                            }
+                        }
+                    }
+                }
+
+                elem.children_mut()
+                    .iter_mut()
+                    .for_each(|child| self.build_fragment_tree_from_node(child, id));
+            }
+            NodeType::SpecialBlock(block) => match block {
+                SpecialBlock::If(if_block) => if_block
+                    .inner_mut()
+                    .iter_mut()
+                    .for_each(|child| self.build_fragment_tree_from_node(child, id)),
+                SpecialBlock::For(for_block) => for_block
+                    .inner_mut()
+                    .iter_mut()
+                    .for_each(|child| self.build_fragment_tree_from_node(child, id)),
+            },
+            _ => {}
+        }
+    }
+
+    fn generate_elem_id(&mut self) -> u32 {
         let old = self.current_id;
         self.current_id += 1;
-        old
-    }
-
-    fn generate_var_id(&mut self) -> u32 {
-        let old = self.current_var_id;
-        self.current_var_id += 1;
         old
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use rslint_parser::SmolStr;
+
     use super::*;
     use crate::{ParseError, Parser};
 
@@ -186,15 +192,15 @@ mod tests {
             "<script>let x, z = (3, 2); const y = 55; const [...l] = thing</script>",
         );
         assert_eq!(
-            &[
+            &(&[
                 (SmolStr::from("x"), 0),
                 (SmolStr::from("z"), 1),
                 (SmolStr::from("y"), 2),
                 (SmolStr::from("l"), 3)
             ]
             .into_iter()
-            .collect::<HashMap<SmolStr, u32>>(),
-            component.declared_vars()
+            .collect::<HashMap<SmolStr, u32>>()),
+            &component.declared_vars.all_vars()
         );
     }
 
@@ -215,5 +221,11 @@ mod tests {
     fn hoists_imports() {
         let component = make_component("<script>let x = 3; let y = 4; import data from \"data\"");
         insta::assert_debug_snapshot!(component.hoist());
+    }
+
+    #[test]
+    fn can_extract_closures_from_html() {
+        let component = make_component("<button on:click={() => console.log(\"hello\")}></button>");
+        insta::assert_debug_snapshot!(component.declared_vars());
     }
 }

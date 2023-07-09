@@ -21,6 +21,11 @@ pub fn get_unbound_refs(syntax_node: &SyntaxNode) -> Vec<NameRef> {
         }
 
         return all;
+    } else if syntax_node.is::<ArrowExpr>() {
+        let mut declared = vec![];
+        let mut all = vec![];
+        get_unbound_refs_from_arrow_expr(syntax_node.to::<ArrowExpr>(), &mut declared, &mut all);
+        return all;
     }
 
     let mut declared = vec![];
