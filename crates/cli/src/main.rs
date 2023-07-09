@@ -13,17 +13,18 @@ use decorous_frontend::{Component, Parser};
 #[derive(Debug, ArgParser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
+    /// The decor file to compile.
     #[arg(value_name = "PATH")]
     input: FileOrStdin,
 
-    /// The name of the output file to generate
+    /// The name of the output file to generate.
     #[arg(short, long, value_name = "PATH", default_value = "./out.js")]
     out: PathBuf,
-    /// Writes the compiled output to stdout
+    /// Write the compiled output to stdout.
     #[arg(long, conflicts_with_all = ["out", "html"])]
     stdout: bool,
 
-    /// Generates an HTML file along with the compiled JS file. The default is index.html
+    /// Generate an HTML file along with the compiled JS file. With no argument, it is index.html.
     #[arg(long, value_name = "PATH", num_args = 0..=1, require_equals = true, default_missing_value = "index.html", default_value = None)]
     html: Option<PathBuf>,
 }
