@@ -10,7 +10,7 @@ DecorousAst {
                 end: 16,
             },
             node_type: Text(
-                "\n",
+                " ",
             ),
         },
         Node {
@@ -51,7 +51,7 @@ DecorousAst {
                                 end: 68,
                             },
                             node_type: Text(
-                                "\n",
+                                " ",
                             ),
                         },
                         Node {
@@ -73,7 +73,7 @@ DecorousAst {
                                 end: 98,
                             },
                             node_type: Text(
-                                "\n",
+                                " ",
                             ),
                         },
                     ],

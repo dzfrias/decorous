@@ -333,9 +333,9 @@ impl<'a> Parser<'a> {
         self.consume_while(|c| c.is_whitespace() && c != '\n');
         let mut start = self.index;
         let mut text = self.consume_while(|c| c != '<' && c != '{');
-        if text.get(0..=0).is_some_and(|c| c == "\n") {
+        if text.trim().is_empty() {
             start = self.index.saturating_sub(1);
-            text = &text[..1];
+            text = " ";
         }
 
         let node_type = NodeType::Text(text);

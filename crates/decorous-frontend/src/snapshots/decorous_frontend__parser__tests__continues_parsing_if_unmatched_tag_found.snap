@@ -17,7 +17,7 @@ DecorousAst {
                 end: 25,
             },
             node_type: Text(
-                "\n",
+                " ",
             ),
         },
         Node {
