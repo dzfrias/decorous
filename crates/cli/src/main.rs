@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context, Result};
 use clap::Parser as ArgParser;
 use clap_stdin::FileOrStdin;
-use decorous_backend::render;
+use decorous_backend::dom_render::render;
 use decorous_frontend::{Component, Parser};
 
 #[derive(Debug, ArgParser)]

@@ -5,7 +5,7 @@ use decorous_frontend::{
 use itertools::Itertools;
 use std::{borrow::Cow, io};
 
-use crate::replace;
+use crate::dom_render::replace;
 
 pub trait Renderer<T>
 where
