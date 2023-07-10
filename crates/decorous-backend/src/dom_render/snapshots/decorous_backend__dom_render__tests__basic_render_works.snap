@@ -1,38 +1,32 @@
 ---
-source: crates/decorous-backend/src/lib.rs
+source: crates/decorous-backend/src/dom_render/mod.rs
 expression: "String::from_utf8(out).unwrap()"
 ---
 const dirty = new Uint8Array(new ArrayBuffer(1));
 function make_fragment(ctx) {
 let e0;
 let e1;
-let e2;
 return {
 c() {
 e0 = document.createElement("p");
-e1 = document.createTextNode(ctx[0]);
-e2 = document.createElement("button");
-e2.addEventListener("click", ctx[1]);
-e2.textContent = "Clickme";
+e1 = document.createTextNode(`${ctx[0]}hello`);
 },
 m(target) {
 target.appendChild(e0);
 e0.appendChild(e1);
-target.appendChild(e2);
 },
 u(ctx, dirty) {
-if (dirty[0] & 1) e1.data = ctx[0];
+if (dirty[0] & 1) e1.data = `${ctx[0]}hello`;
 },
 d() {
 e0.parentNode.removeChild(e0);
-e2.parentNode.removeChild(e2);
 },
 }
 }
 function __init_ctx() {
 let x = 3;
-let __closure1 = () => {if (x == 3) { __schedule_update(0, x = 44); }};
-return [x,__closure1];
+function remake_x() { __schedule_update(0, x = 44); }
+return [x,remake_x];
 }
 const ctx = __init_ctx();
 const fragment = make_fragment(ctx);
