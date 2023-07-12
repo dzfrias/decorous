@@ -4,26 +4,18 @@ use thiserror::Error;
 pub enum ParseErrorType {
     #[error("invalid closing tag, expected {0}")]
     InvalidClosingTag(String),
+    #[error("unclosed tag: {0}")]
+    UnclosedTag(String),
     #[error("invalid character, expected {0}")]
     ExpectedCharacter(char),
     #[error("invalid character, expected {0:?}, got {1}")]
     ExpectedCharacterAny(Vec<char>, char),
-    #[error("expected end of comment")]
-    ExpectedEndOfComment,
-    #[error("invalid closing block, expected {0}, got {1}")]
-    InvalidClosingBlock(String, String),
-    #[error("expected string {0}, got {1}")]
-    ExpectedString(String, String),
-    #[error("unrecognized special block: \"{0}\"")]
-    UnrecognizedSpecialBlock(String),
+    #[error("expected closing tag. If you meant to escape the slash, use '\\/'")]
+    ExpectedClosingTag,
     #[error("cannot have non-toplevel script")]
-    CannotHaveNonTopLevelScript,
-    #[error("cannot have two scripts")]
     CannotHaveTwoScripts,
     #[error("cannot have two style tags")]
     CannotHaveTwoStyleTags,
-    #[error("cannot have non-toplevel style tag")]
-    CannotHaveNonTopLevelStyle,
     #[error("javascript parsing error: {}", 0.to_string())]
     JavaScriptParseError(rslint_parser::ParserError),
     #[error("byte processing error: {}", 0.to_string())]

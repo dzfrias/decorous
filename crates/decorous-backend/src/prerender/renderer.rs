@@ -386,15 +386,12 @@ impl<'a> Renderer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use decorous_frontend::{ParseError, Parser};
+    use decorous_frontend::parse;
 
     use super::*;
 
     fn make_component(input: &str) -> Component {
-        let parser = Parser::new(input);
-        let parse_res = parser.parse();
-        assert_eq!(Vec::<ParseError>::new(), parse_res.1);
-        Component::new(parse_res.0)
+        Component::new(parse(input).expect("should be valid input"))
     }
 
     macro_rules! test_render {

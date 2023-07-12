@@ -1,6 +1,7 @@
 use std::fmt;
 
 use itertools::Itertools;
+use nom_locate::LocatedSpan;
 use rslint_parser::SyntaxNode;
 
 /// The collection of the three main parts of decorous syntax: the HTML-like template (`nodes`),
@@ -28,10 +29,39 @@ pub struct Node<'a, T> {
     node_type: NodeType<'a, T>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Location {
-    start: usize,
-    end: usize,
+    offset: usize,
+    length: usize,
+    line: u32,
+    column: usize,
+}
+
+impl Location {
+    pub fn from_spans<'a>(span1: LocatedSpan<&'a str>, span2: LocatedSpan<&'a str>) -> Self {
+        Self {
+            offset: span1.location_offset(),
+            length: span2.location_offset() - span1.location_offset(),
+            line: span1.location_line(),
+            column: span1.get_column(),
+        }
+    }
+
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    pub fn length(&self) -> usize {
+        self.length
+    }
+
+    pub fn line(&self) -> u32 {
+        self.line
+    }
+
+    pub fn column(&self) -> usize {
+        self.column
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -283,27 +313,6 @@ impl<'a, T> Node<'a, T> {
     }
 }
 
-impl Location {
-    pub fn new(start: usize, end: usize) -> Self {
-        Self { start, end }
-    }
-
-    pub fn char(idx: usize) -> Self {
-        Self {
-            start: idx,
-            end: idx,
-        }
-    }
-
-    pub fn start(&self) -> usize {
-        self.start
-    }
-
-    pub fn end(&self) -> usize {
-        self.end
-    }
-}
-
 impl<'a, T> ForBlock<'a, T> {
     pub fn new(
         binding: &'a str,
@@ -415,16 +424,6 @@ impl<'a> DecorousAst<'a> {
     }
 
     /// Creates a recursive iterator over the nodes of the template.
-    ///
-    /// ```
-    /// # use decorous_frontend::ast::*;
-    /// let ast = DecorousAst::new(vec![Node::new(NodeType::Text("hello"), Location::new(0, 5))], None, None);
-    /// for node in ast.iter_nodes() {
-    ///     if node.metadata().start() == 0 {
-    ///         println!("This node starts at the first character!");
-    ///     }
-    /// }
-    /// ```
     pub fn iter_nodes(&'a self) -> NodeIter<'a, Location> {
         NodeIter::new(self.nodes())
     }

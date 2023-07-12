@@ -1,0 +1,15 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: nodes(input.into())
+---
+Ok(
+    (
+        LocatedSpan {
+            offset: 0,
+            line: 1,
+            fragment: "/div",
+            extra: (),
+        },
+        [],
+    ),
+)

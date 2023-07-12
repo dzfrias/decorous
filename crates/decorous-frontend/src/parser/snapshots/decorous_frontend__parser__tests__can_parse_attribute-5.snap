@@ -1,0 +1,22 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: attribute(input.into())
+---
+Ok(
+    (
+        LocatedSpan {
+            offset: 14,
+            line: 1,
+            fragment: "",
+            extra: (),
+        },
+        KeyValue(
+            "hello",
+            Some(
+                Literal(
+                    "你好",
+                ),
+            ),
+        ),
+    ),
+)

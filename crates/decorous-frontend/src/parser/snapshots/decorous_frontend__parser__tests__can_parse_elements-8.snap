@@ -1,0 +1,83 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: element(input.into())
+---
+Ok(
+    (
+        LocatedSpan {
+            offset: 40,
+            line: 1,
+            fragment: "",
+            extra: (),
+        },
+        Element {
+            tag: "div",
+            attrs: [],
+            children: [
+                Node {
+                    metadata: Location {
+                        offset: 5,
+                        length: 5,
+                        line: 1,
+                        column: 6,
+                    },
+                    node_type: Text(
+                        "text ",
+                    ),
+                },
+                Node {
+                    metadata: Location {
+                        offset: 10,
+                        length: 10,
+                        line: 1,
+                        column: 11,
+                    },
+                    node_type: Mustache(
+                        MODULE@0..8
+                          EXPR_STMT@0..8
+                            NAME_REF@0..8
+                              IDENT@0..8 "mustache"
+                        ,
+                    ),
+                },
+                Node {
+                    metadata: Location {
+                        offset: 20,
+                        length: 7,
+                        line: 1,
+                        column: 21,
+                    },
+                    node_type: Text(
+                        " hello ",
+                    ),
+                },
+                Node {
+                    metadata: Location {
+                        offset: 27,
+                        length: 8,
+                        line: 1,
+                        column: 28,
+                    },
+                    node_type: Element(
+                        Element {
+                            tag: "div",
+                            attrs: [],
+                            children: [],
+                        },
+                    ),
+                },
+                Node {
+                    metadata: Location {
+                        offset: 35,
+                        length: 1,
+                        line: 1,
+                        column: 36,
+                    },
+                    node_type: Text(
+                        " ",
+                    ),
+                },
+            ],
+        },
+    ),
+)

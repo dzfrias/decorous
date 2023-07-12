@@ -1,0 +1,21 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: parse(input.into())
+---
+Err(
+    Report {
+        errors: [
+            ParseError {
+                fragment: LocatedSpan {
+                    offset: 5,
+                    line: 1,
+                    fragment: "notdiv#div2/notdiv2",
+                    extra: (),
+                },
+                err_type: InvalidClosingTag(
+                    "notdiv",
+                ),
+            },
+        ],
+    },
+)

@@ -1,0 +1,23 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: attribute(input.into())
+---
+Err(
+    Failure(
+        Report {
+            errors: [
+                ParseError {
+                    fragment: LocatedSpan {
+                        offset: 12,
+                        line: 1,
+                        fragment: "\"wrong\"",
+                        extra: (),
+                    },
+                    err_type: ExpectedCharacter(
+                        '{',
+                    ),
+                },
+            ],
+        },
+    ),
+)

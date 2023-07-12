@@ -1,0 +1,72 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: parse(input.into())
+---
+Ok(
+    DecorousAst {
+        nodes: [
+            Node {
+                metadata: Location {
+                    offset: 21,
+                    length: 13,
+                    line: 1,
+                    column: 22,
+                },
+                node_type: Element(
+                    Element {
+                        tag: "div",
+                        attrs: [],
+                        children: [
+                            Node {
+                                metadata: Location {
+                                    offset: 26,
+                                    length: 3,
+                                    line: 1,
+                                    column: 27,
+                                },
+                                node_type: Mustache(
+                                    MODULE@0..1
+                                      EXPR_STMT@0..1
+                                        NAME_REF@0..1
+                                          IDENT@0..1 "x"
+                                    ,
+                                ),
+                            },
+                            Node {
+                                metadata: Location {
+                                    offset: 29,
+                                    length: 1,
+                                    line: 1,
+                                    column: 30,
+                                },
+                                node_type: Text(
+                                    " ",
+                                ),
+                            },
+                        ],
+                    },
+                ),
+            },
+        ],
+        script: Some(
+            MODULE@0..12
+              WHITESPACE@0..1 " "
+              VAR_DECL@1..11
+                IDENT@1..4 "let"
+                WHITESPACE@4..5 " "
+                DECLARATOR@5..10
+                  SINGLE_PATTERN@5..6
+                    NAME@5..6
+                      IDENT@5..6 "x"
+                  WHITESPACE@6..7 " "
+                  EQ@7..8 "="
+                  WHITESPACE@8..9 " "
+                  LITERAL@9..10
+                    NUMBER@9..10 "3"
+                SEMICOLON@10..11 ";"
+              WHITESPACE@11..12 " "
+            ,
+        ),
+        css: None,
+    },
+)

@@ -1,67 +1,51 @@
-#![allow(dead_code, unused_imports)]
-
 mod errors;
 
 use nom::{
     branch::alt,
-    bytes::complete::{escaped, tag, take, take_until, take_while, take_while1},
+    bytes::complete::{escaped, tag, take, take_until, take_while},
     character::complete::{
         alpha1, alphanumeric1, anychar, char, multispace0, multispace1, none_of, one_of,
     },
-    combinator::{cut, eof, map, opt, recognize, value},
+    combinator::{all_consuming, cut, eof, map, opt, peek, recognize, value},
+    error::ParseError as NomParseError,
     multi::{many0, many0_count, separated_list0},
     sequence::{delimited, pair, preceded, terminated},
-    IResult,
+    IResult, InputIter, InputTake,
 };
 use nom_locate::{position, LocatedSpan};
 use rslint_parser::{parse_module, SyntaxNode};
 
 use self::errors::{ParseError, ParseErrorType, Report};
-use crate::ast::{Attribute, AttributeValue, Element, EventHandler, Location, Node, NodeType};
+use crate::ast::{
+    Attribute, AttributeValue, DecorousAst, Element, EventHandler, Location, Node, NodeType,
+};
 
 type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report<NomSpan<'a>>>;
 type NomSpan<'a> = LocatedSpan<&'a str>;
 
-#[derive(Debug)]
-pub struct NewLocation {
-    offset: usize,
-    length: usize,
-    line: u32,
-    column: usize,
-}
-
-impl NewLocation {
-    pub fn from_spans(span1: NomSpan, span2: NomSpan) -> Self {
-        Self {
-            offset: span1.location_offset(),
-            length: span2.location_offset() - span1.location_offset(),
-            line: span1.location_line(),
-            column: span1.get_column(),
+pub fn parse<'a>(input: &'a str) -> std::result::Result<DecorousAst<'a>, Report<NomSpan<'a>>> {
+    let result = cut(alt((
+        all_consuming(_parse),
+        failure_case(char('/'), |_| ParseErrorType::ExpectedClosingTag),
+    )))(input.into());
+    match result {
+        Err(err) => {
+            use nom::Err::Failure;
+            match err {
+                Failure(report) => Err(report),
+                _ => unreachable!(),
+            }
         }
-    }
-
-    pub fn offset(&self) -> usize {
-        self.offset
-    }
-
-    pub fn length(&self) -> usize {
-        self.length
-    }
-
-    pub fn line(&self) -> u32 {
-        self.line
-    }
-
-    pub fn column(&self) -> usize {
-        self.column
+        Ok((_, ast)) => Ok(ast),
     }
 }
 
-// pub fn parse<'a>(input: NomSpan<'a>) -> Result<Vec<Node<'a, NewLocation>>> {
-//     let (input, script) = opt(ws(script))(input)?;
-//     let (input, nodes) = nodes(input)?;
-//     // TODO: Turn into decorous ast
-// }
+fn _parse<'a>(input: NomSpan<'a>) -> Result<DecorousAst<'a>> {
+    let (input, script) = opt(ws(script))(input)?;
+    let (input, nodes) = nodes(input)?;
+    let (input, css) = opt(ws(style))(input)?;
+    Ok((input, DecorousAst::new(nodes, script, css)))
+}
 
 fn failure_case<'i, Free, Parsed, P, F>(
     parser: P,
@@ -91,10 +75,6 @@ fn parse_str(i: NomSpan) -> Result<NomSpan> {
     escaped(none_of("\""), '\\', one_of("\"n\\"))(i)
 }
 
-fn any_word(input: NomSpan) -> Result<NomSpan> {
-    recognize(take_while(|c: char| c.is_whitespace()))(input)
-}
-
 fn script(input: NomSpan) -> Result<SyntaxNode> {
     let (input, _) = tag("---js")(input)?;
     let (input, body) = take_until("---")(input)?;
@@ -104,28 +84,43 @@ fn script(input: NomSpan) -> Result<SyntaxNode> {
     Ok((input, parsed.syntax()))
 }
 
-fn nodes(input: NomSpan) -> Result<Vec<Node<'_, NewLocation>>> {
+fn style(input: NomSpan) -> Result<&'_ str> {
+    let (input, _) = tag("---css")(input)?;
+    let (input, body) = take_until("---")(input)?;
+    let (input, _) = take(3usize)(input)?;
+    Ok((input, &body))
+}
+
+fn nodes(input: NomSpan) -> Result<Vec<Node<'_, Location>>> {
     many0(node)(input)
 }
 
-fn node(input: NomSpan) -> Result<Node<'_, NewLocation>> {
+fn node(input: NomSpan) -> Result<Node<'_, Location>> {
     let (input, pos) = position(input)?;
+    // Do not succeed. This tells many0 to stop before it errors (many0 errors when there's no more
+    // input).
+    if input.is_empty() {
+        return Err(nom::Err::Error(Report::from_error_kind(
+            input,
+            nom::error::ErrorKind::Eof,
+        )));
+    }
     let (input, node) = alt((
         map(element, NodeType::Element),
         map(comment, |c| NodeType::Comment(&c)),
         map(mustache, NodeType::Mustache),
         map(
-            take_while1(|c| c != '/' && c != '#' && c != '{'),
+            escaped(none_of("/#\\{"), '\\', one_of(r#"/#{}"#)),
             |text: NomSpan| NodeType::Text(&text),
         ),
     ))(input)?;
     let (input, end_pos) = position(input)?;
-    let location = NewLocation::from_spans(pos, end_pos);
+    let location = Location::from_spans(pos, end_pos);
 
     Ok((input, Node::new(node, location)))
 }
 
-fn element(input: NomSpan) -> Result<Element<'_, NewLocation>> {
+fn element(input: NomSpan) -> Result<Element<'_, Location>> {
     let (input, _) = tag("#")(input)?;
     let (input, tag_name) = alphanumeric1(input)?;
     let (input, attrs) = terminated(
@@ -140,15 +135,20 @@ fn element(input: NomSpan) -> Result<Element<'_, NewLocation>> {
         multispace0,
     )(input)?;
     let (input, children) = nodes(input)?;
-    let (input, _) = preceded(
-        char('/'),
-        alt((
-            tag(*tag_name.fragment()),
-            failure_case(identifier, |tag| {
-                ParseErrorType::InvalidClosingTag(tag.to_string())
-            }),
-        )),
-    )(input)?;
+    let (input, _hello) = alt((
+        preceded(
+            char('/'),
+            alt((
+                tag(*tag_name.fragment()),
+                failure_case(identifier, |tag| {
+                    ParseErrorType::InvalidClosingTag(tag.to_string())
+                }),
+            )),
+        ),
+        failure_case(bad_char, |_| {
+            ParseErrorType::UnclosedTag(tag_name.to_string())
+        }),
+    ))(input)?;
     Ok((
         input,
         Element::new(&tag_name, attrs.unwrap_or_default(), children),
@@ -163,6 +163,12 @@ fn attribute(input: NomSpan) -> Result<Attribute<'_>> {
             ws(char('=')),
             failure_case(bad_char, |_| ParseErrorType::ExpectedCharacter('=')),
         ))(input)?;
+        if peek(char::<NomSpan, Report<NomSpan>>('{'))(input).is_err() {
+            return Err(nom::Err::Failure(Report::from(ParseError::new(
+                input,
+                ParseErrorType::ExpectedCharacter('{'),
+            ))));
+        }
         return map(mustache, |node| {
             Attribute::EventHandler(EventHandler::new(&attr, node))
         })(input);
@@ -195,9 +201,45 @@ fn comment(input: NomSpan) -> Result<NomSpan> {
     preceded(tag("//"), take_while(|c| c != '\n'))(input)
 }
 
+fn take_ignoring_nested(left: char, right: char) -> impl Fn(NomSpan) -> Result<NomSpan> {
+    move |i: NomSpan| {
+        let mut index = 0;
+        let mut needed = 1;
+        let mut chars = i.iter_elements();
+
+        while needed > 0 {
+            let c = chars.next().unwrap_or_default();
+            if c == left {
+                needed += 1;
+            }
+            if c == right {
+                needed -= 1;
+            }
+            if c == '\0' {
+                return Err(nom::Err::Error(Report::from_error_kind(
+                    i,
+                    nom::error::ErrorKind::Eof,
+                )));
+            }
+            if needed > 0 {
+                index += c.len_utf8();
+            }
+        }
+
+        let (new_i, old_i) = i.take_split(index);
+        Ok((new_i, old_i))
+    }
+}
+
 fn mustache(input: NomSpan) -> Result<SyntaxNode> {
-    // FIX: Allow for curly braces in JavaScript
-    let (input, js_text) = delimited(tag("{"), take_while(|c| c != '}'), tag("}"))(input)?;
+    let (input, js_text) = delimited(
+        char('{'),
+        alt((
+            take_ignoring_nested('{', '}'),
+            failure_case(bad_char, |_| ParseErrorType::ExpectedCharacter('}')),
+        )),
+        char('}'),
+    )(input)?;
     Ok((input, parse_module(&js_text, 0).syntax()))
 }
 
@@ -275,7 +317,7 @@ mod tests {
                 "#div[hello=\"world\"/div",
                 "#div[hello=\"world\"]/notdiv",
                 "#div]/div",
-                "#div"
+                "#div",
             ]
         );
     }
@@ -296,6 +338,31 @@ mod tests {
 
     #[test]
     fn can_parse_scripts() {
-        nom_test_all_insta!(script, ["---js console.log(\"hello\")---"])
+        nom_test_all_insta!(script, ["---js console.log(\"hello\")---",]);
+        nom_test_all_insta!(style, ["---css body { height: 100vh; } ---"]);
+    }
+
+    #[test]
+    fn can_parse_entire_input() {
+        nom_test_all_insta!(
+            parse,
+            [
+                "---js let x = 3; --- #div {x} /div",
+                "#div/notdiv#div2/notdiv2",
+                "#div",
+                "\\/",
+                "#div \\#hello \\{ /div",
+                "/",
+                "#div / /div",
+                "#div[@attr={hello]/div",
+                "#div[@attr=\"hello\"]/div",
+                "#div[@attr]/div",
+            ]
+        )
+    }
+
+    #[test]
+    fn mustaches_allow_for_curly_braces() {
+        nom_test_all_insta!(mustache, ["{hello () => { console.log(\"hi\") }  }"])
     }
 }

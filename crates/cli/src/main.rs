@@ -6,7 +6,7 @@ use clap::{Parser as ArgParser, ValueEnum};
 use clap_stdin::FileOrStdin;
 use decorous_backend::dom_render::render as dom_render;
 use decorous_backend::prerender::Renderer as Prerenderer;
-use decorous_frontend::{Component, Parser};
+use decorous_frontend::{parse, Component};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
@@ -92,14 +92,20 @@ fn main() -> Result<()> {
 }
 
 fn parse_component(input: &str) -> Result<Component> {
-    let parser = Parser::new(input);
-    let (ast, errs) = parser.parse();
-    let errors_len = errs.len();
-    for err in errs {
-        eprintln!("{err}");
+    match parse(input) {
+        Ok(ast) => Ok(Component::new(ast)),
+        Err(_err) => {
+            todo!("handle errors")
+        }
     }
-    if errors_len > 0 {
-        anyhow::bail!("\ndecorous failed with {errors_len} errors");
-    }
-    Ok(Component::new(ast))
+    // let parser = Parser::new(input);
+    // let (ast, errs) = parser.parse();
+    // let errors_len = errs.len();
+    // for err in errs {
+    //     eprintln!("{err}");
+    // }
+    // if errors_len > 0 {
+    //     anyhow::bail!("\ndecorous failed with {errors_len} errors");
+    // }
+    // Ok(Component::new(ast))
 }

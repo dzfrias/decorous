@@ -256,7 +256,7 @@ mod tests {
     fn can_write_basic_text_nodes() {
         let node = Node::new(
             NodeType::Text("hello"),
-            FragmentMetadata::new(0, None, Location::new(0, 1)),
+            FragmentMetadata::new(0, None, Location::default()),
         );
 
         test_lifecycle!(node, init, "let e0;\n", &DeclaredVariables::new());
@@ -289,15 +289,15 @@ mod tests {
                 vec![
                     Node::new(
                         NodeType::Text("text"),
-                        FragmentMetadata::new(1, Some(0), Location::new(0, 0)),
+                        FragmentMetadata::new(1, Some(0), Location::default()),
                     ),
                     Node::new(
                         NodeType::Element(Element::new("div", vec![], vec![])),
-                        FragmentMetadata::new(2, Some(0), Location::new(0, 0)),
+                        FragmentMetadata::new(2, Some(0), Location::default()),
                     ),
                 ],
             )),
-            FragmentMetadata::new(0, None, Location::new(0, 0)),
+            FragmentMetadata::new(0, None, Location::default()),
         );
 
         test_lifecycle!(node, init, "let e0;\n", &DeclaredVariables::new());
@@ -326,7 +326,7 @@ mod tests {
         let js = parse_text("(hi, hi)", 0).syntax().first_child().unwrap();
         let node = Node::new(
             NodeType::Mustache(js),
-            FragmentMetadata::new(0, None, Location::new(0, 0)),
+            FragmentMetadata::new(0, None, Location::default()),
         );
 
         let declared = {
@@ -359,10 +359,10 @@ mod tests {
                 vec![],
                 vec![Node::new(
                     NodeType::Text("hello"),
-                    FragmentMetadata::new(1, Some(0), Location::new(0, 0)),
+                    FragmentMetadata::new(1, Some(0), Location::default()),
                 )],
             )),
-            FragmentMetadata::new(0, None, Location::new(0, 0)),
+            FragmentMetadata::new(0, None, Location::default()),
         );
 
         test_lifecycle!(node, init, "let e0;\n", &DeclaredVariables::new());
@@ -394,7 +394,7 @@ mod tests {
             .unwrap();
         let node = Node::new(
             NodeType::Mustache(js),
-            FragmentMetadata::new(0, None, Location::new(0, 0)),
+            FragmentMetadata::new(0, None, Location::default()),
         );
 
         let declared = {
