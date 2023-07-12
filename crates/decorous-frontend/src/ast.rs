@@ -159,6 +159,12 @@ impl<'a, T> Element<'a, T> {
 
         None
     }
+
+    pub fn has_immediate_mustache(&self) -> bool {
+        self.children()
+            .iter()
+            .any(|child| matches!(child.node_type(), NodeType::Mustache(_)))
+    }
 }
 
 impl<'a, T> Node<'a, T> {
@@ -434,7 +440,7 @@ pub struct NodeIter<'a, T> {
 }
 
 impl<'a, T> NodeIter<'a, T> {
-    fn new(node: &'a [Node<'a, T>]) -> NodeIter<'a, T> {
+    pub fn new(node: &'a [Node<'a, T>]) -> NodeIter<'a, T> {
         let mut stack = Vec::new();
         stack.extend(node);
         Self { stack }

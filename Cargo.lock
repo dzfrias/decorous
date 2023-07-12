@@ -210,6 +210,7 @@ dependencies = [
  "decorous-frontend",
  "insta",
  "itertools",
+ "lazy_format",
  "rslint_parser",
  "rslint_text_edit",
 ]
@@ -326,6 +327,12 @@ checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
 dependencies = [
  "either",
 ]
+
+[[package]]
+name = "lazy_format"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c20af27ff47d964ba51ed586b8e84695261ff364922ad40bcf5a8080e99954d"
 
 [[package]]
 name = "lazy_static"

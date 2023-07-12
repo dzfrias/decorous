@@ -2,10 +2,9 @@ use decorous_frontend::{
     ast::{Attribute, AttributeValue, CollapsedChildrenType, Node, NodeType},
     utils, DeclaredVariables, FragmentMetadata,
 };
-use itertools::Itertools;
 use std::{borrow::Cow, io};
 
-use crate::dom_render::replace;
+use crate::{codegen_utils, dom_render::replace};
 
 pub trait Renderer<T>
 where
@@ -180,15 +179,13 @@ where
                 for attr in elem.attrs() {
                     // TODO: Update to use dirty
                     if let Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) = attr {
+                        let unbound = utils::get_unbound_refs(js);
+                        let dirty_indices = codegen_utils::calc_dirty(&unbound, toplevel_vars);
+                        let replacement = replace::replace_namerefs(js, &unbound, toplevel_vars);
                         writeln!(
                             f,
-                            "e{}.setAttribute(\"{key}\", {});",
+                            "if ({dirty_indices}) e{}.setAttribute(\"{key}\", {replacement});",
                             self.metadata().id(),
-                            replace::replace_namerefs(
-                                js,
-                                &utils::get_unbound_refs(js),
-                                toplevel_vars
-                            )
                         )?;
                     }
                 }
@@ -202,34 +199,11 @@ where
             }
             NodeType::Mustache(mustache) => {
                 let unbound = utils::get_unbound_refs(mustache);
-                let mut dirty_indices: Vec<(usize, u8)> = vec![];
-                for unbound in &unbound {
-                    let Some(ident) = unbound.ident_token().map(|tok| tok.text().clone()) else {
-                        continue;
-                    };
-                    let Some(idx) = toplevel_vars.get_var(&ident) else {
-                        continue;
-                    };
-                    // Get the byte index for the dirty bitmap. Need to subtract one because
-                    // ceiling division only results in 0 if x == 0.
-                    let dirty_idx = ((idx + 7) / 8).saturating_sub(1) as usize;
-
-                    // Modulo 8 so it wraps every byte. The byte is tracked by dirty_idx
-                    let bitmask = 1 << (idx % 8);
-                    if let Some(pos) = dirty_indices.iter().position(|(idx, _)| *idx == dirty_idx) {
-                        dirty_indices[pos].1 |= bitmask;
-                    } else {
-                        dirty_indices.push((dirty_idx, bitmask));
-                    }
-                }
+                let dirty_indices = codegen_utils::calc_dirty(&unbound, toplevel_vars);
                 let new_text = replace::replace_namerefs(mustache, &unbound, toplevel_vars);
                 writeln!(
                     f,
-                    "if ({}) e{}.data = {new_text};",
-                    dirty_indices
-                        .iter()
-                        .map(|(idx, bitmask)| format!("dirty[{idx}] & {bitmask}"))
-                        .join(" || "),
+                    "if ({dirty_indices}) e{}.data = {new_text};",
                     self.metadata().id()
                 )
             }

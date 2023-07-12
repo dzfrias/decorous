@@ -1,11 +1,11 @@
 use self::renderer::Renderer;
+use crate::replace;
 use decorous_frontend::{utils, Component};
 use itertools::Itertools;
 use rslint_parser::AstNode;
 use std::{borrow::Cow, io};
 
 mod renderer;
-mod replace;
 
 pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Result<()> {
     macro_rules! render {

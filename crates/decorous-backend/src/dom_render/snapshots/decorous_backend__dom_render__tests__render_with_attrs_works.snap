@@ -14,7 +14,7 @@ m(target) {
 target.appendChild(e0);
 },
 u(ctx, dirty) {
-e0.setAttribute("class", ctx[0]);
+if (dirty[0] & 1) e0.setAttribute("class", ctx[0]);
 },
 d() {
 e0.parentNode.removeChild(e0);

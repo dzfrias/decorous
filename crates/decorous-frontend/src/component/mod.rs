@@ -7,7 +7,7 @@ use rslint_parser::{
 };
 
 use crate::{
-    ast::{Attribute, DecorousAst, Location, Node, NodeType, SpecialBlock},
+    ast::{Attribute, DecorousAst, Location, Node, NodeIter, NodeType, SpecialBlock},
     utils,
 };
 pub use declared_vars::DeclaredVariables;
@@ -57,6 +57,10 @@ impl<'a> Component<'a> {
 
     pub fn hoist(&self) -> &[SyntaxNode] {
         self.hoist.as_ref()
+    }
+
+    pub fn descendents(&'a self) -> NodeIter<'a, FragmentMetadata> {
+        NodeIter::new(self.fragment_tree())
     }
 }
 

@@ -11,3 +11,4 @@ insta = { workspace = true }
 decorous-frontend = { path = "../decorous-frontend" }
 rslint_text_edit = "0.1.0"
 itertools = "0.11.0"
+lazy_format = "2.0.0"
