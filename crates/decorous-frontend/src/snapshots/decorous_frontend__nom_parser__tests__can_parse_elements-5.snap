@@ -1,0 +1,14 @@
+---
+source: crates/decorous-frontend/src/nom_parser.rs
+expression: element(input)
+---
+Ok(
+    (
+        "",
+        Element {
+            tag: "div",
+            attrs: [],
+            children: [],
+        },
+    ),
+)

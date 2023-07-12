@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 itertools = "0.11.0"
+nom = "7.1.3"
+nom_locate = "4.1.0"
 rslint_parser = { workspace = true }
 thiserror = "1.0.40"
 

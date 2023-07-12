@@ -1,0 +1,23 @@
+---
+source: crates/decorous-frontend/src/nom_parser/mod.rs
+expression: element(input.into())
+---
+Err(
+    Failure(
+        Report {
+            errors: [
+                ParseError {
+                    fragment: LocatedSpan {
+                        offset: 18,
+                        line: 1,
+                        fragment: "/div",
+                        extra: (),
+                    },
+                    err_type: ExpectedCharacter(
+                        ']',
+                    ),
+                },
+            ],
+        },
+    ),
+)

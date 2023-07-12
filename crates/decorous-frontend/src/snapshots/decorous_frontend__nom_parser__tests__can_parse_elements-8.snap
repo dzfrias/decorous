@@ -1,0 +1,68 @@
+---
+source: crates/decorous-frontend/src/nom_parser.rs
+expression: element(input)
+---
+Ok(
+    (
+        "",
+        Element {
+            tag: "div",
+            attrs: [],
+            children: [
+                Node {
+                    metadata: Location {
+                        start: 0,
+                        end: 0,
+                    },
+                    node_type: Text(
+                        "text ",
+                    ),
+                },
+                Node {
+                    metadata: Location {
+                        start: 0,
+                        end: 0,
+                    },
+                    node_type: Mustache(
+                        MODULE@0..8
+                          EXPR_STMT@0..8
+                            NAME_REF@0..8
+                              IDENT@0..8 "mustache"
+                        ,
+                    ),
+                },
+                Node {
+                    metadata: Location {
+                        start: 0,
+                        end: 0,
+                    },
+                    node_type: Text(
+                        " hello ",
+                    ),
+                },
+                Node {
+                    metadata: Location {
+                        start: 0,
+                        end: 0,
+                    },
+                    node_type: Element(
+                        Element {
+                            tag: "div",
+                            attrs: [],
+                            children: [],
+                        },
+                    ),
+                },
+                Node {
+                    metadata: Location {
+                        start: 0,
+                        end: 0,
+                    },
+                    node_type: Text(
+                        " ",
+                    ),
+                },
+            ],
+        },
+    ),
+)

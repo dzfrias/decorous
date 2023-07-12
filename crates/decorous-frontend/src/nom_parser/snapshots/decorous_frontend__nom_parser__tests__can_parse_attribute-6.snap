@@ -1,0 +1,31 @@
+---
+source: crates/decorous-frontend/src/nom_parser/mod.rs
+expression: attribute(input.into())
+---
+Ok(
+    (
+        LocatedSpan {
+            offset: 14,
+            line: 1,
+            fragment: "",
+            extra: (),
+        },
+        KeyValue(
+            "hello",
+            Some(
+                JavaScript(
+                    MODULE@0..6
+                      EXPR_STMT@0..6
+                        BRACKET_EXPR@0..6
+                          NAME_REF@0..3
+                            IDENT@0..3 "ctx"
+                          L_BRACK@3..4 "["
+                          LITERAL@4..5
+                            NUMBER@4..5 "1"
+                          R_BRACK@5..6 "]"
+                    ,
+                ),
+            ),
+        ),
+    ),
+)
