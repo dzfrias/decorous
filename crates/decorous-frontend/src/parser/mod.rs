@@ -1,4 +1,4 @@
-mod errors;
+pub mod errors;
 
 use nom::{
     branch::alt,
@@ -15,7 +15,7 @@ use nom::{
 use nom_locate::{position, LocatedSpan};
 use rslint_parser::{parse_module, SyntaxNode};
 
-use self::errors::{ParseError, ParseErrorType, Report};
+use self::errors::{Help, ParseError, ParseErrorType, Report};
 use crate::ast::{
     Attribute, AttributeValue, DecorousAst, Element, EventHandler, Location, Node, NodeType,
 };
@@ -25,9 +25,9 @@ type NomSpan<'a> = LocatedSpan<&'a str>;
 
 /// Helper macro for creating an IResult error by hand.
 macro_rules! nom_err {
-    ($input:expr, $severity:ident, $err_type:expr) => {
+    ($input:expr, $severity:ident, $err_type:expr, $help:expr) => {
         Err(nom::Err::$severity(Report::from(ParseError::new(
-            $input, $err_type,
+            $input, $err_type, $help,
         ))))
     };
 }
@@ -35,7 +35,12 @@ macro_rules! nom_err {
 pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<NomSpan>> {
     let result = cut(alt((
         all_consuming(_parse),
-        failure_case(char('/'), |_| ParseErrorType::ExpectedClosingTag),
+        failure_case(char('/'), |_| {
+            (
+                ParseErrorType::ExpectedClosingTag,
+                Some(Help::with_message("escape the slash with \\/")),
+            )
+        }),
     )))(input.into());
     match result {
         Err(err) => {
@@ -63,7 +68,7 @@ fn script(input: NomSpan) -> Result<SyntaxNode> {
     let (input, _) = take(3usize)(input)?;
     match parse_js(&body, loc.location_offset()) {
         Ok(node) => Ok((input, node)),
-        Err(err) => nom_err!(input, Failure, err),
+        Err(err) => nom_err!(input, Failure, err, None),
     }
 }
 
@@ -80,13 +85,13 @@ fn nodes(input: NomSpan) -> Result<Vec<Node<'_, Location>>> {
 
 fn node(input: NomSpan) -> Result<Node<'_, Location>> {
     let (input, pos) = position(input)?;
-    // Do not succeed. This tells many0 to stop before it errors (many0 errors when there's no more
-    // input).
+    // Do not succeed if empty
     if input.is_empty() {
         return nom_err!(
             input,
             Error,
-            ParseErrorType::Nom(nom::error::ErrorKind::Eof)
+            ParseErrorType::Nom(nom::error::ErrorKind::Eof),
+            None
         );
     }
     let (input, node) = alt((
@@ -106,17 +111,23 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
 
 fn attributes(input: NomSpan) -> Result<Vec<Attribute>> {
     delimited(
-        ws_trailing(tag("[")),
+        ws_trailing(char('[')),
         separated_list0(multispace1, attribute),
         alt((
-            ws_leading(tag("]")),
-            failure_case(bad_char, |_| ParseErrorType::ExpectedCharacter(']')),
+            ws_leading(char(']')),
+            failure_case(bad_char, |_| {
+                (
+                    ParseErrorType::ExpectedCharacter(']'),
+                    Some(Help::with_message("attribute bracket was never closed")),
+                )
+            }),
         )),
     )(input)
 }
 
 fn element(input: NomSpan) -> Result<Element<'_, Location>> {
-    let (input, _) = tag("#")(input)?;
+    let (input, _) = char('#')(input)?;
+    let (input, start_pos) = position(input)?;
     let (input, tag_name) = alphanumeric1(input)?;
     let (input, attrs) = terminated(opt(attributes), multispace0)(input)?;
     let (input, children) = alt((
@@ -142,15 +153,27 @@ fn element(input: NomSpan) -> Result<Element<'_, Location>> {
                         char('/'),
                         alt((
                             tag(*tag_name.fragment()),
-                            failure_case(identifier, |tag| {
-                                ParseErrorType::InvalidClosingTag(tag.to_string())
+                            failure_case(identifier, |_| {
+                                (
+                                    ParseErrorType::InvalidClosingTag(tag_name.to_string()),
+                                    Some(Help::with_message("replace this tag with the expected!")),
+                                )
                             }),
                         )),
                     ),
                     opt(char(' ')),
                 ),
                 failure_case(bad_char, |_| {
-                    ParseErrorType::UnclosedTag(tag_name.to_string())
+                    (
+                        ParseErrorType::UnclosedTag(
+                            tag_name.to_string(),
+                            start_pos.location_line(),
+                        ),
+                        Some(Help::with_line(
+                            start_pos.location_line(),
+                            "tag never closed",
+                        )),
+                    )
                 }),
             )),
         ),
@@ -167,10 +190,24 @@ fn attribute(input: NomSpan) -> Result<Attribute<'_>> {
     if event_handler {
         let (input, _) = alt((
             ws(char('=')),
-            failure_case(bad_char, |_| ParseErrorType::ExpectedCharacter('=')),
+            failure_case(bad_char, |_| {
+                (
+                    ParseErrorType::ExpectedCharacter('='),
+                    Some(Help::with_message(
+                        "value-less event handlers are not allowed",
+                    )),
+                )
+            }),
         ))(input)?;
         if peek(char::<NomSpan, Report<NomSpan>>('{'))(input).is_err() {
-            return nom_err!(input, Failure, ParseErrorType::ExpectedCharacter('{'));
+            return nom_err!(
+                input,
+                Failure,
+                ParseErrorType::ExpectedCharacter('{'),
+                Some(Help::with_message(
+                    "expected because event handlers must always have curly braces as their values"
+                ))
+            );
         }
         return map(mustache, |node| {
             Attribute::EventHandler(EventHandler::new(&attr, node))
@@ -187,10 +224,23 @@ fn attribute(input: NomSpan) -> Result<Attribute<'_>> {
         }),
         map(
             preceded(
-                char('\"'),
+                alt((
+                    char('\"'),
+                    failure_case(bad_char, |_| {
+                        (
+                            ParseErrorType::ExpectedCharacter('"'),
+                            Some(Help::with_message("expected either { or \"")),
+                        )
+                    }),
+                )),
                 alt((
                     terminated(parse_str, char('\"')),
-                    failure_case(bad_char, |_| ParseErrorType::ExpectedCharacter('"')),
+                    failure_case(bad_char, |_| {
+                        (
+                            ParseErrorType::ExpectedCharacter('"'),
+                            Some(Help::with_message("quote was never closed")),
+                        )
+                    }),
                 )),
             ),
             |t| Attribute::KeyValue(&attr, Some(AttributeValue::Literal(&t))),
@@ -210,14 +260,19 @@ fn mustache(input: NomSpan) -> Result<SyntaxNode> {
         char('{'),
         alt((
             take_ignoring_nested('{', '}'),
-            failure_case(bad_char, |_| ParseErrorType::ExpectedCharacter('}')),
+            failure_case(bad_char, |_| {
+                (
+                    ParseErrorType::ExpectedCharacter('}'),
+                    Some(Help::with_message("mustache was never closed")),
+                )
+            }),
         )),
         char('}'),
     )(input)?;
 
     match parse_js(&js_text, loc.location_offset()) {
         Ok(s) => Ok((input, s.first_child().map_or(s, |child| child))),
-        Err(err) => Err(nom::Err::Failure(Report::from(ParseError::new(input, err)))),
+        Err(err) => nom_err!(input, Failure, err, None),
     }
 }
 
@@ -248,12 +303,13 @@ fn failure_case<'i, Free, Parsed, P, F>(
 ) -> impl Fn(NomSpan<'i>) -> Result<'i, Free>
 where
     P: Fn(NomSpan<'i>) -> Result<'i, Parsed>,
-    F: Fn(Parsed) -> ParseErrorType,
+    F: Fn(Parsed) -> (ParseErrorType, Option<Help>),
 {
     use nom::Err::{Error, Failure, Incomplete};
     move |i: NomSpan<'i>| match parser(i) {
         Ok((_, parsed)) => {
-            let report = Report::from(ParseError::new(i, err_constructor(parsed)));
+            let (err, help) = err_constructor(parsed);
+            let report = Report::from(ParseError::new(i, err, help));
             Err(Failure(report))
         }
         Err(Failure(e)) => Err(Failure(e)),

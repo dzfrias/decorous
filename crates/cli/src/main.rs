@@ -94,18 +94,9 @@ fn main() -> Result<()> {
 fn parse_component(input: &str) -> Result<Component> {
     match parse(input) {
         Ok(ast) => Ok(Component::new(ast)),
-        Err(_err) => {
-            todo!("handle errors")
+        Err(report) => {
+            report.format(input, &mut io::stderr())?;
+            anyhow::bail!("\nthe decorous parser failed");
         }
     }
-    // let parser = Parser::new(input);
-    // let (ast, errs) = parser.parse();
-    // let errors_len = errs.len();
-    // for err in errs {
-    //     eprintln!("{err}");
-    // }
-    // if errors_len > 0 {
-    //     anyhow::bail!("\ndecorous failed with {errors_len} errors");
-    // }
-    // Ok(Component::new(ast))
 }
