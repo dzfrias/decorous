@@ -229,6 +229,7 @@ dependencies = [
  "itertools",
  "nom",
  "nom_locate",
+ "rslint_errors",
  "rslint_parser",
  "thiserror",
 ]

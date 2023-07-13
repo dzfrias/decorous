@@ -23,6 +23,15 @@ use crate::ast::{
 type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report<NomSpan<'a>>>;
 type NomSpan<'a> = LocatedSpan<&'a str>;
 
+/// Helper macro for creating an IResult error by hand.
+macro_rules! nom_err {
+    ($input:expr, $severity:ident, $err_type:expr) => {
+        Err(nom::Err::$severity(Report::from(ParseError::new(
+            $input, $err_type,
+        ))))
+    };
+}
+
 pub fn parse<'a>(input: &'a str) -> std::result::Result<DecorousAst<'a>, Report<NomSpan<'a>>> {
     let result = cut(alt((
         all_consuming(_parse),
@@ -47,41 +56,15 @@ fn _parse<'a>(input: NomSpan<'a>) -> Result<DecorousAst<'a>> {
     Ok((input, DecorousAst::new(nodes, script, css)))
 }
 
-fn failure_case<'i, Free, Parsed, P, F>(
-    parser: P,
-    err_constructor: F,
-) -> impl Fn(NomSpan<'i>) -> Result<'i, Free>
-where
-    P: Fn(NomSpan<'i>) -> Result<'i, Parsed>,
-    F: Fn(Parsed) -> ParseErrorType,
-{
-    use nom::Err::{Error, Failure, Incomplete};
-    move |i: NomSpan<'i>| match parser(i) {
-        Ok((_, parsed)) => {
-            let report = Report::from(ParseError::new(i, err_constructor(parsed)));
-            Err(Failure(report))
-        }
-        Err(Failure(e)) => Err(Failure(e)),
-        Err(Error(e)) => Err(Error(e)),
-        Err(Incomplete(need)) => Err(Incomplete(need)),
-    }
-}
-
-fn bad_char(input: NomSpan) -> Result<char> {
-    alt((value('\0', eof), anychar))(input)
-}
-
-fn parse_str(i: NomSpan) -> Result<NomSpan> {
-    escaped(none_of("\""), '\\', one_of("\"n\\"))(i)
-}
-
 fn script(input: NomSpan) -> Result<SyntaxNode> {
     let (input, _) = tag("---js")(input)?;
+    let (input, loc) = position(input)?;
     let (input, body) = take_until("---")(input)?;
     let (input, _) = take(3usize)(input)?;
-    // TODO: Errors
-    let parsed = parse_module(&body, 0);
-    Ok((input, parsed.syntax()))
+    match parse_js(&body, loc.location_offset()) {
+        Ok(node) => Ok((input, node)),
+        Err(err) => nom_err!(input, Failure, err),
+    }
 }
 
 fn style(input: NomSpan) -> Result<&'_ str> {
@@ -100,10 +83,11 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
     // Do not succeed. This tells many0 to stop before it errors (many0 errors when there's no more
     // input).
     if input.is_empty() {
-        return Err(nom::Err::Error(Report::from_error_kind(
+        return nom_err!(
             input,
-            nom::error::ErrorKind::Eof,
-        )));
+            Error,
+            ParseErrorType::Nom(nom::error::ErrorKind::Eof)
+        );
     }
     let (input, node) = alt((
         map(element, NodeType::Element),
@@ -120,20 +104,21 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
     Ok((input, Node::new(node, location)))
 }
 
+fn attributes<'a>(input: NomSpan<'a>) -> Result<Vec<Attribute<'a>>> {
+    delimited(
+        ws_trailing(tag("[")),
+        separated_list0(multispace1, attribute),
+        alt((
+            ws_leading(tag("]")),
+            failure_case(bad_char, |_| ParseErrorType::ExpectedCharacter(']')),
+        )),
+    )(input)
+}
+
 fn element(input: NomSpan) -> Result<Element<'_, Location>> {
     let (input, _) = tag("#")(input)?;
     let (input, tag_name) = alphanumeric1(input)?;
-    let (input, attrs) = terminated(
-        opt(delimited(
-            ws_trailing(tag("[")),
-            separated_list0(multispace1, attribute),
-            alt((
-                ws_leading(tag("]")),
-                failure_case(bad_char, |_| ParseErrorType::ExpectedCharacter(']')),
-            )),
-        )),
-        multispace0,
-    )(input)?;
+    let (input, attrs) = terminated(opt(attributes), multispace0)(input)?;
     let (input, children) = nodes(input)?;
     let (input, _hello) = alt((
         preceded(
@@ -164,10 +149,7 @@ fn attribute(input: NomSpan) -> Result<Attribute<'_>> {
             failure_case(bad_char, |_| ParseErrorType::ExpectedCharacter('=')),
         ))(input)?;
         if peek(char::<NomSpan, Report<NomSpan>>('{'))(input).is_err() {
-            return Err(nom::Err::Failure(Report::from(ParseError::new(
-                input,
-                ParseErrorType::ExpectedCharacter('{'),
-            ))));
+            return nom_err!(input, Failure, ParseErrorType::ExpectedCharacter('{'));
         }
         return map(mustache, |node| {
             Attribute::EventHandler(EventHandler::new(&attr, node))
@@ -201,6 +183,60 @@ fn comment(input: NomSpan) -> Result<NomSpan> {
     preceded(tag("//"), take_while(|c| c != '\n'))(input)
 }
 
+fn mustache(input: NomSpan) -> Result<SyntaxNode> {
+    let (input, loc) = position(input)?;
+    let (input, js_text) = delimited(
+        char('{'),
+        alt((
+            take_ignoring_nested('{', '}'),
+            failure_case(bad_char, |_| ParseErrorType::ExpectedCharacter('}')),
+        )),
+        char('}'),
+    )(input)?;
+
+    match parse_js(&js_text, loc.location_offset()) {
+        Ok(s) => Ok((input, s)),
+        Err(err) => Err(nom::Err::Failure(Report::from(ParseError::new(input, err)))),
+    }
+}
+
+fn parse_js(text: &str, offset: usize) -> std::result::Result<SyntaxNode, ParseErrorType> {
+    let res = parse_module(text, 0);
+    if res.errors().is_empty() {
+        Ok(res.syntax())
+    } else {
+        // A bit of a weird way to get owned diagnostics...
+        let errors = res.ok().expect_err("should have errors");
+        Err(ParseErrorType::JavaScriptDiagnostics { errors, offset })
+    }
+}
+
+fn parse_str(i: NomSpan) -> Result<NomSpan> {
+    escaped(none_of("\""), '\\', one_of("\"n\\"))(i)
+}
+
+// --General purpose parsers--
+
+fn failure_case<'i, Free, Parsed, P, F>(
+    parser: P,
+    err_constructor: F,
+) -> impl Fn(NomSpan<'i>) -> Result<'i, Free>
+where
+    P: Fn(NomSpan<'i>) -> Result<'i, Parsed>,
+    F: Fn(Parsed) -> ParseErrorType,
+{
+    use nom::Err::{Error, Failure, Incomplete};
+    move |i: NomSpan<'i>| match parser(i) {
+        Ok((_, parsed)) => {
+            let report = Report::from(ParseError::new(i, err_constructor(parsed)));
+            Err(Failure(report))
+        }
+        Err(Failure(e)) => Err(Failure(e)),
+        Err(Error(e)) => Err(Error(e)),
+        Err(Incomplete(need)) => Err(Incomplete(need)),
+    }
+}
+
 fn take_ignoring_nested(left: char, right: char) -> impl Fn(NomSpan) -> Result<NomSpan> {
     move |i: NomSpan| {
         let mut index = 0;
@@ -231,16 +267,9 @@ fn take_ignoring_nested(left: char, right: char) -> impl Fn(NomSpan) -> Result<N
     }
 }
 
-fn mustache(input: NomSpan) -> Result<SyntaxNode> {
-    let (input, js_text) = delimited(
-        char('{'),
-        alt((
-            take_ignoring_nested('{', '}'),
-            failure_case(bad_char, |_| ParseErrorType::ExpectedCharacter('}')),
-        )),
-        char('}'),
-    )(input)?;
-    Ok((input, parse_module(&js_text, 0).syntax()))
+/// Matches eof or any character
+fn bad_char(input: NomSpan) -> Result<char> {
+    alt((value('\0', eof), anychar))(input)
 }
 
 fn ws<'a, F: 'a, O>(inner: F) -> impl FnMut(NomSpan<'a>) -> Result<O>
@@ -363,6 +392,6 @@ mod tests {
 
     #[test]
     fn mustaches_allow_for_curly_braces() {
-        nom_test_all_insta!(mustache, ["{hello () => { console.log(\"hi\") }  }"])
+        nom_test_all_insta!(mustache, ["{() => { console.log(\"hi\"); }  }"])
     }
 }

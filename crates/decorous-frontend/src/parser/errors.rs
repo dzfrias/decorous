@@ -18,6 +18,11 @@ pub enum ParseErrorType {
     CannotHaveTwoStyleTags,
     #[error("javascript parsing error: {}", 0.to_string())]
     JavaScriptParseError(rslint_parser::ParserError),
+    #[error("parse error in JavaScript: {}", 0.to_string())]
+    JavaScriptDiagnostics {
+        errors: Vec<rslint_errors::Diagnostic>,
+        offset: usize,
+    },
     #[error("byte processing error: {}", 0.to_string())]
     Nom(nom::error::ErrorKind),
 }
