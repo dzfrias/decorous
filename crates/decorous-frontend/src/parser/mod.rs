@@ -32,7 +32,7 @@ macro_rules! nom_err {
     };
 }
 
-pub fn parse<'a>(input: &'a str) -> std::result::Result<DecorousAst<'a>, Report<NomSpan<'a>>> {
+pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<NomSpan>> {
     let result = cut(alt((
         all_consuming(_parse),
         failure_case(char('/'), |_| ParseErrorType::ExpectedClosingTag),
@@ -49,7 +49,7 @@ pub fn parse<'a>(input: &'a str) -> std::result::Result<DecorousAst<'a>, Report<
     }
 }
 
-fn _parse<'a>(input: NomSpan<'a>) -> Result<DecorousAst<'a>> {
+fn _parse(input: NomSpan) -> Result<DecorousAst> {
     let (input, script) = opt(ws(script))(input)?;
     let (input, nodes) = nodes(input)?;
     let (input, css) = opt(ws(style))(input)?;
@@ -104,7 +104,7 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
     Ok((input, Node::new(node, location)))
 }
 
-fn attributes<'a>(input: NomSpan<'a>) -> Result<Vec<Attribute<'a>>> {
+fn attributes(input: NomSpan) -> Result<Vec<Attribute>> {
     delimited(
         ws_trailing(tag("[")),
         separated_list0(multispace1, attribute),
@@ -129,7 +129,7 @@ fn element(input: NomSpan) -> Result<Element<'_, Location>> {
         terminated(
             map(nodes, |mut nodes| {
                 if let Some(NodeType::Text(t)) = nodes.last_mut().map(|node| node.node_type_mut()) {
-                    *t = t.strip_suffix(" ").unwrap_or(t);
+                    *t = t.strip_suffix(' ').unwrap_or(t);
                     if t.is_empty() {
                         nodes.pop();
                     }

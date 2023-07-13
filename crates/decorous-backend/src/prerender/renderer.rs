@@ -166,7 +166,7 @@ impl<'a> Renderer<'a> {
                             });
                             let idx = self.elems.len() - 1;
                             attr_data.push(AttrData {
-                                attr: *key,
+                                attr: key,
                                 js: js.clone(),
                                 elems_idx: idx,
                             });
@@ -268,7 +268,7 @@ impl<'a> Renderer<'a> {
         for (idx, js) in &data.mustache_data {
             let unbound = utils::get_unbound_refs(js);
             let dirty_indices = codegen_utils::calc_dirty(&unbound, self.component.declared_vars());
-            let replaced = replace::replace_namerefs(&js, &unbound, self.component.declared_vars());
+            let replaced = replace::replace_namerefs(js, &unbound, self.component.declared_vars());
             writeln!(
                 self.update_body,
                 "if ({dirty_indices}) elems[{idx}].data = {replaced};",
@@ -284,7 +284,7 @@ impl<'a> Renderer<'a> {
         {
             let unbound = utils::get_unbound_refs(js);
             let dirty_indices = codegen_utils::calc_dirty(&unbound, self.component.declared_vars());
-            let replaced = replace::replace_namerefs(&js, &unbound, self.component.declared_vars());
+            let replaced = replace::replace_namerefs(js, &unbound, self.component.declared_vars());
             writeln!(
                 self.update_body,
                 "if ({dirty_indices}) elems[{elems_idx}].setAttribute(\"{attr}\", {replaced});",

@@ -16,8 +16,6 @@ pub enum ParseErrorType {
     CannotHaveTwoScripts,
     #[error("cannot have two style tags")]
     CannotHaveTwoStyleTags,
-    #[error("javascript parsing error: {}", 0.to_string())]
-    JavaScriptParseError(rslint_parser::ParserError),
     #[error("parse error in JavaScript: {}", 0.to_string())]
     JavaScriptDiagnostics {
         errors: Vec<rslint_errors::Diagnostic>,
