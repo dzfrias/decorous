@@ -8,8 +8,10 @@ expression: component.fragment_tree
             id: 0,
             parent_id: None,
             location: Location {
-                start: 0,
-                end: 47,
+                offset: 0,
+                length: 34,
+                line: 1,
+                column: 1,
             },
         },
         node_type: Element(
@@ -24,8 +26,10 @@ expression: component.fragment_tree
                                 0,
                             ),
                             location: Location {
-                                start: 5,
-                                end: 22,
+                                offset: 5,
+                                length: 12,
+                                line: 1,
+                                column: 6,
                             },
                         },
                         node_type: Element(
@@ -40,12 +44,14 @@ expression: component.fragment_tree
                                                 1,
                                             ),
                                             location: Location {
-                                                start: 11,
-                                                end: 15,
+                                                offset: 0,
+                                                length: 0,
+                                                line: 0,
+                                                column: 0,
                                             },
                                         },
                                         node_type: Text(
-                                            "hello",
+                                            "hello ",
                                         ),
                                     },
                                 ],
@@ -59,8 +65,10 @@ expression: component.fragment_tree
                                 0,
                             ),
                             location: Location {
-                                start: 23,
-                                end: 41,
+                                offset: 17,
+                                length: 13,
+                                line: 1,
+                                column: 18,
                             },
                         },
                         node_type: Element(
@@ -75,12 +83,14 @@ expression: component.fragment_tree
                                                 3,
                                             ),
                                             location: Location {
-                                                start: 29,
-                                                end: 34,
+                                                offset: 0,
+                                                length: 0,
+                                                line: 0,
+                                                column: 0,
                                             },
                                         },
                                         node_type: Text(
-                                            "hello2",
+                                            "hello2 ",
                                         ),
                                     },
                                 ],

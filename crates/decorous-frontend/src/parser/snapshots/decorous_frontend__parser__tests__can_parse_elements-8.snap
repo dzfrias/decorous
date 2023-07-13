@@ -33,10 +33,9 @@ Ok(
                         column: 11,
                     },
                     node_type: Mustache(
-                        MODULE@0..8
-                          EXPR_STMT@0..8
-                            NAME_REF@0..8
-                              IDENT@0..8 "mustache"
+                        EXPR_STMT@0..8
+                          NAME_REF@0..8
+                            IDENT@0..8 "mustache"
                         ,
                     ),
                 },

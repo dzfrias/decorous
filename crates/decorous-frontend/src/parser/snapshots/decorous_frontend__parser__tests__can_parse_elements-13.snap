@@ -5,15 +5,36 @@ expression: element(input.into())
 Ok(
     (
         LocatedSpan {
-            offset: 5,
+            offset: 28,
             line: 1,
             fragment: "",
             extra: (),
         },
         Element {
-            tag: "div",
-            attrs: [],
-            children: [],
+            tag: "span",
+            attrs: [
+                KeyValue(
+                    "x",
+                    Some(
+                        Literal(
+                            "green",
+                        ),
+                    ),
+                ),
+            ],
+            children: [
+                Node {
+                    metadata: Location {
+                        offset: 0,
+                        length: 0,
+                        line: 0,
+                        column: 0,
+                    },
+                    node_type: Text(
+                        "hello world",
+                    ),
+                },
+            ],
         },
     ),
 )

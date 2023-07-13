@@ -119,20 +119,31 @@ fn element(input: NomSpan) -> Result<Element<'_, Location>> {
     let (input, _) = tag("#")(input)?;
     let (input, tag_name) = alphanumeric1(input)?;
     let (input, attrs) = terminated(opt(attributes), multispace0)(input)?;
-    let (input, children) = nodes(input)?;
-    let (input, _hello) = alt((
+    let (input, children) = alt((
         preceded(
-            char('/'),
+            char(':'),
+            map(
+                escaped(none_of("/#\\{"), '\\', one_of(r#"/#{}"#)),
+                |text: NomSpan| vec![Node::new(NodeType::Text(&text), Location::default())],
+            ),
+        ),
+        terminated(
+            nodes,
             alt((
-                tag(*tag_name.fragment()),
-                failure_case(identifier, |tag| {
-                    ParseErrorType::InvalidClosingTag(tag.to_string())
+                preceded(
+                    char('/'),
+                    alt((
+                        tag(*tag_name.fragment()),
+                        failure_case(identifier, |tag| {
+                            ParseErrorType::InvalidClosingTag(tag.to_string())
+                        }),
+                    )),
+                ),
+                failure_case(bad_char, |_| {
+                    ParseErrorType::UnclosedTag(tag_name.to_string())
                 }),
             )),
         ),
-        failure_case(bad_char, |_| {
-            ParseErrorType::UnclosedTag(tag_name.to_string())
-        }),
     ))(input)?;
     Ok((
         input,
@@ -195,7 +206,7 @@ fn mustache(input: NomSpan) -> Result<SyntaxNode> {
     )(input)?;
 
     match parse_js(&js_text, loc.location_offset()) {
-        Ok(s) => Ok((input, s)),
+        Ok(s) => Ok((input, s.first_child().map_or(s, |child| child))),
         Err(err) => Err(nom::Err::Failure(Report::from(ParseError::new(input, err)))),
     }
 }
@@ -347,6 +358,7 @@ mod tests {
                 "#div[hello=\"world\"]/notdiv",
                 "#div]/div",
                 "#div",
+                "#span[x=\"green\"]:hello world"
             ]
         );
     }

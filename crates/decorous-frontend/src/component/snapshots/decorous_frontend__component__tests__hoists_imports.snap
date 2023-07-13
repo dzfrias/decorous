@@ -3,15 +3,15 @@ source: crates/decorous-frontend/src/component/mod.rs
 expression: component.hoist()
 ---
 [
-    IMPORT_DECL@22..45
-      IMPORT_KW@22..28 "import"
-      WHITESPACE@28..29 " "
-      NAME@29..33
-        IDENT@29..33 "data"
-      WHITESPACE@33..34 " "
-      FROM_KW@34..38 "from"
-      WHITESPACE@38..39 " "
-      LITERAL@39..45
-        STRING@39..45 "\"data\""
+    IMPORT_DECL@23..46
+      IMPORT_KW@23..29 "import"
+      WHITESPACE@29..30 " "
+      NAME@30..34
+        IDENT@30..34 "data"
+      WHITESPACE@34..35 " "
+      FROM_KW@35..39 "from"
+      WHITESPACE@39..40 " "
+      LITERAL@40..46
+        STRING@40..46 "\"data\""
     ,
 ]
