@@ -29,7 +29,7 @@ Ok(
             Node {
                 metadata: Location {
                     offset: 8,
-                    length: 15,
+                    length: 16,
                     line: 1,
                     column: 9,
                 },
@@ -55,13 +55,13 @@ Ok(
             },
             Node {
                 metadata: Location {
-                    offset: 23,
-                    length: 6,
+                    offset: 24,
+                    length: 5,
                     line: 1,
-                    column: 24,
+                    column: 25,
                 },
                 node_type: Text(
-                    " hello",
+                    "hello",
                 ),
             },
         ],

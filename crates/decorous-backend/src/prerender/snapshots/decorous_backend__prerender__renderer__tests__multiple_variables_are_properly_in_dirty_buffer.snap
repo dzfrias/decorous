@@ -38,4 +38,4 @@ dirty.fill(0);
 
 ---
 <script defer src="./out.js"></script>
-<p id="0"><span></span>and <span></span>and <span></span></p>
+<p id="0"><span></span> and <span></span> and <span></span></p>

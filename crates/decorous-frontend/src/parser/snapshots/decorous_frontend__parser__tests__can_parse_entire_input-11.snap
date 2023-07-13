@@ -1,0 +1,64 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: parse(input.into())
+---
+Ok(
+    DecorousAst {
+        nodes: [
+            Node {
+                metadata: Location {
+                    offset: 0,
+                    length: 9,
+                    line: 1,
+                    column: 1,
+                },
+                node_type: Element(
+                    Element {
+                        tag: "p",
+                        attrs: [],
+                        children: [
+                            Node {
+                                metadata: Location {
+                                    offset: 3,
+                                    length: 3,
+                                    line: 1,
+                                    column: 4,
+                                },
+                                node_type: Text(
+                                    "Hi",
+                                ),
+                            },
+                        ],
+                    },
+                ),
+            },
+            Node {
+                metadata: Location {
+                    offset: 9,
+                    length: 7,
+                    line: 1,
+                    column: 10,
+                },
+                node_type: Text(
+                    "Hello, ",
+                ),
+            },
+            Node {
+                metadata: Location {
+                    offset: 16,
+                    length: 6,
+                    line: 1,
+                    column: 17,
+                },
+                node_type: Mustache(
+                    EXPR_STMT@0..4
+                      NAME_REF@0..4
+                        IDENT@0..4 "name"
+                    ,
+                ),
+            },
+        ],
+        script: None,
+        css: None,
+    },
+)

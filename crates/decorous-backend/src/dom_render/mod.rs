@@ -138,32 +138,28 @@ mod tests {
 
     #[test]
     fn basic_render_works() {
-        test_render!(
-            "<script>let x = 3; function remake_x() { x = 44; }</script><p>{`${x}hello`}</p>"
-        );
+        test_render!("---js let x = 3; function remake_x() { x = 44; } --- #p {`${x}hello`} /p");
     }
 
     #[test]
     fn render_with_attrs_works() {
-        test_render!(
-            "<script>let x = 3; function remake_x() { x = 44; }</script><div class={x}></div>"
-        );
+        test_render!("---js let x = 3; function remake_x() { x = 44; } --- #div[class={x}]/div");
     }
 
     #[test]
     fn render_with_event_listeners_works() {
         test_render!(
-            "<script>let x = 3;</script><p>{x}</p><button on:click={() => {if (x == 3) { x = 44; }} }>Clickme</button>"
+            "---js let x = 3; --- #p {x} /p #button[@click={() => {if (x == 3) { x = 44; }} }]Clickme /button"
         );
     }
 
     #[test]
     fn imports_are_hoisted_out_of_context_init() {
-        test_render!("<script>import data from \"data\"; let x = 3;</script><p>{x}</p>");
+        test_render!("---js import data from \"data\"; let x = 3; --- #p {x} /p");
     }
 
     #[test]
     fn everything_in_script_tag_is_in_context_init() {
-        test_render!("<script>let x = 3; x = 4;</script>");
+        test_render!("---js let x = 3; x = 4; ---");
     }
 }

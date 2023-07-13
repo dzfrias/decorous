@@ -53,7 +53,7 @@ Ok(
                 Node {
                     metadata: Location {
                         offset: 27,
-                        length: 8,
+                        length: 9,
                         line: 1,
                         column: 28,
                     },

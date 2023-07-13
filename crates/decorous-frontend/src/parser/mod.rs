@@ -137,14 +137,17 @@ fn element(input: NomSpan) -> Result<Element<'_, Location>> {
                 nodes
             }),
             alt((
-                preceded(
-                    char('/'),
-                    alt((
-                        tag(*tag_name.fragment()),
-                        failure_case(identifier, |tag| {
-                            ParseErrorType::InvalidClosingTag(tag.to_string())
-                        }),
-                    )),
+                terminated(
+                    preceded(
+                        char('/'),
+                        alt((
+                            tag(*tag_name.fragment()),
+                            failure_case(identifier, |tag| {
+                                ParseErrorType::InvalidClosingTag(tag.to_string())
+                            }),
+                        )),
+                    ),
+                    opt(char(' ')),
                 ),
                 failure_case(bad_char, |_| {
                     ParseErrorType::UnclosedTag(tag_name.to_string())
@@ -409,6 +412,7 @@ mod tests {
                 "#div[@attr={hello]/div",
                 "#div[@attr=\"hello\"]/div",
                 "#div[@attr]/div",
+                "#p Hi /p Hello, {name}",
             ]
         )
     }

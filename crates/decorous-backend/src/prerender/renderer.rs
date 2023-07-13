@@ -409,41 +409,37 @@ mod tests {
 
     #[test]
     fn can_write_basic_html_from_fragment_tree_ignoring_mustache_tags() {
-        test_render!(
-            "<p>Hello</p>",
-            "<div><p>Hi</p>Hello, {name}</div>",
-            "<!-- comment -->hello"
-        );
+        test_render!("#p Hello /p", "#div #p Hi /p Hello, {name} /div");
     }
 
     #[test]
     fn can_write_basic_js() {
         test_render!(
-            "<script>let x = 3;</script><p>Hello, {x}!</p><button on:click={() => x = 444}>Click Me</button>",
-            "<script>let x = 3;</script><p>Hello, {x}!</p><button on:click={() => x = 444}>Click Me</button><p>{x}</p>"
+            "---js let x = 3; --- #p Hello, {x}! /p #button[@click={() => x = 444}] Click Me /button",
+            "---js let x = 3; --- #p Hello, {x}! /p #button[@click={() => x = 444}] Click Me /button #p {x} /p"
         );
     }
 
     #[test]
     fn custom_ids_do_not_get_overriden() {
-        test_render!("<script>let x = 3;</script><p id=\"custom\">Hello, {x}!</p>");
+        test_render!("---js let x = 3;--- #p[id=\"custom\"] Hello, {x}! /p");
     }
 
     #[test]
     fn can_create_dynamic_attributes() {
         test_render!(
-            "<script>let x = 3;</script><p class={x + 3}>Text</p>",
-            "<script>let x = 3;</script><p class={x + 3}>Hello {x}</p>"
+            "---js let x = 3; --- #p[class={x + 3}] Text /p",
+            "---js let x = 3; --- #p[class={x + 3}] Hello {x} /p"
         );
     }
 
     #[test]
     fn supports_toplevel_mustache_tags() {
-        test_render!("<script>let x = 3;</script>{x}");
+        test_render!("---js let x = 3; --- {x}");
     }
 
     #[test]
     fn multiple_variables_are_properly_in_dirty_buffer() {
-        test_render!("<script>let x = 0; let y = 0;</script><p>{x} and {y} and {x + y}</p>");
+        test_render!("---js let x = 0; let y = 0; --- #p {x} and {y} and {x + y} /p");
     }
 }
