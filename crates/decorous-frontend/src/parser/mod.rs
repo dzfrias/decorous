@@ -122,13 +122,20 @@ fn element(input: NomSpan) -> Result<Element<'_, Location>> {
     let (input, children) = alt((
         preceded(
             char(':'),
-            map(
-                escaped(none_of("/#\\{"), '\\', one_of(r#"/#{}"#)),
-                |text: NomSpan| vec![Node::new(NodeType::Text(&text), Location::default())],
-            ),
+            map(parse_text, |text: NomSpan| {
+                vec![Node::new(NodeType::Text(&text), Location::default())]
+            }),
         ),
         terminated(
-            nodes,
+            map(nodes, |mut nodes| {
+                if let Some(NodeType::Text(t)) = nodes.last_mut().map(|node| node.node_type_mut()) {
+                    *t = t.strip_suffix(" ").unwrap_or(t);
+                    if t.is_empty() {
+                        nodes.pop();
+                    }
+                }
+                nodes
+            }),
             alt((
                 preceded(
                     char('/'),
@@ -224,6 +231,10 @@ fn parse_js(text: &str, offset: usize) -> std::result::Result<SyntaxNode, ParseE
 
 fn parse_str(i: NomSpan) -> Result<NomSpan> {
     escaped(none_of("\""), '\\', one_of("\"n\\"))(i)
+}
+
+fn parse_text(input: NomSpan) -> Result<NomSpan> {
+    escaped(none_of("/#\\{"), '\\', one_of(r#"/#{}"#))(input)
 }
 
 // --General purpose parsers--

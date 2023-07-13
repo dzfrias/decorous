@@ -65,17 +65,6 @@ Ok(
                         },
                     ),
                 },
-                Node {
-                    metadata: Location {
-                        offset: 35,
-                        length: 1,
-                        line: 1,
-                        column: 36,
-                    },
-                    node_type: Text(
-                        " ",
-                    ),
-                },
             ],
         },
     ),

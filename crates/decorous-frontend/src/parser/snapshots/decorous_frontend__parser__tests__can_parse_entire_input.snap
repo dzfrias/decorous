@@ -31,17 +31,6 @@ Ok(
                                     ,
                                 ),
                             },
-                            Node {
-                                metadata: Location {
-                                    offset: 29,
-                                    length: 1,
-                                    line: 1,
-                                    column: 30,
-                                },
-                                node_type: Text(
-                                    " ",
-                                ),
-                            },
                         ],
                     },
                 ),
