@@ -125,7 +125,7 @@ fn fmt_report<T: io::Write>(input: &str, report: &Report<Location>, out: &mut T)
         if let Some(help_line) = err
             .help()
             .and_then(|help| help.corresponding_line())
-            .filter(|ln| ln <= &line_no)
+            .filter(|ln| ln < &line_no)
         {
             let (_, line) = lines
                 .clone()
