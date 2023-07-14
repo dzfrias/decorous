@@ -6,14 +6,20 @@ Err(
     Report {
         errors: [
             ParseError {
-                fragment: LocatedSpan {
+                fragment: Location {
                     offset: 5,
+                    length: 1,
                     line: 1,
-                    fragment: "notdiv#div2/notdiv2",
-                    extra: (),
+                    column: 6,
                 },
+                help: Some(
+                    Help {
+                        corresponding_line: None,
+                        message: "replace this tag with the expected!",
+                    },
+                ),
                 err_type: InvalidClosingTag(
-                    "notdiv",
+                    "div",
                 ),
             },
         ],

@@ -13,8 +13,14 @@ Err(
                         fragment: "notdiv",
                         extra: (),
                     },
+                    help: Some(
+                        Help {
+                            corresponding_line: None,
+                            message: "replace this tag with the expected!",
+                        },
+                    ),
                     err_type: InvalidClosingTag(
-                        "notdiv",
+                        "div",
                     ),
                 },
             ],

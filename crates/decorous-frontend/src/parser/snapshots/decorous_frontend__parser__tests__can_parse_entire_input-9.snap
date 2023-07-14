@@ -6,12 +6,18 @@ Err(
     Report {
         errors: [
             ParseError {
-                fragment: LocatedSpan {
+                fragment: Location {
                     offset: 11,
+                    length: 1,
                     line: 1,
-                    fragment: "\"hello\"]/div",
-                    extra: (),
+                    column: 12,
                 },
+                help: Some(
+                    Help {
+                        corresponding_line: None,
+                        message: "expected because event handlers must always have curly braces as their values",
+                    },
+                ),
                 err_type: ExpectedCharacter(
                     '{',
                 ),

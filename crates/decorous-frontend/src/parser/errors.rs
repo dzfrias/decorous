@@ -3,6 +3,8 @@ use std::{fmt, io};
 use nom_locate::LocatedSpan;
 use thiserror::Error;
 
+use crate::ast::Location;
+
 #[derive(Debug, Error, PartialEq, Clone)]
 pub enum ParseErrorType {
     #[error("invalid closing tag, expected {0}")]
@@ -94,6 +96,16 @@ impl Report<LocatedSpan<&str>> {
             writeln!(out)?;
         }
         Ok(())
+    }
+}
+
+impl From<Report<LocatedSpan<&str>>> for Report<Location> {
+    fn from(report: Report<LocatedSpan<&str>>) -> Self {
+        let mut new_report = Vec::with_capacity(report.errors.len());
+        for err in report.errors {
+            new_report.push(ParseError::new(err.fragment.into(), err.err_type, err.help));
+        }
+        Self { errors: new_report }
     }
 }
 

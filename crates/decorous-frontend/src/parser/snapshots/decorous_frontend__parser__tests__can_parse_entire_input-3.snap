@@ -6,14 +6,23 @@ Err(
     Report {
         errors: [
             ParseError {
-                fragment: LocatedSpan {
+                fragment: Location {
                     offset: 4,
+                    length: 1,
                     line: 1,
-                    fragment: "",
-                    extra: (),
+                    column: 5,
                 },
+                help: Some(
+                    Help {
+                        corresponding_line: Some(
+                            1,
+                        ),
+                        message: "tag never closed",
+                    },
+                ),
                 err_type: UnclosedTag(
                     "div",
+                    1,
                 ),
             },
         ],

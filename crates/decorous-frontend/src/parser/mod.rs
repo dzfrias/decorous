@@ -32,7 +32,7 @@ macro_rules! nom_err {
     };
 }
 
-pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<NomSpan>> {
+pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<Location>> {
     let result = cut(alt((
         all_consuming(_parse),
         failure_case(char('/'), |_| {
@@ -46,7 +46,9 @@ pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<NomSpan>> {
         Err(err) => {
             use nom::Err::Failure;
             match err {
-                Failure(report) => Err(report),
+                // NomSpans from the report are turned into Locations, so to not leak into the
+                // public interface of this module.
+                Failure(report) => Err(report.into()),
                 _ => unreachable!(),
             }
         }

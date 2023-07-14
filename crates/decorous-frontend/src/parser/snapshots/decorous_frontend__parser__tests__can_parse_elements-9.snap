@@ -13,6 +13,12 @@ Err(
                         fragment: "/div",
                         extra: (),
                     },
+                    help: Some(
+                        Help {
+                            corresponding_line: None,
+                            message: "attribute bracket was never closed",
+                        },
+                    ),
                     err_type: ExpectedCharacter(
                         ']',
                     ),

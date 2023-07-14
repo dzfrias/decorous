@@ -64,6 +64,17 @@ impl Location {
     }
 }
 
+impl<'a> From<LocatedSpan<&'a str>> for Location {
+    fn from(span: LocatedSpan<&'a str>) -> Self {
+        Self {
+            offset: span.location_offset(),
+            length: 1,
+            line: span.location_line(),
+            column: span.get_column(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeType<'a, T> {
     Element(Element<'a, T>),

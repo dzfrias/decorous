@@ -6,12 +6,18 @@ Err(
     Report {
         errors: [
             ParseError {
-                fragment: LocatedSpan {
+                fragment: Location {
                     offset: 12,
+                    length: 1,
                     line: 1,
-                    fragment: "hello]/div",
-                    extra: (),
+                    column: 13,
                 },
+                help: Some(
+                    Help {
+                        corresponding_line: None,
+                        message: "mustache was never closed",
+                    },
+                ),
                 err_type: ExpectedCharacter(
                     '}',
                 ),

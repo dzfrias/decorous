@@ -13,6 +13,12 @@ Err(
                         fragment: "\"wrong\"",
                         extra: (),
                     },
+                    help: Some(
+                        Help {
+                            corresponding_line: None,
+                            message: "expected because event handlers must always have curly braces as their values",
+                        },
+                    ),
                     err_type: ExpectedCharacter(
                         '{',
                     ),

@@ -6,12 +6,18 @@ Err(
     Report {
         errors: [
             ParseError {
-                fragment: LocatedSpan {
+                fragment: Location {
                     offset: 10,
+                    length: 1,
                     line: 1,
-                    fragment: "]/div",
-                    extra: (),
+                    column: 11,
                 },
+                help: Some(
+                    Help {
+                        corresponding_line: None,
+                        message: "value-less event handlers are not allowed",
+                    },
+                ),
                 err_type: ExpectedCharacter(
                     '=',
                 ),

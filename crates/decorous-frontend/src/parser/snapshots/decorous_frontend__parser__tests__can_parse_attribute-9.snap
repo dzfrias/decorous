@@ -13,6 +13,12 @@ Err(
                         fragment: "",
                         extra: (),
                     },
+                    help: Some(
+                        Help {
+                            corresponding_line: None,
+                            message: "value-less event handlers are not allowed",
+                        },
+                    ),
                     err_type: ExpectedCharacter(
                         '=',
                     ),

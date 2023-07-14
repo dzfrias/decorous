@@ -13,8 +13,17 @@ Err(
                         fragment: "",
                         extra: (),
                     },
+                    help: Some(
+                        Help {
+                            corresponding_line: Some(
+                                1,
+                            ),
+                            message: "tag never closed",
+                        },
+                    ),
                     err_type: UnclosedTag(
                         "div",
+                        1,
                     ),
                 },
             ],

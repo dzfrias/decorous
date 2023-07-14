@@ -6,12 +6,18 @@ Err(
     Report {
         errors: [
             ParseError {
-                fragment: LocatedSpan {
+                fragment: Location {
                     offset: 0,
+                    length: 1,
                     line: 1,
-                    fragment: "/",
-                    extra: (),
+                    column: 1,
                 },
+                help: Some(
+                    Help {
+                        corresponding_line: None,
+                        message: "escape the slash with \\/",
+                    },
+                ),
                 err_type: ExpectedClosingTag,
             },
         ],
