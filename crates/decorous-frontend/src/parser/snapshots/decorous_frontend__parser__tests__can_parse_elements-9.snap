@@ -15,7 +15,9 @@ Err(
                     },
                     help: Some(
                         Help {
-                            corresponding_line: None,
+                            corresponding_line: Some(
+                                1,
+                            ),
                             message: "attribute bracket was never closed",
                         },
                     ),

@@ -112,15 +112,20 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
 }
 
 fn attributes(input: NomSpan) -> Result<Vec<Attribute>> {
+    let (input, start_pos) = position(input)?;
+    let start_line = start_pos.location_line();
     delimited(
         ws_trailing(char('[')),
         separated_list0(multispace1, attribute),
         alt((
             ws_leading(char(']')),
-            failure_case(bad_char, |_| {
+            failure_case(bad_char, move |_| {
                 (
                     ParseErrorType::ExpectedCharacter(']'),
-                    Some(Help::with_message("attribute bracket was never closed")),
+                    Some(Help::with_line(
+                        start_line,
+                        "attribute bracket was never closed",
+                    )),
                 )
             }),
         )),
