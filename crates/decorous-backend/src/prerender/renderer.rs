@@ -227,24 +227,6 @@ impl<'a> Renderer<'a> {
     }
 
     fn build_ctx_body(&mut self, data: &TransientNodeData<'_>) {
-        for (idx, js) in &data.mustache_data {
-            writeln!(self.ctx_body, "elems[{idx}].data = {js};")
-                .expect("writing to string format should not fail");
-        }
-
-        for AttrData {
-            attr,
-            js,
-            elems_idx,
-        } in &data.attr_data
-        {
-            writeln!(
-                self.ctx_body,
-                "elems[{elems_idx}].setAttribute(\"{attr}\", {js});"
-            )
-            .expect("writing to format string should not fail");
-        }
-
         for Listener {
             event,
             js,

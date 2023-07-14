@@ -11,12 +11,13 @@ return text;
 const elems = [document.getElementById("0"),replace(document.getElementById("0").childNodes[1]),];
 function __init_ctx() {
 let x = 3;
-elems[1].data = x;
-elems[0].setAttribute("class", x + 3);
 return [x];
 }
 const ctx = __init_ctx();
 let updating = false;
+dirty.fill(255);
+__update(dirty);
+dirty.fill(0);
 function __update(dirty) {
 if (dirty[0] & 1) elems[1].data = ctx[0];
 if (dirty[0] & 1) elems[0].setAttribute("class", ctx[0] + 3);

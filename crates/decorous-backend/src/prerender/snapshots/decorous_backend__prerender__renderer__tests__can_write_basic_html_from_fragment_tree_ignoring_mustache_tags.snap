@@ -14,6 +14,9 @@ return [];
 }
 const ctx = __init_ctx();
 let updating = false;
+dirty.fill(255);
+__update(dirty);
+dirty.fill(0);
 function __update(dirty) {
 }
 function __schedule_update(ctx_idx, val) {

@@ -9,6 +9,9 @@ function __init_ctx() {{
 {ctx_body}}}
 const ctx = __init_ctx();
 let updating = false;
+dirty.fill(255);
+__update(dirty);
+dirty.fill(0);
 function __update(dirty) {{
 {update_body}}}
 function __schedule_update(ctx_idx, val) {{

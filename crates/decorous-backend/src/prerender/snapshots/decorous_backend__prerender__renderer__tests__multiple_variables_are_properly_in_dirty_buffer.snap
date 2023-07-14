@@ -12,13 +12,13 @@ const elems = [replace(document.getElementById("0").childNodes[0]),replace(docum
 function __init_ctx() {
 let x = 0;
 let y = 0;
-elems[0].data = x;
-elems[1].data = y;
-elems[2].data = x + y;
 return [x,y];
 }
 const ctx = __init_ctx();
 let updating = false;
+dirty.fill(255);
+__update(dirty);
+dirty.fill(0);
 function __update(dirty) {
 if (dirty[0] & 1) elems[0].data = ctx[0];
 if (dirty[0] & 2) elems[1].data = ctx[1];

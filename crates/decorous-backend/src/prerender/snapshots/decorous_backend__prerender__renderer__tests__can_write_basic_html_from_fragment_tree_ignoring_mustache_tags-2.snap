@@ -10,11 +10,13 @@ return text;
 }
 const elems = [replace(document.getElementById("0").childNodes[2]),];
 function __init_ctx() {
-elems[0].data = name;
 return [];
 }
 const ctx = __init_ctx();
 let updating = false;
+dirty.fill(255);
+__update(dirty);
+dirty.fill(0);
 function __update(dirty) {
 if () elems[0].data = name;
 }
