@@ -6,7 +6,7 @@ use nom::{
     character::complete::{
         alpha1, alphanumeric1, anychar, char, multispace0, multispace1, none_of, one_of,
     },
-    combinator::{all_consuming, cut, eof, map, opt, peek, recognize, value},
+    combinator::{all_consuming, cut, eof, map, not, opt, peek, recognize, value},
     error::ParseError as NomParseError,
     multi::{many0, many0_count, separated_list0},
     sequence::{delimited, pair, preceded, terminated},
@@ -17,7 +17,8 @@ use rslint_parser::{parse_module, SyntaxNode};
 
 use self::errors::{Help, ParseError, ParseErrorType, Report};
 use crate::ast::{
-    Attribute, AttributeValue, DecorousAst, Element, EventHandler, Location, Node, NodeType,
+    Attribute, AttributeValue, DecorousAst, Element, EventHandler, ForBlock, IfBlock, Location,
+    Node, NodeType, SpecialBlock,
 };
 
 type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report<NomSpan<'a>>>;
@@ -99,6 +100,7 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
     let (input, node) = alt((
         map(element, NodeType::Element),
         map(comment, |c| NodeType::Comment(&c)),
+        map(special_block, NodeType::SpecialBlock),
         map(mustache, NodeType::Mustache),
         map(
             escaped(none_of("/#\\{"), '\\', one_of(r#"/#{}"#)),
@@ -262,9 +264,73 @@ fn comment(input: NomSpan) -> Result<NomSpan> {
 }
 
 fn mustache(input: NomSpan) -> Result<SyntaxNode> {
+    // Make sure it doesn't parse "{/", as that's the beginning of the end of a special block
+    not(alt((tag("{/"), tag("{:"))))(input)?;
+    preceded(char('{'), mustache_inner)(input)
+}
+
+fn special_block(input: NomSpan) -> Result<SpecialBlock<'_, Location>> {
+    let (input, block_type) = preceded(tag("{#"), identifier)(input)?;
+    match *block_type.fragment() {
+        "for" => {
+            let (input, binding) = delimited(multispace1, identifier, multispace0)(input)?;
+            let (input, true_binding) = opt(preceded(ws_trailing(char(',')), identifier))(input)?;
+            let (input, _) = delimited(multispace0, tag("in"), multispace1)(input)?;
+            let (input, expr) = terminated(mustache_inner, opt(char(' ')))(input)?;
+            let (input, inner) = terminated(nodes, tag("{/for}"))(input)?;
+            if let Some(bind) = true_binding {
+                Ok((
+                    input,
+                    SpecialBlock::For(ForBlock::new(&bind, Some(&binding), expr, inner)),
+                ))
+            } else {
+                Ok((
+                    input,
+                    SpecialBlock::For(ForBlock::new(&binding, None, expr, inner)),
+                ))
+            }
+        }
+        "if" => {
+            let (input, expr) = terminated(mustache_inner, opt(char(' ')))(input)?;
+            let (input, (inner, else_block)) = pair(
+                nodes,
+                alt((
+                    map(tag("{/if}"), |_| None),
+                    map(
+                        delimited(
+                            delimited(multispace0, tag("{:else}"), opt(char(' '))),
+                            nodes,
+                            tag("{/if}"),
+                        ),
+                        |nodes| Some(nodes),
+                    ),
+                )),
+            )(input)?;
+            Ok((
+                input,
+                SpecialBlock::If(IfBlock::new(expr, inner, else_block)),
+            ))
+        }
+        "each" => nom_err!(
+            input,
+            Failure,
+            ParseErrorType::InvalidSpecialBlockType(String::from("each")),
+            Some(Help::with_message(
+                "you might've meant `for`. each loops do not exist in decorous"
+            ))
+        ),
+        block => nom_err!(
+            input,
+            Failure,
+            ParseErrorType::InvalidSpecialBlockType(block.to_owned()),
+            None
+        ),
+    }
+}
+
+fn mustache_inner(input: NomSpan) -> Result<SyntaxNode> {
     let (input, loc) = position(input)?;
-    let (input, js_text) = delimited(
-        char('{'),
+    let (input, js_text) = terminated(
         alt((
             take_ignoring_nested('{', '}'),
             failure_case(bad_char, |_| {
@@ -483,5 +549,18 @@ mod tests {
     #[test]
     fn mustaches_allow_for_curly_braces() {
         nom_test_all_insta!(mustache, ["{() => { console.log(\"hi\"); }  }"])
+    }
+
+    #[test]
+    fn can_parse_special_blocks() {
+        nom_test_all_insta!(
+            parse,
+            [
+                "{#for i in [1, 2, 3]} #p hello /p {/for}",
+                "{#for idx, elem in [1, 2, 3]} #p hello /p {/for}",
+                "{#if x == 3} #p hello /p {/if}",
+                "{#if x == 3} #p hello /p {:else} hello {/if}"
+            ]
+        )
     }
 }
