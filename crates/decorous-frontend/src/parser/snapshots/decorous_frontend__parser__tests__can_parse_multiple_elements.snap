@@ -46,7 +46,9 @@ Ok(
                                     column: 14,
                                 },
                                 node_type: Text(
-                                    "hello",
+                                    Text(
+                                        "hello",
+                                    ),
                                 ),
                             },
                         ],
@@ -61,7 +63,9 @@ Ok(
                     column: 25,
                 },
                 node_type: Text(
-                    "hello",
+                    Text(
+                        "hello",
+                    ),
                 ),
             },
         ],

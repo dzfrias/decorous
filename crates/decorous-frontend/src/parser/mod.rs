@@ -17,8 +17,8 @@ use rslint_parser::{parse_module, SyntaxNode};
 
 use self::errors::{Help, ParseError, ParseErrorType, Report};
 use crate::ast::{
-    Attribute, AttributeValue, DecorousAst, Element, EventHandler, ForBlock, IfBlock, Location,
-    Node, NodeType, SpecialBlock,
+    Attribute, AttributeValue, Comment, DecorousAst, Element, EventHandler, ForBlock, IfBlock,
+    Location, Mustache, Node, NodeType, SpecialBlock, Text,
 };
 
 type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report<NomSpan<'a>>>;
@@ -99,12 +99,12 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
     }
     let (input, node) = alt((
         map(element, NodeType::Element),
-        map(comment, |c| NodeType::Comment(&c)),
+        map(comment, |c| NodeType::Comment(Comment(&c))),
         map(special_block, NodeType::SpecialBlock),
-        map(mustache, NodeType::Mustache),
+        map(mustache, |js| NodeType::Mustache(Mustache(js))),
         map(
             escaped(none_of("/#\\{"), '\\', one_of(r#"/#{}"#)),
-            |text: NomSpan| NodeType::Text(&text),
+            |text: NomSpan| NodeType::Text(Text(&text)),
         ),
     ))(input)?;
     let (input, end_pos) = position(input)?;
@@ -143,12 +143,14 @@ fn element(input: NomSpan) -> Result<Element<'_, Location>> {
         preceded(
             char(':'),
             map(parse_text, |text: NomSpan| {
-                vec![Node::new(NodeType::Text(&text), Location::default())]
+                vec![Node::new(NodeType::Text(Text(&text)), Location::default())]
             }),
         ),
         terminated(
             map(nodes, |mut nodes| {
-                if let Some(NodeType::Text(t)) = nodes.last_mut().map(|node| node.node_type_mut()) {
+                if let Some(NodeType::Text(Text(t))) =
+                    nodes.last_mut().map(|node| node.node_type_mut())
+                {
                     *t = t.strip_suffix(' ').unwrap_or(t);
                     if t.is_empty() {
                         nodes.pop();

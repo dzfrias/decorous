@@ -25,10 +25,12 @@ Ok(
                                     column: 27,
                                 },
                                 node_type: Mustache(
-                                    EXPR_STMT@0..1
-                                      NAME_REF@0..1
-                                        IDENT@0..1 "x"
-                                    ,
+                                    Mustache(
+                                        EXPR_STMT@0..1
+                                          NAME_REF@0..1
+                                            IDENT@0..1 "x"
+                                        ,
+                                    ),
                                 ),
                             },
                         ],

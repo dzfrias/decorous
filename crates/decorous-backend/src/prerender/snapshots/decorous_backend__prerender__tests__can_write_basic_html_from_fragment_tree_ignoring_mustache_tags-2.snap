@@ -1,18 +1,16 @@
 ---
-source: crates/decorous-backend/src/prerender/renderer/mod.rs
+source: crates/decorous-backend/src/prerender/mod.rs
 expression: "format!(\"{}\\n---\\n{}\", String :: from_utf8(js_out).unwrap(), String ::\n    from_utf8(html_out).unwrap())"
 ---
-const dirty = new Uint8Array(new ArrayBuffer(1));
+const dirty = new Uint8Array(new ArrayBuffer(0));
 function replace(node) {
 const text = document.createTextNode("");
 node.replaceWith(text);
 return text;
 }
-const elems = {"custom":document.getElementById("custom"),"2":replace(document.getElementById("2")),};
+const elems = {"4":replace(document.getElementById("4")),};
 function __init_ctx() {
-let x = 3;
-elems["custom"].addEventListener("click", () => console.log(1 + 1));
-return [x];
+return [];
 }
 const ctx = __init_ctx();
 let updating = false;
@@ -20,8 +18,7 @@ dirty.fill(255);
 __update(dirty);
 dirty.fill(0);
 function __update(dirty) {
-if (dirty[0] & 1) elems[2].data = ctx[0];
-elems["custom"].setAttribute("class", 1 + 1);
+elems[4].data = name
 }
 function __schedule_update(ctx_idx, val) {
 ctx[ctx_idx] = val;
@@ -36,4 +33,4 @@ dirty.fill(0);
 }
 
 ---
-<p id="custom">Hello, <span id="2"></span>!</p>
+<div><p>Hi</p>Hello, <span id="4"></span></div>

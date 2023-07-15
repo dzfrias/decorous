@@ -78,11 +78,56 @@ impl<'a> From<LocatedSpan<&'a str>> for Location {
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeType<'a, T> {
     Element(Element<'a, T>),
-    Text(&'a str),
-    Comment(&'a str),
+    Text(Text<'a>),
+    Comment(Comment<'a>),
     SpecialBlock(SpecialBlock<'a, T>),
-    Mustache(SyntaxNode),
+    Mustache(Mustache),
     Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub struct Mustache(pub SyntaxNode);
+
+impl fmt::Display for Mustache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::ops::Deref for Mustache {
+    type Target = SyntaxNode;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Copy)]
+pub struct Text<'a>(pub &'a str);
+
+impl fmt::Display for Text<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl<'a> std::ops::Deref for Text<'a> {
+    type Target = &'a str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Copy)]
+pub struct Comment<'a>(pub &'a str);
+
+impl<'a> std::ops::Deref for Comment<'a> {
+    type Target = &'a str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -110,7 +155,6 @@ pub struct ForBlock<'a, T> {
 pub struct IfBlock<'a, T> {
     expr: SyntaxNode,
     inner: Vec<Node<'a, T>>,
-    // TODO: Implement
     else_block: Option<Vec<Node<'a, T>>>,
 }
 
@@ -177,7 +221,7 @@ impl<'a, T> Element<'a, T> {
     pub fn inner_collapsed(&self) -> Option<CollapsedChildrenType<'_>> {
         if self.children().len() == 1 {
             if let NodeType::Text(t) = *self.children().first().unwrap().node_type() {
-                return Some(CollapsedChildrenType::Text(t));
+                return Some(CollapsedChildrenType::Text(&t));
             }
         }
 
@@ -216,8 +260,8 @@ impl<'a, T> Node<'a, T> {
     /// ```
     /// # use decorous_frontend::ast::*;
     /// // A new text node with no metadata.
-    /// let node = Node::new(NodeType::Text("hello"), ());
-    /// assert_eq!(&NodeType::Text("hello"), node.node_type());
+    /// let node = Node::new(NodeType::Text(Text("hello")), ());
+    /// assert_eq!(&NodeType::Text(Text("hello")), node.node_type());
     /// ```
     pub fn new(ty: NodeType<'a, T>, metadata: T) -> Self {
         Self {
@@ -475,7 +519,7 @@ impl<'a, T> fmt::Display for Node<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.node_type() {
             NodeType::Text(t) => write!(f, "{t}"),
-            NodeType::Comment(c) => write!(f, "<!--{c}-->"),
+            NodeType::Comment(Comment(c)) => write!(f, "<!--{c}-->"),
             NodeType::Element(elem) => write!(f, "{elem}"),
             NodeType::Mustache(js) => write!(f, "{{{js}}}"),
             NodeType::SpecialBlock(block) => write!(f, "{block}"),

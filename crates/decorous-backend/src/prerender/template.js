@@ -4,7 +4,7 @@ const text = document.createTextNode("");
 node.replaceWith(text);
 return text;
 }}
-const elems = [{elems}];
+const elems = {elems};
 function __init_ctx() {{
 {ctx_body}}}
 const ctx = __init_ctx();

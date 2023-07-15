@@ -22,7 +22,9 @@ Ok(
                         column: 6,
                     },
                     node_type: Text(
-                        "text ",
+                        Text(
+                            "text ",
+                        ),
                     ),
                 },
                 Node {
@@ -33,10 +35,12 @@ Ok(
                         column: 11,
                     },
                     node_type: Mustache(
-                        EXPR_STMT@0..8
-                          NAME_REF@0..8
-                            IDENT@0..8 "mustache"
-                        ,
+                        Mustache(
+                            EXPR_STMT@0..8
+                              NAME_REF@0..8
+                                IDENT@0..8 "mustache"
+                            ,
+                        ),
                     ),
                 },
                 Node {
@@ -47,7 +51,9 @@ Ok(
                         column: 21,
                     },
                     node_type: Text(
-                        " hello ",
+                        Text(
+                            " hello ",
+                        ),
                     ),
                 },
                 Node {

@@ -34,7 +34,9 @@ Ok(
                     column: 9,
                 },
                 node_type: Comment(
-                    " hello!",
+                    Comment(
+                        " hello!",
+                    ),
                 ),
             },
         ],

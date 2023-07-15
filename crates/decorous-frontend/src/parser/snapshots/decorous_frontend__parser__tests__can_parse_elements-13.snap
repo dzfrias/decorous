@@ -31,7 +31,9 @@ Ok(
                         column: 0,
                     },
                     node_type: Text(
-                        "hello world",
+                        Text(
+                            "hello world",
+                        ),
                     ),
                 },
             ],

@@ -241,7 +241,7 @@ fn collapse_whitespace(input: &str) -> (Cow<str>, bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use decorous_frontend::ast::{Element, Location};
+    use decorous_frontend::ast::{Element, Location, Mustache, Text};
     use rslint_parser::{parse_text, SmolStr};
 
     macro_rules! test_lifecycle {
@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn can_write_basic_text_nodes() {
         let node = Node::new(
-            NodeType::Text("hello"),
+            NodeType::Text(Text("hello")),
             FragmentMetadata::new(0, None, Location::default()),
         );
 
@@ -288,7 +288,7 @@ mod tests {
                 vec![],
                 vec![
                     Node::new(
-                        NodeType::Text("text"),
+                        NodeType::Text(Text("text")),
                         FragmentMetadata::new(1, Some(0), Location::default()),
                     ),
                     Node::new(
@@ -325,7 +325,7 @@ mod tests {
     fn can_write_mustache_tags() {
         let js = parse_text("(hi, hi)", 0).syntax().first_child().unwrap();
         let node = Node::new(
-            NodeType::Mustache(js),
+            NodeType::Mustache(Mustache(js)),
             FragmentMetadata::new(0, None, Location::default()),
         );
 
@@ -358,7 +358,7 @@ mod tests {
                 "span",
                 vec![],
                 vec![Node::new(
-                    NodeType::Text("hello"),
+                    NodeType::Text(Text("hello")),
                     FragmentMetadata::new(1, Some(0), Location::default()),
                 )],
             )),
@@ -393,7 +393,7 @@ mod tests {
             .first_child()
             .unwrap();
         let node = Node::new(
-            NodeType::Mustache(js),
+            NodeType::Mustache(Mustache(js)),
             FragmentMetadata::new(0, None, Location::default()),
         );
 

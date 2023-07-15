@@ -22,7 +22,9 @@ Ok(
                         column: 5,
                     },
                     node_type: Text(
-                        "]",
+                        Text(
+                            "]",
+                        ),
                     ),
                 },
             ],

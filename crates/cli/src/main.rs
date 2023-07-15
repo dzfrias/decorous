@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context, Result};
 use clap::{Parser as ArgParser, ValueEnum};
 use clap_stdin::FileOrStdin;
-use decorous_backend::{dom_render::render as dom_render, prerender::Renderer as Prerenderer};
+use decorous_backend::{dom_render::render as dom_render, prerender::render as prerender};
 use decorous_frontend::{ast::Location, errors::Report, parse, Component};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -54,8 +54,7 @@ fn main() -> Result<()> {
     println!("\x1b[1mrendering...\x1b[0m");
     match args.render_method {
         RenderMethod::Prerender if args.stdout => {
-            let renderer = Prerenderer::new(&component);
-            renderer.render(&mut io::stdout(), &mut io::stdout())?;
+            prerender(&component, &mut io::stdout(), &mut io::stdout())?;
             println!("\x1b[1;32mrendered\x1b[0m to stdout!");
         }
         RenderMethod::Prerender => {
@@ -67,8 +66,7 @@ fn main() -> Result<()> {
                 format!("problem creating {} for prerendering", args.out.display())
             })?;
 
-            let renderer = Prerenderer::new(&component);
-            renderer.render(&mut js, &mut html)?;
+            prerender(&component, &mut js, &mut html)?;
             println!(
                 "\x1b[1;32mrendered\x1b[0m to {} and {}!",
                 html_out.display(),

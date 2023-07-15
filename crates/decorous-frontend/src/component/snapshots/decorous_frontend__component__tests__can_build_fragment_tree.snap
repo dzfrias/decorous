@@ -51,7 +51,9 @@ expression: component.fragment_tree
                                             },
                                         },
                                         node_type: Text(
-                                            "hello ",
+                                            Text(
+                                                "hello ",
+                                            ),
                                         ),
                                     },
                                 ],
@@ -90,7 +92,9 @@ expression: component.fragment_tree
                                             },
                                         },
                                         node_type: Text(
-                                            "hello2 ",
+                                            Text(
+                                                "hello2 ",
+                                            ),
                                         ),
                                     },
                                 ],

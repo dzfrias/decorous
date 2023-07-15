@@ -46,7 +46,9 @@ Ok(
                                                         column: 17,
                                                     },
                                                     node_type: Text(
-                                                        "hello",
+                                                        Text(
+                                                            "hello",
+                                                        ),
                                                     ),
                                                 },
                                             ],

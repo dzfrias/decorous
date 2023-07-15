@@ -19,7 +19,9 @@ Ok(
                     column: 1,
                 },
                 node_type: Text(
-                    "hello",
+                    Text(
+                        "hello",
+                    ),
                 ),
             },
         ],
