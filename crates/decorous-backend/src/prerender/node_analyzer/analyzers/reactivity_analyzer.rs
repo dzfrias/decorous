@@ -9,30 +9,30 @@ use rslint_parser::{SmolStr, SyntaxNode};
 use crate::prerender::node_analyzer::NodeAnalyzer;
 
 #[derive(Debug, PartialEq, Clone, Hash)]
-pub enum ElementAttribute {
+pub enum ReactiveAttribute {
     KeyValue(SmolStr, SyntaxNode),
     EventListener(SmolStr, SyntaxNode),
 }
 
 #[derive(Debug, PartialEq, Clone, Hash)]
-pub enum ElementData {
+pub enum ReactiveData {
     Mustache(SyntaxNode),
-    AttributeCollection(Rc<[ElementAttribute]>),
+    AttributeCollection(Rc<[ReactiveAttribute]>),
 }
 
 #[derive(Debug, Default)]
-pub struct ElemsAnalyzer {
-    elems: HashMap<u32, ElementData>,
+pub struct ReactivityAnalyzer {
+    elems: HashMap<u32, ReactiveData>,
 }
 
-impl ElemsAnalyzer {
+impl ReactivityAnalyzer {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl NodeAnalyzer for ElemsAnalyzer {
-    type AccumulatedOutput = HashMap<u32, ElementData>;
+impl NodeAnalyzer for ReactivityAnalyzer {
+    type AccumulatedOutput = HashMap<u32, ReactiveData>;
 
     fn visit(&mut self, node: &Node<'_, FragmentMetadata>, _component: &Component) {
         match node.node_type() {
@@ -42,9 +42,9 @@ impl NodeAnalyzer for ElemsAnalyzer {
                 for attr in elem.attrs() {
                     let data = match attr {
                         Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) => {
-                            ElementAttribute::KeyValue(SmolStr::new(key), js.clone())
+                            ReactiveAttribute::KeyValue(SmolStr::new(key), js.clone())
                         }
-                        Attribute::EventHandler(event_handler) => ElementAttribute::EventListener(
+                        Attribute::EventHandler(event_handler) => ReactiveAttribute::EventListener(
                             SmolStr::new(event_handler.event()),
                             event_handler.expr().clone(),
                         ),
@@ -58,12 +58,12 @@ impl NodeAnalyzer for ElemsAnalyzer {
                 }
                 self.elems.insert(
                     node.metadata().id(),
-                    ElementData::AttributeCollection(attrs.into()),
+                    ReactiveData::AttributeCollection(attrs.into()),
                 );
             }
             NodeType::Mustache(Mustache(js)) => {
                 self.elems
-                    .insert(node.metadata().id(), ElementData::Mustache(js.clone()));
+                    .insert(node.metadata().id(), ReactiveData::Mustache(js.clone()));
             }
             _ => {}
         }

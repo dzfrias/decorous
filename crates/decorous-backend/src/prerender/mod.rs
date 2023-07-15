@@ -9,7 +9,7 @@ use crate::{codegen_utils, replace};
 
 use self::{
     html_render::HtmlFmt,
-    node_analyzer::analyzers::{Analysis, ElementAttribute, ElementData},
+    node_analyzer::analyzers::{Analysis, ReactiveAttribute, ReactiveData},
 };
 
 macro_rules! sort_if_testing {
@@ -58,14 +58,14 @@ where
 fn render_elements(analysis: &Analysis) -> String {
     let mut out = String::new();
     write!(out, "{{").expect("string formatting should not fail");
-    for (id, data) in sort_if_testing!(analysis.elem_data().iter(), |a, b| a.0.cmp(b.0)) {
+    for (id, data) in sort_if_testing!(analysis.reactive_data().iter(), |a, b| a.0.cmp(b.0)) {
         let id = analysis.id_overwrites().try_get(*id);
         match data {
-            ElementData::Mustache(_) => {
+            ReactiveData::Mustache(_) => {
                 write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),")
                     .expect("string formatting should not fail")
             }
-            ElementData::AttributeCollection(_) => {
+            ReactiveData::AttributeCollection(_) => {
                 write!(out, "\"{id}\":document.getElementById(\"{id}\"),")
                     .expect("string formatting should not fail")
             }
@@ -91,13 +91,13 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
         }
     }
 
-    for (id, event, expr) in sort_if_testing!(analysis.elem_data().iter(), |a, b| a.0.cmp(b.0))
+    for (id, event, expr) in sort_if_testing!(analysis.reactive_data().iter(), |a, b| a.0.cmp(b.0))
         .filter_map(|(id, data)| match data {
-            ElementData::Mustache(_) => None,
-            ElementData::AttributeCollection(elems) => {
+            ReactiveData::Mustache(_) => None,
+            ReactiveData::AttributeCollection(elems) => {
                 Some(elems.iter().filter_map(move |attr| match attr {
-                    ElementAttribute::KeyValue(_, _) => None,
-                    ElementAttribute::EventListener(expr, handler) => Some((id, expr, handler)),
+                    ReactiveAttribute::KeyValue(_, _) => None,
+                    ReactiveAttribute::EventListener(expr, handler) => Some((id, expr, handler)),
                 }))
             }
         })
@@ -128,10 +128,10 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
 fn render_update_body(component: &Component, analysis: &Analysis) -> String {
     let mut out = String::new();
 
-    for (idx, js) in sort_if_testing!(analysis.elem_data().iter(), |a, b| a.0.cmp(b.0)).filter_map(
+    for (idx, js) in sort_if_testing!(analysis.reactive_data().iter(), |a, b| a.0.cmp(b.0)).filter_map(
         |(id, data)| match data {
-            ElementData::Mustache(js) => Some((id, js)),
-            ElementData::AttributeCollection(_) => None,
+            ReactiveData::Mustache(js) => Some((id, js)),
+            ReactiveData::AttributeCollection(_) => None,
         },
     ) {
         let unbound = utils::get_unbound_refs(js);
@@ -148,14 +148,14 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
     }
 
     for (id, attr, js) in analysis
-        .elem_data()
+        .reactive_data()
         .iter()
         .filter_map(|(id, data)| match data {
-            ElementData::Mustache(_) => None,
-            ElementData::AttributeCollection(attrs) => {
+            ReactiveData::Mustache(_) => None,
+            ReactiveData::AttributeCollection(attrs) => {
                 Some(attrs.iter().filter_map(move |attr| match attr {
-                    ElementAttribute::KeyValue(attr, expr) => Some((id, attr, expr)),
-                    ElementAttribute::EventListener(_, _) => None,
+                    ReactiveAttribute::KeyValue(attr, expr) => Some((id, attr, expr)),
+                    ReactiveAttribute::EventListener(_, _) => None,
                 }))
             }
         })
