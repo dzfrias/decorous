@@ -82,7 +82,6 @@ pub enum NodeType<'a, T> {
     Comment(Comment<'a>),
     SpecialBlock(SpecialBlock<'a, T>),
     Mustache(Mustache),
-    Error,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
@@ -236,7 +235,6 @@ impl<'a, T> Element<'a, T> {
                     Attribute::Binding(_) | Attribute::EventHandler(_) => false,
                 }),
                 NodeType::Mustache(_) | NodeType::SpecialBlock(_) => false,
-                NodeType::Error => panic!("should not call with error nodes"),
             })
         {
             return Some(CollapsedChildrenType::Html(self.children().iter().join("")));
@@ -270,11 +268,6 @@ impl<'a, T> Node<'a, T> {
         }
     }
 
-    /// Create a new error node. Shorthand for [`Self::new()`] and passing in [`NodeType::Error`].
-    pub fn error(metadata: T) -> Self {
-        Self::new(NodeType::Error, metadata)
-    }
-
     /// Obtain an shared reference to the node's type. See [`NodeType`] for more.
     pub fn node_type(&self) -> &NodeType<'a, T> {
         &self.node_type
@@ -302,8 +295,8 @@ impl<'a, T> Node<'a, T> {
     /// ```
     /// # use decorous_frontend::ast::*;
     /// // Some random metadata
-    /// let node = Node::new(NodeType::Error, 11);
-    /// assert_eq!(Node::new(NodeType::Error, true), node.cast_meta(&mut |node| *node.metadata() > 10));
+    /// let node = Node::new(NodeType::Text(Text("hello")), 11);
+    /// assert_eq!(Node::new(NodeType::Text(Text("hello")), true), node.cast_meta(&mut |node| *node.metadata() > 10));
     /// ```
     pub fn cast_meta<U, F>(self, transfer_func: &mut F) -> Node<'a, U>
     where
@@ -359,10 +352,6 @@ impl<'a, T> Node<'a, T> {
             NodeType::Mustache(syntax_node) => Node {
                 metadata: new_meta,
                 node_type: NodeType::Mustache(syntax_node),
-            },
-            NodeType::Error => Node {
-                metadata: new_meta,
-                node_type: NodeType::Error,
             },
         }
     }
@@ -523,7 +512,6 @@ impl<'a, T> fmt::Display for Node<'a, T> {
             NodeType::Element(elem) => write!(f, "{elem}"),
             NodeType::Mustache(js) => write!(f, "{{{js}}}"),
             NodeType::SpecialBlock(block) => write!(f, "{block}"),
-            NodeType::Error => write!(f, "ERROR"),
         }
     }
 }

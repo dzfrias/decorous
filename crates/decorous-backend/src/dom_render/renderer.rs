@@ -39,7 +39,6 @@ where
             }
             NodeType::Comment(_) => Ok(()),
             NodeType::SpecialBlock(_) => todo!(),
-            NodeType::Error => panic!("should not have an error node during rendering phase"),
         }
     }
 
@@ -143,7 +142,6 @@ where
                 )
             }
             NodeType::Comment(_) => Ok(()),
-            NodeType::Error => panic!("should not have an error node during rendering phase"),
             NodeType::SpecialBlock(_) => todo!(),
         }
     }
@@ -165,7 +163,6 @@ where
                     child.mount(f, _toplevel_vars)?;
                 }
             }
-            NodeType::Error => panic!("should not have an error node during rendering phase"),
             NodeType::SpecialBlock(_) => todo!(),
             _ => {}
         }

@@ -82,7 +82,6 @@ impl<'a, T: io::Write> HtmlFmt<T> for Node<'a, FragmentMetadata> {
             NodeType::Comment(comment) => comment.html_fmt(f, self.metadata()),
             NodeType::Mustache(mustache) => mustache.html_fmt(f, self.metadata()),
             NodeType::SpecialBlock(_block) => todo!(),
-            NodeType::Error => panic!("should not try to format"),
         }
     }
 }
