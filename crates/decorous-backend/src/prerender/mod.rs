@@ -128,12 +128,12 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
 fn render_update_body(component: &Component, analysis: &Analysis) -> String {
     let mut out = String::new();
 
-    for (idx, js) in sort_if_testing!(analysis.reactive_data().iter(), |a, b| a.0.cmp(b.0)).filter_map(
-        |(id, data)| match data {
+    for (idx, js) in sort_if_testing!(analysis.reactive_data().iter(), |a, b| a.0.cmp(b.0))
+        .filter_map(|(id, data)| match data {
             ReactiveData::Mustache(js) => Some((id, js)),
             ReactiveData::AttributeCollection(_) => None,
-        },
-    ) {
+        })
+    {
         let unbound = utils::get_unbound_refs(js);
         let dirty_indices = codegen_utils::calc_dirty(&unbound, component.declared_vars());
         let replaced = replace::replace_namerefs(js, &unbound, component.declared_vars());

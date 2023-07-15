@@ -304,7 +304,7 @@ fn special_block(input: NomSpan) -> Result<SpecialBlock<'_, Location>> {
                             nodes,
                             tag("{/if}"),
                         ),
-                        |nodes| Some(nodes),
+                        Some,
                     ),
                 )),
             )(input)?;

@@ -72,8 +72,7 @@ impl Report<LocatedSpan<&str>> {
             {
                 let (_, line) = lines
                     .clone()
-                    .skip_while(|(n, _)| *n as u32 != help_line - 1)
-                    .next()
+                    .find(|(n, _)| *n as u32 == help_line - 1)
                     .expect("should be in lines");
                 writeln!(out, "{help_line}| {} <-- this line", line)?;
                 if help_line + 1 != line_no {
@@ -82,8 +81,7 @@ impl Report<LocatedSpan<&str>> {
             }
             let (i, line) = lines
                 .clone()
-                .skip_while(|(n, _)| (*n as u32) + 1 < line_no)
-                .next()
+                .find(|(n, _)| (*n as u32) + 1 == line_no)
                 .expect("line should be in input");
 
             writeln!(out, "{}| {line}", i + 1)?;

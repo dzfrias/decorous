@@ -20,8 +20,8 @@ impl Analysis {
         let mut id_analyzer = IdAnalyzer::new();
         let mut element_analyzer = ReactivityAnalyzer::new();
         for node in component.descendents() {
-            id_analyzer.visit(node, &component);
-            element_analyzer.visit(node, &component);
+            id_analyzer.visit(node, component);
+            element_analyzer.visit(node, component);
         }
 
         Self {
