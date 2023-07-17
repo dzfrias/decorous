@@ -2,17 +2,15 @@ use std::{borrow::Cow, fmt::Write, io};
 
 mod html_render;
 mod node_analyzer;
-mod render_if;
 
 use decorous_frontend::{ast::SpecialBlock, utils, Component};
 use rslint_parser::AstNode;
 
-use crate::codegen_utils;
+use crate::{codegen_utils, dom_render::render_fragment as dom_render_fragment};
 
 use self::{
     html_render::HtmlFmt,
     node_analyzer::analyzers::{Analysis, ReactiveAttribute, ReactiveData},
-    render_if::render_if_block,
 };
 
 macro_rules! sort_if_testing {
@@ -64,8 +62,9 @@ fn render_hoists<'a>(component: &Component<'a>, analysis: &Analysis<'a>) -> Stri
     let mut out = String::new();
 
     for (id, if_block) in analysis.hoistables().if_blocks() {
-        let renderered = render_if_block(*if_block, *id, component.declared_vars());
-        out.push_str(&renderered.0);
+        let renderered =
+            dom_render_fragment(if_block.inner(), Some(*id), component.declared_vars());
+        out.push_str(&renderered);
     }
 
     out

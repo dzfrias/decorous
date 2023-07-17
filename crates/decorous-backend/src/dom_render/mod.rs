@@ -1,22 +1,14 @@
-use crate::codegen_utils;
+use decorous_frontend::{
+    ast::{Attribute, AttributeValue, Node, NodeIter, NodeType, SpecialBlock},
+    utils, Component, DeclaredVariables, FragmentMetadata,
+};
 use itertools::Itertools;
-
-use self::renderer::Renderer;
-use decorous_frontend::{utils, Component};
 use rslint_parser::AstNode;
-use std::{borrow::Cow, io};
+use std::{borrow::Cow, fmt::Write, io};
 
-mod renderer;
+use crate::codegen_utils;
 
 pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Result<()> {
-    macro_rules! render {
-        ($lifecycle:ident) => {
-            for node in component.fragment_tree() {
-                node.$lifecycle(render_to, component.declared_vars())?;
-            }
-        };
-    }
-
     // Hoisted syntax nodes should come first
     for hoist in component.hoist() {
         writeln!(render_to, "{hoist}")?;
@@ -28,28 +20,11 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
         // Ceiling division to get the amount of bytes needed in the ArrayBuffer
         ((component.declared_vars().len() + 7) / 8)
     )?;
-    writeln!(render_to, "function make_fragment(ctx) {{")?;
-    render!(init);
-
-    writeln!(render_to, "return {{")?;
-    writeln!(render_to, "c() {{")?;
-    render!(create);
-    writeln!(render_to, "}},")?;
-
-    writeln!(render_to, "m(target) {{")?;
-    render!(mount);
-    writeln!(render_to, "}},")?;
-
-    writeln!(render_to, "u(ctx, dirty) {{")?;
-    render!(update);
-    writeln!(render_to, "}},")?;
-
-    writeln!(render_to, "d() {{")?;
-    render!(detach);
-    writeln!(render_to, "}},")?;
-
-    writeln!(render_to, "}}")?;
-    writeln!(render_to, "}}")?;
+    write!(
+        render_to,
+        "{}",
+        render_fragment(component.fragment_tree(), None, component.declared_vars())
+    )?;
 
     writeln!(render_to, "function __init_ctx() {{")?;
     writeln!(
@@ -95,9 +70,10 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
     writeln!(render_to, "}}")?;
 
     writeln!(render_to, "const ctx = __init_ctx();")?;
-    writeln!(render_to, "const fragment = make_fragment(ctx);")?;
-    writeln!(render_to, "fragment.c();")?;
-    writeln!(render_to, "fragment.m(document.getElementById(\"app\"));")?;
+    writeln!(
+        render_to,
+        "const fragment = create_main_block(document.getElementById(\"app\"));"
+    )?;
     writeln!(render_to, "let updating = false;")?;
     writeln!(
         render_to,
@@ -107,7 +83,7 @@ dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
 if (updating) return;
 updating = true;
 Promise.resolve().then(() => {{
-fragment.u(ctx, dirty);
+fragment.u(dirty);
 updating = false;
 dirty.fill(0);
 }});
@@ -115,6 +91,218 @@ dirty.fill(0);
     )?;
 
     Ok(())
+}
+
+pub(crate) fn render_fragment<'a>(
+    nodes: &[Node<'a, FragmentMetadata>],
+    root: Option<u32>,
+    declared: &DeclaredVariables,
+) -> String {
+    let mut decls = String::new();
+    let mut mounts = String::new();
+    let mut updates = String::new();
+    let mut detaches = String::new();
+    for node in NodeIter::new(nodes) {
+        render_decl(&mut decls, node, declared);
+        render_mount(&mut mounts, node, root, declared);
+        render_update(&mut updates, node, declared);
+        render_detach(&mut detaches, node, root);
+    }
+
+    let rendered = format!(
+        include_str!("./templates/fragment.js"),
+        id = root
+            .map(|root| Cow::Owned(root.to_string()))
+            .unwrap_or(Cow::Borrowed("main")),
+        decls = decls,
+        mounts = mounts,
+        update_body = updates,
+        detach_body = detaches
+    );
+
+    rendered
+}
+
+fn render_decl<'a>(
+    f: &mut String,
+    node: &Node<'a, FragmentMetadata>,
+    declared: &DeclaredVariables,
+) {
+    let id = node.metadata().id();
+    match node.node_type() {
+        NodeType::Text(t) => writeln!(
+            f,
+            "const e{id} = document.createTextNode(\"{}\");",
+            collapse_whitespace(t)
+        )
+        .expect("string format should not fail"),
+        NodeType::Mustache(mustache) => {
+            let replaced = codegen_utils::replace_namerefs(
+                &mustache,
+                &utils::get_unbound_refs(&mustache),
+                declared,
+            );
+            writeln!(f, "const e{id} = document.createTextNode({replaced});")
+                .expect("string format should not fail");
+        }
+        NodeType::Element(elem) => {
+            writeln!(
+                f,
+                "const e{id} = document.createElement(\"{}\");",
+                elem.tag()
+            )
+            .expect("string format should not fail");
+
+            for attr in elem.attrs() {
+                match attr {
+                    Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) => writeln!(
+                        f,
+                        "e{id}.setAttribute(\"{key}\", {});",
+                        codegen_utils::replace_namerefs(js, &utils::get_unbound_refs(js), declared)
+                    )
+                    .expect("string format should not fail"),
+                    Attribute::KeyValue(key, None) => {
+                        writeln!(f, "e{id}.setAttribute(\"{key}\", \"\")")
+                            .expect("string format should not fail");
+                    }
+                    Attribute::KeyValue(key, Some(AttributeValue::Literal(literal))) => {
+                        writeln!(
+                            f,
+                            "e{id}.setAttribute(\"{key}\", \"{}\")",
+                            collapse_whitespace(literal)
+                        )
+                        .expect("string format should not fail");
+                    }
+                    Attribute::EventHandler(event_handler) => {
+                        writeln!(
+                            f,
+                            "e{id}.addEventListener(\"{}\", {})",
+                            event_handler.event(),
+                            codegen_utils::replace_namerefs(
+                                event_handler.expr(),
+                                &utils::get_unbound_refs(event_handler.expr()),
+                                declared
+                            )
+                        )
+                        .expect("string format should not fail");
+                    }
+                    Attribute::Binding(_) => todo!(),
+                }
+            }
+        }
+        NodeType::SpecialBlock(SpecialBlock::If(_)) => {
+            writeln!(f, "const e{id}_anchor = document.createTextNode(\"\");")
+                .expect("string format should not fail");
+        }
+        NodeType::SpecialBlock(SpecialBlock::For(_)) => todo!("for block"),
+        NodeType::Comment(_) => {}
+    }
+}
+
+fn render_mount<'a>(
+    f: &mut String,
+    node: &Node<'a, FragmentMetadata>,
+    root: Option<u32>,
+    declared: &DeclaredVariables,
+) {
+    let id = node.metadata().id();
+
+    // In the special case of an if block, create AND mount here
+    if let NodeType::SpecialBlock(SpecialBlock::If(if_block)) = node.node_type() {
+        // TODO: Else blocks
+        let block = render_fragment(if_block.inner(), Some(id), declared);
+        writeln!(f, "{block}").expect("string format should not fail");
+        let replacement = codegen_utils::replace_namerefs(
+            if_block.expr(),
+            &utils::get_unbound_refs(if_block.expr()),
+            declared,
+        );
+
+        writeln!(f, "mount(target, e{id}_anchor, anchor);").expect("string format should not fail");
+        writeln!(
+            f,
+            "let e{id} = {replacement} && create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor);"
+        )
+        .expect("string format should not fail");
+        return;
+    }
+
+    if node.metadata().parent_id() == root {
+        writeln!(f, "mount(target, e{id}, anchor);").expect("string format should not fail");
+    } else if let Some(parent_id) = node.metadata().parent_id() {
+        writeln!(f, "e{parent_id}.appendChild(e{id});").expect("string format should not fail;")
+    } else {
+        panic!("BUG: node's parent should never be None while root is Some");
+    }
+}
+
+fn render_update<'a>(
+    f: &mut String,
+    node: &Node<'a, FragmentMetadata>,
+    declared: &DeclaredVariables,
+) {
+    let id = node.metadata().id();
+    match node.node_type() {
+        NodeType::Mustache(mustache) => {
+            let unbound = utils::get_unbound_refs(mustache);
+            let dirty_indices = codegen_utils::calc_dirty(&unbound, declared);
+            let new_text = codegen_utils::replace_namerefs(mustache, &unbound, declared);
+            writeln!(f, "if ({dirty_indices}) e{id}.data = {new_text};",)
+                .expect("string format should work");
+        }
+        NodeType::Element(elem) => {
+            for attr in elem.attrs() {
+                let Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) = attr else {
+                    continue;
+                };
+
+                let unbound = utils::get_unbound_refs(js);
+                let dirty_indices = codegen_utils::calc_dirty(&unbound, declared);
+                let replacement = codegen_utils::replace_namerefs(js, &unbound, declared);
+                writeln!(
+                    f,
+                    "if ({dirty_indices}) e{id}.setAttribute(\"{key}\", {replacement});",
+                )
+                .expect("string format should not fail");
+            }
+        }
+        NodeType::SpecialBlock(SpecialBlock::If(if_block)) => {
+            let unbound = utils::get_unbound_refs(if_block.expr());
+            let replaced = codegen_utils::replace_namerefs(if_block.expr(), &unbound, declared);
+            writeln!(
+                    f,
+                    "if ({replaced}) {{ if (e{id}) {{ e{id}.u(dirty); }} else {{ e{id} = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); }} }} else if (e{id}) {{ e{id}.d(); e{id} = null; }}"
+                )
+                .expect("string formatting should not fail");
+        }
+        _ => {}
+    }
+}
+
+fn render_detach<'a>(f: &mut String, node: &Node<'a, FragmentMetadata>, root: Option<u32>) {
+    if matches!(node.node_type(), NodeType::Comment(_)) || root != node.metadata().parent_id() {
+        return;
+    }
+    if let NodeType::SpecialBlock(SpecialBlock::If(_)) = node.node_type() {
+        writeln!(
+            f,
+            "if (e{}) e{0}.d();\ne{0}_anchor.parentNode.removeChild(e{0}_anchor);",
+            node.metadata().id()
+        )
+        .expect("string format should not fail");
+        return;
+    }
+
+    writeln!(f, "e{}.parentNode.removeChild(e{0});", node.metadata().id())
+        .expect("string format should not fail");
+}
+
+fn collapse_whitespace(s: &str) -> Cow<str> {
+    match s {
+        "\n" => Cow::Borrowed(" "),
+        s if s.contains('\n') => Cow::Owned(s.replace('\n', "\\n")),
+        s => Cow::Borrowed(s),
+    }
 }
 
 #[cfg(test)]
@@ -139,7 +327,7 @@ mod tests {
 
     #[test]
     fn basic_render_works() {
-        test_render!("---js let x = 3; function remake_x() { x = 44; } --- #p {`${x}hello`} /p");
+        test_render!("---js let x = 3; function remake_x() { x = 44; } --- #p {`${x}hello`} /p #button[@click={remake_x}]:Click me");
     }
 
     #[test]
@@ -162,5 +350,30 @@ mod tests {
     #[test]
     fn everything_in_script_tag_is_in_context_init() {
         test_render!("---js let x = 3; x = 4; ---");
+    }
+
+    #[test]
+    fn can_write_basic_text_nodes() {
+        test_render!("hello");
+    }
+
+    #[test]
+    fn basic_elements_and_html_are_collapsed() {
+        test_render!("#div text #div/div /div");
+    }
+
+    #[test]
+    fn can_write_mustache_tags() {
+        test_render!("---js let x = 0; --- {(x, x)}");
+    }
+
+    #[test]
+    fn text_with_only_one_text_node_as_child_is_collapsed() {
+        test_render!("#span:hello");
+    }
+
+    #[test]
+    fn dirty_items_are_in_conditional() {
+        test_render!("---js let hello = 0; let test = 1; --- {(hello, test)}");
     }
 }
