@@ -1,5 +1,8 @@
 use decorous_frontend::{
-    ast::{Attribute, AttributeValue, Node, NodeIter, NodeType, SpecialBlock},
+    ast::{
+        traverse_with, Attribute, AttributeValue, CollapsedChildrenType, Node, NodeType,
+        SpecialBlock,
+    },
     utils, Component, DeclaredVariables, FragmentMetadata,
 };
 use itertools::Itertools;
@@ -102,12 +105,16 @@ pub(crate) fn render_fragment<'a>(
     let mut mounts = String::new();
     let mut updates = String::new();
     let mut detaches = String::new();
-    for node in NodeIter::new(nodes) {
-        render_decl(&mut decls, node, declared);
-        render_mount(&mut mounts, node, root, declared);
-        render_update(&mut updates, node, declared);
-        render_detach(&mut detaches, node, root);
-    }
+    traverse_with(
+        nodes,
+        &mut |elem| elem.inner_collapsed().is_none(),
+        &mut |node| {
+            render_decl(&mut decls, node, declared);
+            render_mount(&mut mounts, node, root, declared);
+            render_update(&mut updates, node, declared);
+            render_detach(&mut detaches, node, root);
+        },
+    );
 
     let rendered = format!(
         include_str!("./templates/fragment.js"),
@@ -151,6 +158,17 @@ fn render_decl<'a>(
                 "const e{id} = document.createElement(\"{}\");",
                 elem.tag()
             )
+            .expect("string format should not fail");
+
+            match elem.inner_collapsed() {
+                Some(CollapsedChildrenType::Text(t)) => {
+                    writeln!(f, "e{id}.textContent = \"{}\";", collapse_whitespace(t))
+                }
+                Some(CollapsedChildrenType::Html(html)) => {
+                    writeln!(f, "e{id}.innerHtml = \"{html}\";")
+                }
+                None => Ok(()),
+            }
             .expect("string format should not fail");
 
             for attr in elem.attrs() {

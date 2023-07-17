@@ -486,6 +486,22 @@ impl<'a> DecorousAst<'a> {
     }
 }
 
+pub fn traverse_with<'a, T, F, G>(nodes: &'a [Node<'a, T>], predicate: &mut F, body_func: &mut G)
+where
+    F: FnMut(&'a Element<'a, T>) -> bool,
+    G: FnMut(&'a Node<'a, T>),
+{
+    for node in nodes {
+        body_func(node);
+        if let NodeType::Element(elem) = node.node_type() {
+            if !predicate(elem) {
+                continue;
+            }
+            traverse_with(elem.children(), predicate, body_func);
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct NodeIter<'a, T> {
     stack: Vec<&'a Node<'a, T>>,

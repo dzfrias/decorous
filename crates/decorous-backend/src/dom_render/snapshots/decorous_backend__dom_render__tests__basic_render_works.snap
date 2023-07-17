@@ -10,13 +10,12 @@ target.insertBefore(newNode, anchor || null);
 const e0 = document.createElement("p");
 const e1 = document.createTextNode(`${ctx[0]}hello`);
 const e2 = document.createElement("button");
+e2.textContent = "Click me";
 e2.addEventListener("click", ctx[1])
-const e3 = document.createTextNode("Click me");
 
 mount(target, e0, anchor);
 e0.appendChild(e1);
 mount(target, e2, anchor);
-e2.appendChild(e3);
 
 return {
 u(dirty) {
