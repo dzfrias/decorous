@@ -7,7 +7,7 @@ mod render_if;
 use decorous_frontend::{ast::SpecialBlock, utils, Component};
 use rslint_parser::AstNode;
 
-use crate::{codegen_utils, replace};
+use crate::codegen_utils;
 
 use self::{
     html_render::HtmlFmt,
@@ -107,7 +107,7 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
         writeln!(
             out,
             "let __closure{idx} = {};",
-            replace::replace_assignments(
+            codegen_utils::replace_assignments(
                 arrow_expr.syntax(),
                 &utils::get_unbound_refs(arrow_expr.syntax()),
                 component.declared_vars()
@@ -117,7 +117,7 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
     }
     for node in component.toplevel_nodes() {
         if node.substitute_assign_refs {
-            let replacement = replace::replace_assignments(
+            let replacement = codegen_utils::replace_assignments(
                 &node.node,
                 &utils::get_unbound_refs(&node.node),
                 component.declared_vars(),
@@ -141,7 +141,7 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
         .flatten()
     {
         let id = analysis.id_overwrites().try_get(*id);
-        let replaced = replace::replace_assignments(
+        let replaced = codegen_utils::replace_assignments(
             expr,
             &utils::get_unbound_refs(expr),
             component.declared_vars(),
@@ -177,7 +177,7 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
     {
         let unbound = utils::get_unbound_refs(js);
         let dirty_indices = codegen_utils::calc_dirty(&unbound, component.declared_vars());
-        let replaced = replace::replace_namerefs(js, &unbound, component.declared_vars());
+        let replaced = codegen_utils::replace_namerefs(js, &unbound, component.declared_vars());
 
         if dirty_indices.is_empty() {
             writeln!(out, "elems[{idx}].data = {replaced}")
@@ -198,8 +198,11 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
         match special_block {
             SpecialBlock::If(if_block) => {
                 let unbound = utils::get_unbound_refs(if_block.expr());
-                let replaced =
-                    replace::replace_namerefs(if_block.expr(), &unbound, component.declared_vars());
+                let replaced = codegen_utils::replace_namerefs(
+                    if_block.expr(),
+                    &unbound,
+                    component.declared_vars(),
+                );
 
                 writeln!(
                     out,
@@ -227,7 +230,7 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
         let id = analysis.id_overwrites().try_get(*id);
         let unbound = utils::get_unbound_refs(js);
         let dirty_indices = codegen_utils::calc_dirty(&unbound, component.declared_vars());
-        let replaced = replace::replace_namerefs(js, &unbound, component.declared_vars());
+        let replaced = codegen_utils::replace_namerefs(js, &unbound, component.declared_vars());
         if dirty_indices.is_empty() {
             writeln!(out, "elems[\"{id}\"].setAttribute(\"{attr}\", {replaced});")
                 .expect("string formatting should not fail");

@@ -4,7 +4,7 @@ use decorous_frontend::{
 };
 use std::{borrow::Cow, fmt::Write};
 
-use crate::{codegen_utils, replace};
+use crate::codegen_utils;
 
 pub fn render_if_block<'a>(
     if_block: &IfBlock<'a, FragmentMetadata>,
@@ -48,8 +48,11 @@ fn render_decl<'a>(
         )
         .expect("string format should not fail"),
         NodeType::Mustache(mustache) => {
-            let replaced =
-                replace::replace_namerefs(&mustache, &utils::get_unbound_refs(&mustache), declared);
+            let replaced = codegen_utils::replace_namerefs(
+                &mustache,
+                &utils::get_unbound_refs(&mustache),
+                declared,
+            );
             writeln!(f, "const e{id} = document.createTextNode({replaced});")
                 .expect("string format should not fail");
         }
@@ -66,7 +69,7 @@ fn render_decl<'a>(
                     Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) => writeln!(
                         f,
                         "e{id}.setAttribute(\"{key}\", {});",
-                        replace::replace_namerefs(js, &utils::get_unbound_refs(js), declared)
+                        codegen_utils::replace_namerefs(js, &utils::get_unbound_refs(js), declared)
                     )
                     .expect("string format should not fail"),
                     Attribute::KeyValue(key, None) => {
@@ -86,7 +89,7 @@ fn render_decl<'a>(
                             f,
                             "e{id}.addEventListener(\"{}\", {})",
                             event_handler.event(),
-                            replace::replace_namerefs(
+                            codegen_utils::replace_namerefs(
                                 event_handler.expr(),
                                 &utils::get_unbound_refs(event_handler.expr()),
                                 declared
@@ -120,7 +123,7 @@ fn render_mount<'a>(
         // TODO: Else blocks
         let (block, _) = render_if_block(if_block, id, declared);
         writeln!(f, "{block}").expect("string format should not fail");
-        let replacement = replace::replace_namerefs(
+        let replacement = codegen_utils::replace_namerefs(
             if_block.expr(),
             &utils::get_unbound_refs(if_block.expr()),
             declared,
@@ -156,7 +159,7 @@ fn render_update<'a>(
         NodeType::Mustache(mustache) => {
             let unbound = utils::get_unbound_refs(mustache);
             let dirty_indices = codegen_utils::calc_dirty(&unbound, declared);
-            let new_text = replace::replace_namerefs(mustache, &unbound, declared);
+            let new_text = codegen_utils::replace_namerefs(mustache, &unbound, declared);
             writeln!(f, "if ({dirty_indices}) e{id}.data = {new_text};",)
                 .expect("string format should work");
         }
@@ -168,7 +171,7 @@ fn render_update<'a>(
 
                 let unbound = utils::get_unbound_refs(js);
                 let dirty_indices = codegen_utils::calc_dirty(&unbound, declared);
-                let replacement = replace::replace_namerefs(js, &unbound, declared);
+                let replacement = codegen_utils::replace_namerefs(js, &unbound, declared);
                 writeln!(
                     f,
                     "if ({dirty_indices}) e{id}.setAttribute(\"{key}\", {replacement});",
@@ -178,7 +181,7 @@ fn render_update<'a>(
         }
         NodeType::SpecialBlock(SpecialBlock::If(if_block)) => {
             let unbound = utils::get_unbound_refs(if_block.expr());
-            let replaced = replace::replace_namerefs(if_block.expr(), &unbound, declared);
+            let replaced = codegen_utils::replace_namerefs(if_block.expr(), &unbound, declared);
             writeln!(
                     f,
                     "if ({replaced}) {{ if (e{id}) {{ e{id}.u(dirty); }} else {{ e{id} = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); }} }} else if (e{id}) {{ e{id}.d(); e{id} = null; }}"

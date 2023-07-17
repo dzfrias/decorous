@@ -4,7 +4,7 @@ use decorous_frontend::{
 };
 use std::{borrow::Cow, io};
 
-use crate::{codegen_utils, dom_render::replace};
+use crate::codegen_utils;
 
 pub trait Renderer<T>
 where
@@ -69,7 +69,7 @@ where
                                 f,
                                 "e{}.setAttribute(\"{key}\", {});",
                                 self.metadata().id(),
-                                replace::replace_namerefs(
+                                codegen_utils::replace_namerefs(
                                     js,
                                     &utils::get_unbound_refs(js),
                                     toplevel_vars
@@ -87,7 +87,7 @@ where
                                 "e{}.addEventListener(\"{}\", {});",
                                 self.metadata().id(),
                                 event_handler.event(),
-                                replace::replace_namerefs(
+                                codegen_utils::replace_namerefs(
                                     event_handler.expr(),
                                     &utils::get_unbound_refs(event_handler.expr()),
                                     toplevel_vars
@@ -130,7 +130,7 @@ where
                 )
             }
             NodeType::Mustache(mustache) => {
-                let new_text = replace::replace_namerefs(
+                let new_text = codegen_utils::replace_namerefs(
                     mustache,
                     &utils::get_unbound_refs(mustache),
                     toplevel_vars,
@@ -178,7 +178,8 @@ where
                     if let Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) = attr {
                         let unbound = utils::get_unbound_refs(js);
                         let dirty_indices = codegen_utils::calc_dirty(&unbound, toplevel_vars);
-                        let replacement = replace::replace_namerefs(js, &unbound, toplevel_vars);
+                        let replacement =
+                            codegen_utils::replace_namerefs(js, &unbound, toplevel_vars);
                         writeln!(
                             f,
                             "if ({dirty_indices}) e{}.setAttribute(\"{key}\", {replacement});",
@@ -197,7 +198,7 @@ where
             NodeType::Mustache(mustache) => {
                 let unbound = utils::get_unbound_refs(mustache);
                 let dirty_indices = codegen_utils::calc_dirty(&unbound, toplevel_vars);
-                let new_text = replace::replace_namerefs(mustache, &unbound, toplevel_vars);
+                let new_text = codegen_utils::replace_namerefs(mustache, &unbound, toplevel_vars);
                 writeln!(
                     f,
                     "if ({dirty_indices}) e{}.data = {new_text};",

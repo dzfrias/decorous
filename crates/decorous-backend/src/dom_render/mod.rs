@@ -1,7 +1,8 @@
-use self::renderer::Renderer;
-use crate::replace;
-use decorous_frontend::{utils, Component};
+use crate::codegen_utils;
 use itertools::Itertools;
+
+use self::renderer::Renderer;
+use decorous_frontend::{utils, Component};
 use rslint_parser::AstNode;
 use std::{borrow::Cow, io};
 
@@ -59,7 +60,7 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
             .iter()
             .map(|node| {
                 if node.substitute_assign_refs {
-                    replace::replace_assignments(
+                    codegen_utils::replace_assignments(
                         &node.node,
                         &utils::get_unbound_refs(&node.node),
                         component.declared_vars(),
@@ -75,7 +76,7 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
         writeln!(
             render_to,
             "let __closure{idx} = {};",
-            replace::replace_assignments(
+            codegen_utils::replace_assignments(
                 arrow_expr.syntax(),
                 &utils::get_unbound_refs(arrow_expr.syntax()),
                 component.declared_vars()
