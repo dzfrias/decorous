@@ -1,4 +1,4 @@
-use std::{fmt, io};
+use std::fmt;
 
 use nom_locate::LocatedSpan;
 use thiserror::Error;
@@ -56,49 +56,6 @@ impl<T> Report<T> {
     }
 }
 
-impl Report<LocatedSpan<&str>> {
-    pub fn format<T: io::Write>(&self, input: &str, out: &mut T) -> io::Result<()> {
-        for err in self.errors() {
-            let lines = input.lines().enumerate();
-            // Minus one because location_line is 1-indexed
-            let line_no = err.fragment().location_line() - 1;
-
-            // Write the error description
-            writeln!(out, "error: {}", err.err_type())?;
-            if let Some(help_line) = err
-                .help()
-                .and_then(|help| help.corresponding_line())
-                .filter(|ln| ln <= &line_no)
-            {
-                let (_, line) = lines
-                    .clone()
-                    .find(|(n, _)| *n as u32 == help_line - 1)
-                    .expect("should be in lines");
-                writeln!(out, "{help_line}| {} <-- this line", line)?;
-                if help_line + 1 != line_no {
-                    writeln!(out, "...")?;
-                }
-            }
-            let (i, line) = lines
-                .clone()
-                .find(|(n, _)| (*n as u32) + 1 == line_no)
-                .expect("line should be in input");
-
-            writeln!(out, "{}| {line}", i + 1)?;
-            // Plus one because line_no is 0 indexed, so we need to get the actual line number
-            let line_no_len = count_digits(line_no + 1) as usize;
-            let col = err.fragment().get_column() + line_no_len + 2;
-            writeln!(out, "{arrow:>col$}", arrow = "^")?;
-
-            if let Some(help) = err.help() {
-                writeln!(out, "help: {help}")?;
-            }
-            writeln!(out)?;
-        }
-        Ok(())
-    }
-}
-
 impl From<Report<LocatedSpan<&str>>> for Report<Location> {
     fn from(report: Report<LocatedSpan<&str>>) -> Self {
         let mut new_report = Vec::with_capacity(report.errors.len());
@@ -107,10 +64,6 @@ impl From<Report<LocatedSpan<&str>>> for Report<Location> {
         }
         Self { errors: new_report }
     }
-}
-
-fn count_digits(num: u32) -> u32 {
-    num.checked_ilog10().unwrap_or(0) + 1
 }
 
 impl<T> From<ParseError<T>> for Report<T> {

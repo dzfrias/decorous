@@ -26,7 +26,7 @@ impl fmt::Display for DirtyIndices {
         for (i, (idx, bitmask)) in self.0.iter().enumerate() {
             write!(all, "dirty[{idx}] & {bitmask}")?;
             if i != self.0.len() - 1 {
-                all.push_str(" || ")
+                all.push_str(" || ");
             }
         }
         write!(f, "{all}")?;
@@ -35,7 +35,7 @@ impl fmt::Display for DirtyIndices {
     }
 }
 
-/// Returns an vector of (DIRTY_IDX, BITMASK). DIRTY_IDX is the index in the u8 buffer on the
+/// Returns an vector of (DIRTY, BITMASK). DIRTY is the index in the u8 buffer on the
 /// JavaScript side. BITMASK is a bit mask for the changed variables in the corresponding u8.
 /// For example, if the 9th variable had to be dirty, this would return [(1, 0b1)]. Or if the
 /// 9th and tenth were dirty, it work be [(1, 0b11)].

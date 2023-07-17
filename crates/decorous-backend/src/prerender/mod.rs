@@ -82,16 +82,16 @@ fn render_elements(analysis: &Analysis) -> String {
             // special block, as they have to be generated at runtime by JavaScript.
             ReactiveData::Mustache(_) => {
                 write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),")
-                    .expect("string formatting should not fail")
+                    .expect("string formatting should not fail");
             }
             ReactiveData::AttributeCollection(_) => {
                 write!(out, "\"{id}\":document.getElementById(\"{id}\"),")
-                    .expect("string formatting should not fail")
+                    .expect("string formatting should not fail");
             }
             ReactiveData::SpecialBlock(_) => {
                 write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),")
                     .expect("string formatting should not fail");
-                write!(out, "\"{id}_block\":null,").expect("string formatting should not fail")
+                write!(out, "\"{id}_block\":null,").expect("string formatting should not fail");
             }
         }
     }
@@ -170,8 +170,7 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
     for (idx, js) in sort_if_testing!(analysis.reactive_data().iter(), |a, b| a.0.cmp(b.0))
         .filter_map(|(id, data)| match data {
             ReactiveData::Mustache(js) => Some((id, js)),
-            ReactiveData::AttributeCollection(_) => None,
-            ReactiveData::SpecialBlock(_) => None,
+            ReactiveData::AttributeCollection(_) | ReactiveData::SpecialBlock(_) => None,
         })
     {
         let unbound = utils::get_unbound_refs(js);
@@ -215,14 +214,13 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
 
     for (id, attr, js) in sort_if_testing!(analysis.reactive_data().iter(), |a, b| a.0.cmp(b.0))
         .filter_map(|(id, data)| match data {
-            ReactiveData::Mustache(_) => None,
+            ReactiveData::Mustache(_) | ReactiveData::SpecialBlock(_) => None,
             ReactiveData::AttributeCollection(attrs) => {
                 Some(attrs.iter().filter_map(move |attr| match attr {
                     ReactiveAttribute::KeyValue(attr, expr) => Some((id, attr, expr)),
                     ReactiveAttribute::EventListener(_, _) => None,
                 }))
             }
-            ReactiveData::SpecialBlock(_) => None,
         })
         .flatten()
     {

@@ -127,8 +127,7 @@ fn fmt_report<T: io::Write>(input: &str, report: &Report<Location>, out: &mut T)
         {
             let (_, line) = lines
                 .clone()
-                .skip_while(|(n, _)| *n as u32 != help_line - 1)
-                .next()
+                .find(|(n, _)| *n as u32 == help_line - 1)
                 .expect("should be in lines");
             writeln!(out, "{help_line}| {} \x1b[1;33m<--- this line\x1b[0m", line,)?;
             if help_line + 1 != line_no {
@@ -137,8 +136,7 @@ fn fmt_report<T: io::Write>(input: &str, report: &Report<Location>, out: &mut T)
         }
         let (i, line) = lines
             .clone()
-            .skip_while(|(n, _)| (*n as u32) + 1 < line_no)
-            .next()
+            .find(|(n, _)| (*n as u32) + 1 == line_no)
             .expect("line should be in input");
 
         writeln!(out, "{}| {line}", i + 1)?;

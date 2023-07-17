@@ -96,8 +96,8 @@ dirty.fill(0);
     Ok(())
 }
 
-pub(crate) fn render_fragment<'a>(
-    nodes: &[Node<'a, FragmentMetadata>],
+pub(crate) fn render_fragment(
+    nodes: &[Node<'_, FragmentMetadata>],
     root: Option<u32>,
     declared: &DeclaredVariables,
 ) -> String {
@@ -118,9 +118,7 @@ pub(crate) fn render_fragment<'a>(
 
     let rendered = format!(
         include_str!("./templates/fragment.js"),
-        id = root
-            .map(|root| Cow::Owned(root.to_string()))
-            .unwrap_or(Cow::Borrowed("main")),
+        id = root.map_or(Cow::Borrowed("main"), |root| Cow::Owned(root.to_string())),
         decls = decls,
         mounts = mounts,
         update_body = updates,
@@ -130,11 +128,7 @@ pub(crate) fn render_fragment<'a>(
     rendered
 }
 
-fn render_decl<'a>(
-    f: &mut String,
-    node: &Node<'a, FragmentMetadata>,
-    declared: &DeclaredVariables,
-) {
+fn render_decl(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &DeclaredVariables) {
     let id = node.metadata().id();
     match node.node_type() {
         NodeType::Text(t) => writeln!(
@@ -145,8 +139,8 @@ fn render_decl<'a>(
         .expect("string format should not fail"),
         NodeType::Mustache(mustache) => {
             let replaced = codegen_utils::replace_namerefs(
-                &mustache,
-                &utils::get_unbound_refs(&mustache),
+                mustache,
+                &utils::get_unbound_refs(mustache),
                 declared,
             );
             writeln!(f, "const e{id} = document.createTextNode({replaced});")
@@ -217,9 +211,9 @@ fn render_decl<'a>(
     }
 }
 
-fn render_mount<'a>(
+fn render_mount(
     f: &mut String,
-    node: &Node<'a, FragmentMetadata>,
+    node: &Node<'_, FragmentMetadata>,
     root: Option<u32>,
     declared: &DeclaredVariables,
 ) {
@@ -248,17 +242,13 @@ fn render_mount<'a>(
     if node.metadata().parent_id() == root {
         writeln!(f, "mount(target, e{id}, anchor);").expect("string format should not fail");
     } else if let Some(parent_id) = node.metadata().parent_id() {
-        writeln!(f, "e{parent_id}.appendChild(e{id});").expect("string format should not fail;")
+        writeln!(f, "e{parent_id}.appendChild(e{id});").expect("string format should not fail;");
     } else {
         panic!("BUG: node's parent should never be None while root is Some");
     }
 }
 
-fn render_update<'a>(
-    f: &mut String,
-    node: &Node<'a, FragmentMetadata>,
-    declared: &DeclaredVariables,
-) {
+fn render_update(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &DeclaredVariables) {
     let id = node.metadata().id();
     match node.node_type() {
         NodeType::Mustache(mustache) => {
@@ -297,7 +287,7 @@ fn render_update<'a>(
     }
 }
 
-fn render_detach<'a>(f: &mut String, node: &Node<'a, FragmentMetadata>, root: Option<u32>) {
+fn render_detach(f: &mut String, node: &Node<'_, FragmentMetadata>, root: Option<u32>) {
     if matches!(node.node_type(), NodeType::Comment(_)) || root != node.metadata().parent_id() {
         return;
     }

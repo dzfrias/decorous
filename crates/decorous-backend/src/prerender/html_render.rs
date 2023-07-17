@@ -56,7 +56,7 @@ impl<'a, T: io::Write> HtmlFmt<T> for Element<'a, FragmentMetadata> {
             match attr {
                 Attribute::KeyValue(key, Some(AttributeValue::Literal(literal))) => {
                     if *key == "id" {
-                        overwrite = true
+                        overwrite = true;
                     }
                     write!(f, " {key}=\"{literal}\"")?;
                 }

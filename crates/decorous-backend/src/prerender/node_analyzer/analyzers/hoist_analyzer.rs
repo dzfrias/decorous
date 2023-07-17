@@ -30,12 +30,10 @@ impl<'ast> NodeAnalyzer<'ast> for HoistAnalyzer<'ast> {
     type AccumulatedOutput = Hoistables<'ast>;
 
     fn visit(&mut self, node: &'ast Node<'_, FragmentMetadata>, _component: &'ast Component) {
-        match node.node_type() {
-            NodeType::SpecialBlock(SpecialBlock::If(if_block)) => self
-                .hoistables
+        if let NodeType::SpecialBlock(SpecialBlock::If(if_block)) = node.node_type() {
+            self.hoistables
                 .if_blocks
-                .push((node.metadata().id(), if_block)),
-            _ => {}
+                .push((node.metadata().id(), if_block));
         }
     }
 

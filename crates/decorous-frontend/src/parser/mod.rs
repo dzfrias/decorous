@@ -24,7 +24,7 @@ use crate::ast::{
 type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report<NomSpan<'a>>>;
 type NomSpan<'a> = LocatedSpan<&'a str>;
 
-/// Helper macro for creating an IResult error by hand.
+/// Helper macro for creating an `IResult` error by hand.
 macro_rules! nom_err {
     ($input:expr, $severity:ident, $err_type:expr, $help:expr) => {
         Err(nom::Err::$severity(Report::from(ParseError::new(
