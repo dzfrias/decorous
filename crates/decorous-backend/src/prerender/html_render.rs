@@ -1,7 +1,9 @@
 use std::io;
 
 use decorous_frontend::{
-    ast::{Attribute, AttributeValue, Comment, Element, Mustache, Node, NodeType, Text},
+    ast::{
+        Attribute, AttributeValue, Comment, Element, Mustache, Node, NodeType, SpecialBlock, Text,
+    },
     FragmentMetadata,
 };
 
@@ -23,11 +25,19 @@ impl<'a, T: io::Write> HtmlFmt<T> for Comment<'a> {
     type Metadata = FragmentMetadata;
 
     fn html_fmt(&self, f: &mut T, _: &Self::Metadata) -> io::Result<()> {
-        write!(f, "{}", self.0)
+        write!(f, "<!--{}-->", self.0)
     }
 }
 
-impl<'a, T: io::Write> HtmlFmt<T> for Mustache {
+impl<T: io::Write> HtmlFmt<T> for Mustache {
+    type Metadata = FragmentMetadata;
+
+    fn html_fmt(&self, f: &mut T, metadata: &Self::Metadata) -> io::Result<()> {
+        write!(f, "<span id=\"{}\"></span>", metadata.id())
+    }
+}
+
+impl<'a, T: io::Write> HtmlFmt<T> for SpecialBlock<'a, FragmentMetadata> {
     type Metadata = FragmentMetadata;
 
     fn html_fmt(&self, f: &mut T, metadata: &Self::Metadata) -> io::Result<()> {
@@ -81,7 +91,7 @@ impl<'a, T: io::Write> HtmlFmt<T> for Node<'a, FragmentMetadata> {
             NodeType::Element(elem) => elem.html_fmt(f, self.metadata()),
             NodeType::Comment(comment) => comment.html_fmt(f, self.metadata()),
             NodeType::Mustache(mustache) => mustache.html_fmt(f, self.metadata()),
-            NodeType::SpecialBlock(_block) => todo!(),
+            NodeType::SpecialBlock(block) => block.html_fmt(f, self.metadata()),
         }
     }
 }

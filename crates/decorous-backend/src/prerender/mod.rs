@@ -1,15 +1,18 @@
-use std::{fmt::Write, io};
+use std::{borrow::Cow, fmt::Write, io};
 
 mod html_render;
 mod node_analyzer;
+mod render_if;
 
-use decorous_frontend::{utils, Component};
+use decorous_frontend::{ast::SpecialBlock, utils, Component};
+use rslint_parser::AstNode;
 
 use crate::{codegen_utils, replace};
 
 use self::{
     html_render::HtmlFmt,
     node_analyzer::analyzers::{Analysis, ReactiveAttribute, ReactiveData},
+    render_if::render_if_block,
 };
 
 macro_rules! sort_if_testing {
@@ -36,23 +39,36 @@ where
 
     let analysis = Analysis::analyze(component);
 
-    let (elems, ctx_init_body, update_body) = (
+    let (elems, ctx_init_body, update_body, hoists) = (
         render_elements(&analysis),
         render_ctx_init(component, &analysis),
         render_update_body(component, &analysis),
+        render_hoists(component, &analysis),
     );
 
     // Write finished segments
     write!(
         js_out,
-        include_str!("./template.js"),
+        include_str!("./templates/main.js"),
         dirty_items = ((component.declared_vars().all_vars().len() + 7) / 8),
         elems = elems,
         ctx_body = ctx_init_body,
-        update_body = update_body
+        update_body = update_body,
+        hoistables = hoists,
     )?;
 
     Ok(())
+}
+
+fn render_hoists<'a>(component: &Component<'a>, analysis: &Analysis<'a>) -> String {
+    let mut out = String::new();
+
+    for (id, if_block) in analysis.hoistables().if_blocks() {
+        let renderered = render_if_block(*if_block, *id, component.declared_vars());
+        out.push_str(&renderered.0);
+    }
+
+    out
 }
 
 fn render_elements(analysis: &Analysis) -> String {
@@ -61,6 +77,10 @@ fn render_elements(analysis: &Analysis) -> String {
     for (id, data) in sort_if_testing!(analysis.reactive_data().iter(), |a, b| a.0.cmp(b.0)) {
         let id = analysis.id_overwrites().try_get(*id);
         match data {
+            // Replace mustache tags and special blocks with an empty text node. For mustache tags,
+            // this allows us to manipulate its contents by reference. For special blocks like `if`
+            // and `for`, this creates a marker point for where to insert the contents of the
+            // special block, as they have to be generated at runtime by JavaScript.
             ReactiveData::Mustache(_) => {
                 write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),")
                     .expect("string formatting should not fail")
@@ -68,6 +88,11 @@ fn render_elements(analysis: &Analysis) -> String {
             ReactiveData::AttributeCollection(_) => {
                 write!(out, "\"{id}\":document.getElementById(\"{id}\"),")
                     .expect("string formatting should not fail")
+            }
+            ReactiveData::SpecialBlock(_) => {
+                write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),")
+                    .expect("string formatting should not fail");
+                write!(out, "\"{id}_block\":null,").expect("string formatting should not fail")
             }
         }
     }
@@ -78,6 +103,18 @@ fn render_elements(analysis: &Analysis) -> String {
 fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
     let mut out = String::new();
 
+    for (arrow_expr, idx) in component.declared_vars().all_arrow_exprs() {
+        writeln!(
+            out,
+            "let __closure{idx} = {};",
+            replace::replace_assignments(
+                arrow_expr.syntax(),
+                &utils::get_unbound_refs(arrow_expr.syntax()),
+                component.declared_vars()
+            )
+        )
+        .expect("string format should not fail");
+    }
     for node in component.toplevel_nodes() {
         if node.substitute_assign_refs {
             let replacement = replace::replace_assignments(
@@ -93,7 +130,7 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
 
     for (id, event, expr) in sort_if_testing!(analysis.reactive_data().iter(), |a, b| a.0.cmp(b.0))
         .filter_map(|(id, data)| match data {
-            ReactiveData::Mustache(_) => None,
+            ReactiveData::Mustache(_) | ReactiveData::SpecialBlock(_) => None,
             ReactiveData::AttributeCollection(elems) => {
                 Some(elems.iter().filter_map(move |attr| match attr {
                     ReactiveAttribute::KeyValue(_, _) => None,
@@ -116,9 +153,12 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
         .expect("writing to format string should not fail");
     }
 
-    let mut ctx = vec![""; component.declared_vars().all_vars().len()];
+    let mut ctx = vec![Cow::Borrowed(""); component.declared_vars().len()];
     for (name, idx) in component.declared_vars().all_vars() {
-        ctx[*idx as usize] = name;
+        ctx[*idx as usize] = Cow::Borrowed(name);
+    }
+    for idx in component.declared_vars().all_arrow_exprs().values() {
+        ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
     }
     writeln!(out, "return [{}];", ctx.join(",")).expect("string format should not fail");
 
@@ -132,6 +172,7 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
         .filter_map(|(id, data)| match data {
             ReactiveData::Mustache(js) => Some((id, js)),
             ReactiveData::AttributeCollection(_) => None,
+            ReactiveData::SpecialBlock(_) => None,
         })
     {
         let unbound = utils::get_unbound_refs(js);
@@ -147,9 +188,30 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
         }
     }
 
-    for (id, attr, js) in analysis
-        .reactive_data()
-        .iter()
+    for (id, special_block) in sort_if_testing!(analysis.reactive_data().iter(), |a, b| a
+        .0
+        .cmp(b.0))
+    .filter_map(|(id, data)| match data {
+        ReactiveData::Mustache(_) | ReactiveData::AttributeCollection(_) => None,
+        ReactiveData::SpecialBlock(block) => Some((*id, *block)),
+    }) {
+        match special_block {
+            SpecialBlock::If(if_block) => {
+                let unbound = utils::get_unbound_refs(if_block.expr());
+                let replaced =
+                    replace::replace_namerefs(if_block.expr(), &unbound, component.declared_vars());
+
+                writeln!(
+                    out,
+                    "if ({replaced}) {{ if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].u(dirty); }} else {{ elems[\"{id}_block\"] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} }} else if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].d(); elems[\"{id}_block\"] = null; }}"
+                )
+                .expect("string formatting should not fail");
+            }
+            SpecialBlock::For(_) => todo!(),
+        }
+    }
+
+    for (id, attr, js) in sort_if_testing!(analysis.reactive_data().iter(), |a, b| a.0.cmp(b.0))
         .filter_map(|(id, data)| match data {
             ReactiveData::Mustache(_) => None,
             ReactiveData::AttributeCollection(attrs) => {
@@ -158,6 +220,7 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
                     ReactiveAttribute::EventListener(_, _) => None,
                 }))
             }
+            ReactiveData::SpecialBlock(_) => None,
         })
         .flatten()
     {

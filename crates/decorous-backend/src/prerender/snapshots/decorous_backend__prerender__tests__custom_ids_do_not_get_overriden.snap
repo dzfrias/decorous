@@ -8,11 +8,13 @@ const text = document.createTextNode("");
 node.replaceWith(text);
 return text;
 }
+
 const elems = {"custom":document.getElementById("custom"),"2":replace(document.getElementById("2")),};
 function __init_ctx() {
+let __closure1 = () => console.log(1 + 1);
 let x = 3;
 elems["custom"].addEventListener("click", () => console.log(1 + 1));
-return [x];
+return [x,__closure1];
 }
 const ctx = __init_ctx();
 let updating = false;

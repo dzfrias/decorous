@@ -1,7 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
 use decorous_frontend::{
-    ast::{Attribute, AttributeValue, Mustache, Node, NodeType},
+    ast::{Attribute, AttributeValue, Mustache, Node, NodeType, SpecialBlock},
     Component, FragmentMetadata,
 };
 use rslint_parser::{SmolStr, SyntaxNode};
@@ -14,28 +14,29 @@ pub enum ReactiveAttribute {
     EventListener(SmolStr, SyntaxNode),
 }
 
-#[derive(Debug, PartialEq, Clone, Hash)]
-pub enum ReactiveData {
+#[derive(Debug, Clone)]
+pub enum ReactiveData<'ast> {
     Mustache(SyntaxNode),
     AttributeCollection(Rc<[ReactiveAttribute]>),
+    SpecialBlock(&'ast SpecialBlock<'ast, FragmentMetadata>),
 }
 
 #[derive(Debug, Default)]
-pub struct ReactivityAnalyzer {
-    elems: HashMap<u32, ReactiveData>,
+pub struct ReactivityAnalyzer<'a> {
+    elems: HashMap<u32, ReactiveData<'a>>,
 }
 
-impl ReactivityAnalyzer {
+impl ReactivityAnalyzer<'_> {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl NodeAnalyzer for ReactivityAnalyzer {
-    type AccumulatedOutput = HashMap<u32, ReactiveData>;
+impl<'a> NodeAnalyzer<'a> for ReactivityAnalyzer<'a> {
+    type AccumulatedOutput = HashMap<u32, ReactiveData<'a>>;
 
-    fn visit(&mut self, node: &Node<'_, FragmentMetadata>, _component: &Component) {
-        match node.node_type() {
+    fn visit(&mut self, node: &'a Node<'_, FragmentMetadata>, _component: &'a Component) {
+        let data = match node.node_type() {
             NodeType::Element(elem) => {
                 // PERF: small vec?
                 let mut attrs = vec![];
@@ -56,17 +57,14 @@ impl NodeAnalyzer for ReactivityAnalyzer {
                 if attrs.is_empty() {
                     return;
                 }
-                self.elems.insert(
-                    node.metadata().id(),
-                    ReactiveData::AttributeCollection(attrs.into()),
-                );
+                ReactiveData::AttributeCollection(attrs.into())
             }
-            NodeType::Mustache(Mustache(js)) => {
-                self.elems
-                    .insert(node.metadata().id(), ReactiveData::Mustache(js.clone()));
-            }
-            _ => {}
-        }
+            NodeType::Mustache(Mustache(js)) => ReactiveData::Mustache(js.clone()),
+            NodeType::SpecialBlock(block) => ReactiveData::SpecialBlock(block),
+            _ => return,
+        };
+
+        self.elems.insert(node.metadata().id(), data);
     }
 
     fn accumulated_output(self) -> Self::AccumulatedOutput {

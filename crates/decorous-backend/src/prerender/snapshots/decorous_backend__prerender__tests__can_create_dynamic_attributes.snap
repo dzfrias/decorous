@@ -8,6 +8,7 @@ const text = document.createTextNode("");
 node.replaceWith(text);
 return text;
 }
+
 const elems = {"0":document.getElementById("0"),};
 function __init_ctx() {
 let x = 3;

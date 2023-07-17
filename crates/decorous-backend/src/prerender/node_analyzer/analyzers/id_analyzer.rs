@@ -31,7 +31,7 @@ impl IdAnalyzer {
     }
 }
 
-impl NodeAnalyzer for IdAnalyzer {
+impl NodeAnalyzer<'_> for IdAnalyzer {
     type AccumulatedOutput = IdOverwrites;
 
     fn visit(&mut self, node: &Node<'_, FragmentMetadata>, _component: &Component) {

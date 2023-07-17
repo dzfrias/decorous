@@ -4,6 +4,7 @@ const text = document.createTextNode("");
 node.replaceWith(text);
 return text;
 }}
+{hoistables}
 const elems = {elems};
 function __init_ctx() {{
 {ctx_body}}}

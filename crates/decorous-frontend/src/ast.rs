@@ -420,6 +420,15 @@ impl<'a, T> IfBlock<'a, T> {
         }
     }
 
+    pub fn inner_recursive(&'a self) -> NodeIter<'a, T> {
+        NodeIter::new(self.inner())
+    }
+
+    pub fn else_recursive(&'a self) -> Option<NodeIter<'a, T>> {
+        self.else_block()
+            .map(|else_block| NodeIter::new(else_block))
+    }
+
     pub fn expr(&self) -> &SyntaxNode {
         &self.expr
     }
@@ -483,9 +492,9 @@ pub struct NodeIter<'a, T> {
 }
 
 impl<'a, T> NodeIter<'a, T> {
-    pub fn new(node: &'a [Node<'a, T>]) -> NodeIter<'a, T> {
-        let mut stack = Vec::new();
-        stack.extend(node);
+    pub fn new(nodes: &'a [Node<'a, T>]) -> NodeIter<'a, T> {
+        let mut stack = Vec::with_capacity(nodes.len());
+        stack.extend(nodes.iter().rev());
         Self { stack }
     }
 }
