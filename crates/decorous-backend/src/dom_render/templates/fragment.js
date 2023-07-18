@@ -2,14 +2,10 @@ function create_{id}_block(target, anchor) {{
 function mount(target, newNode, anchor) {{
 target.insertBefore(newNode, anchor || null);
 }}
-{decls}
-{mounts}
-return {{
+{decls}{mounts}return {{
 u(dirty) {{
-{update_body}
-}},
+{update_body}}},
 d() {{
-{detach_body}
-}}
+{detach_body}}}
 }};
 }}

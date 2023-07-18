@@ -9,17 +9,13 @@ target.insertBefore(newNode, anchor || null);
 }
 const e0 = document.createElement("div");
 e0.setAttribute("class", ctx[0]);
-
 mount(target, e0, anchor);
-
 return {
 u(dirty) {
 if (dirty[0] & 1) e0.setAttribute("class", ctx[0]);
-
 },
 d() {
 e0.parentNode.removeChild(e0);
-
 }
 };
 }

@@ -12,20 +12,16 @@ const e1 = document.createTextNode(ctx[0]);
 const e2 = document.createElement("button");
 e2.textContent = "Clickme";
 e2.addEventListener("click", ctx[1])
-
 mount(target, e0, anchor);
 e0.appendChild(e1);
 mount(target, e2, anchor);
-
 return {
 u(dirty) {
 if (dirty[0] & 1) e1.data = ctx[0];
-
 },
 d() {
 e0.parentNode.removeChild(e0);
 e2.parentNode.removeChild(e2);
-
 }
 };
 }

@@ -9,16 +9,12 @@ target.insertBefore(newNode, anchor || null);
 }
 const e0 = document.createElement("div");
 e0.innerHtml = "text <div></div>";
-
 mount(target, e0, anchor);
-
 return {
 u(dirty) {
-
 },
 d() {
 e0.parentNode.removeChild(e0);
-
 }
 };
 }

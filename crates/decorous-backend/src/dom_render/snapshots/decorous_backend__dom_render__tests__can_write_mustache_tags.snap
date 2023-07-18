@@ -8,17 +8,13 @@ function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
 const e0 = document.createTextNode((ctx[0], ctx[0]));
-
 mount(target, e0, anchor);
-
 return {
 u(dirty) {
 if (dirty[0] & 1) e0.data = (ctx[0], ctx[0]);
-
 },
 d() {
 e0.parentNode.removeChild(e0);
-
 }
 };
 }

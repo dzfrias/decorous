@@ -9,16 +9,12 @@ target.insertBefore(newNode, anchor || null);
 }
 const e0 = document.createElement("span");
 e0.textContent = "hello";
-
 mount(target, e0, anchor);
-
 return {
 u(dirty) {
-
 },
 d() {
 e0.parentNode.removeChild(e0);
-
 }
 };
 }

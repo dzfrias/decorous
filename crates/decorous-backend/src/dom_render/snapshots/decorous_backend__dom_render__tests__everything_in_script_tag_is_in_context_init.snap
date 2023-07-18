@@ -7,14 +7,10 @@ function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
-
-
 return {
 u(dirty) {
-
 },
 d() {
-
 }
 };
 }
