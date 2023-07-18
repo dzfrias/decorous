@@ -62,9 +62,22 @@ fn render_hoists<'a>(component: &Component<'a>, analysis: &Analysis<'a>) -> Stri
     let mut out = String::new();
 
     for (id, if_block) in analysis.hoistables().if_blocks() {
-        let renderered =
-            dom_render_fragment(if_block.inner(), Some(*id), component.declared_vars());
-        out.push_str(&renderered);
+        let rendered = dom_render_fragment(
+            if_block.inner(),
+            Some(*id),
+            component.declared_vars(),
+            &id.to_string(),
+        );
+        out.push_str(&rendered);
+        if let Some(else_block) = if_block.else_block() {
+            let rendered = dom_render_fragment(
+                else_block,
+                Some(*id),
+                component.declared_vars(),
+                &format!("{id}_else"),
+            );
+            out.push_str(&rendered);
+        }
     }
 
     out
@@ -88,11 +101,15 @@ fn render_elements(analysis: &Analysis) -> String {
                 write!(out, "\"{id}\":document.getElementById(\"{id}\"),")
                     .expect("string formatting should not fail");
             }
-            ReactiveData::SpecialBlock(_) => {
+            ReactiveData::SpecialBlock(SpecialBlock::If(block)) => {
                 write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),")
                     .expect("string formatting should not fail");
                 write!(out, "\"{id}_block\":null,").expect("string formatting should not fail");
+                if block.else_block().is_some() {
+                    write!(out, "\"{id}_on\":true,").expect("string formatting should not fail");
+                }
             }
+            ReactiveData::SpecialBlock(SpecialBlock::For(_block)) => todo!("for block"),
         }
     }
     write!(out, "}}").expect("string formatting should not fail");
@@ -202,10 +219,14 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
                     component.declared_vars(),
                 );
 
-                writeln!(
-                    out,
-                    "if ({replaced}) {{ if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].u(dirty); }} else {{ elems[\"{id}_block\"] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} }} else if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].d(); elems[\"{id}_block\"] = null; }}"
-                )
+                if if_block.else_block().is_some() {
+                    writeln!(out, include_str!("./templates/if.js"), replaced = replaced, id = id)
+                } else {
+                    writeln!(
+                        out,
+                        "if ({replaced}) {{ if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].u(dirty); }} else {{ elems[\"{id}_block\"] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} }} else if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].d(); elems[\"{id}_block\"] = null; }}"
+                    )
+                }
                 .expect("string formatting should not fail");
             }
             SpecialBlock::For(_) => todo!(),
@@ -301,5 +322,13 @@ mod tests {
     #[test]
     fn multiple_variables_are_properly_in_dirty_buffer() {
         test_render!("---js let x = 0; let y = 0; --- #p {x} and {y} and {x + y} /p");
+    }
+
+    #[test]
+    fn can_render_if_else() {
+        test_render!(
+            "---js let x = 0; --- {#if x == 0} wow {/if}",
+            "---js let x = 0; --- {#if x == 0} wow {:else} wow!! {/if}"
+        );
     }
 }

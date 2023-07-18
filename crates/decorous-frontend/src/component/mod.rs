@@ -154,10 +154,17 @@ impl<'a> Component<'a> {
                     .for_each(|child| self.build_fragment_tree_from_node(child, id));
             }
             NodeType::SpecialBlock(block) => match block {
-                SpecialBlock::If(if_block) => if_block
-                    .inner_mut()
-                    .iter_mut()
-                    .for_each(|child| self.build_fragment_tree_from_node(child, id)),
+                SpecialBlock::If(if_block) => {
+                    if_block
+                        .inner_mut()
+                        .iter_mut()
+                        .for_each(|child| self.build_fragment_tree_from_node(child, id));
+                    if let Some(else_block) = if_block.else_block_mut() {
+                        for n in else_block.iter_mut() {
+                            self.build_fragment_tree_from_node(n, id)
+                        }
+                    }
+                }
                 SpecialBlock::For(for_block) => for_block
                     .inner_mut()
                     .iter_mut()

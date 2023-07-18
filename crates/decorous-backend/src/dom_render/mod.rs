@@ -26,7 +26,12 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
     write!(
         render_to,
         "{}",
-        render_fragment(component.fragment_tree(), None, component.declared_vars())
+        render_fragment(
+            component.fragment_tree(),
+            None,
+            component.declared_vars(),
+            "main"
+        )
     )?;
 
     writeln!(render_to, "function __init_ctx() {{")?;
@@ -100,6 +105,7 @@ pub(crate) fn render_fragment(
     nodes: &[Node<'_, FragmentMetadata>],
     root: Option<u32>,
     declared: &DeclaredVariables,
+    name: &str,
 ) -> String {
     let mut decls = String::new();
     let mut mounts = String::new();
@@ -118,7 +124,7 @@ pub(crate) fn render_fragment(
 
     let rendered = format!(
         include_str!("./templates/fragment.js"),
-        id = root.map_or(Cow::Borrowed("main"), |root| Cow::Owned(root.to_string())),
+        id = name,
         decls = decls,
         mounts = mounts,
         update_body = updates,
@@ -221,9 +227,12 @@ fn render_mount(
 
     // In the special case of an if block, create AND mount here
     if let NodeType::SpecialBlock(SpecialBlock::If(if_block)) = node.node_type() {
-        // TODO: Else blocks
-        let block = render_fragment(if_block.inner(), Some(id), declared);
+        let block = render_fragment(if_block.inner(), Some(id), declared, &id.to_string());
         writeln!(f, "{block}").expect("string format should not fail");
+        if let Some(else_block) = if_block.else_block() {
+            let block = render_fragment(else_block, Some(id), declared, &format!("{id}_else"));
+            writeln!(f, "{block}").expect("string format should not fail");
+        }
         let replacement = codegen_utils::replace_namerefs(
             if_block.expr(),
             &utils::get_unbound_refs(if_block.expr()),
@@ -231,11 +240,19 @@ fn render_mount(
         );
 
         writeln!(f, "mount(target, e{id}_anchor, anchor);").expect("string format should not fail");
-        writeln!(
-            f,
-            "let e{id} = {replacement} && create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor);"
-        )
+        if if_block.else_block().is_some() {
+            writeln!(
+                f,
+                "let e{id};\nlet e{id}_on = false;\nif ({replacement}) {{ e{id} = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); e{id}_on = true; }} else {{ e{id} = create_{id}_else_block(e{id}_anchor.parentNode, e{id}_anchor); }}",
+            )
+        } else {
+            writeln!(
+                f,
+                "let e{id} = {replacement} && create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor);"
+            )
+        }
         .expect("string format should not fail");
+
         return;
     }
 
@@ -277,11 +294,19 @@ fn render_update(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &D
         NodeType::SpecialBlock(SpecialBlock::If(if_block)) => {
             let unbound = utils::get_unbound_refs(if_block.expr());
             let replaced = codegen_utils::replace_namerefs(if_block.expr(), &unbound, declared);
-            writeln!(
-                    f,
-                    "if ({replaced}) {{ if (e{id}) {{ e{id}.u(dirty); }} else {{ e{id} = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); }} }} else if (e{id}) {{ e{id}.d(); e{id} = null; }}"
-                )
-                .expect("string formatting should not fail");
+            if if_block.else_block().is_some() {
+                writeln!(
+                        f,
+                        "if ({replaced}) {{ if (e{id} && e{id}_on) {{ e{id}.u(dirty); }} else {{ e{id}_on = true; e{id}.d(); e{id} = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); }} }} else if (e{id}_on) {{ e{id}_on = false; e{id}.d(); e{id} = create_{id}_else_block(e{id}_anchor.parentNode, e{id}_anchor); }}"
+                    )
+                    .expect("string formatting should not fail");
+            } else {
+                writeln!(
+                        f,
+                        "if ({replaced}) {{ if (e{id}) {{ e{id}.u(dirty); }} else {{ e{id} = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); }} }} else if (e{id}) {{ e{id}.d(); e{id} = null; }}"
+                    )
+                    .expect("string formatting should not fail");
+            }
         }
         _ => {}
     }
@@ -383,5 +408,10 @@ mod tests {
     #[test]
     fn dirty_items_are_in_conditional() {
         test_render!("---js let hello = 0; let test = 1; --- {(hello, test)}");
+    }
+
+    #[test]
+    fn can_render_else_blocks() {
+        test_render!("---js let hello = 0; --- {#if hello == 0} wow {:else} woah {/if}");
     }
 }

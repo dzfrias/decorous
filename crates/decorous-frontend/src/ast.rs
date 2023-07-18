@@ -444,6 +444,10 @@ impl<'a, T> IfBlock<'a, T> {
     pub fn inner_mut(&mut self) -> &mut Vec<Node<'a, T>> {
         &mut self.inner
     }
+
+    pub fn else_block_mut(&mut self) -> Option<&mut [Node<'a, T>]> {
+        self.else_block.as_deref_mut()
+    }
 }
 
 impl<'a> DecorousAst<'a> {
