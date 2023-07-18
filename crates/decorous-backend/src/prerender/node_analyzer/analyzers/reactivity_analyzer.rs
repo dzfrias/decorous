@@ -8,12 +8,15 @@ use rslint_parser::{SmolStr, SyntaxNode};
 
 use crate::prerender::node_analyzer::NodeAnalyzer;
 
+pub type IdVec<T> = Vec<(u32, T)>;
+pub type IdSlice<'a, T> = &'a [(u32, T)];
+
 #[derive(Debug, Clone)]
 pub struct ReactiveData<'ast> {
-    mustaches: Vec<(u32, SyntaxNode)>,
-    key_values: Vec<(u32, Rc<[(SmolStr, SyntaxNode)]>)>,
-    event_listeners: Vec<(u32, Rc<[(SmolStr, SyntaxNode)]>)>,
-    special_blocks: Vec<(u32, &'ast SpecialBlock<'ast, FragmentMetadata>)>,
+    mustaches: IdVec<SyntaxNode>,
+    key_values: IdVec<Rc<[(SmolStr, SyntaxNode)]>>,
+    event_listeners: IdVec<Rc<[(SmolStr, SyntaxNode)]>>,
+    special_blocks: IdVec<&'ast SpecialBlock<'ast, FragmentMetadata>>,
 }
 
 #[derive(Debug)]
@@ -87,33 +90,31 @@ impl<'a> NodeAnalyzer<'a> for ReactivityAnalyzer<'a> {
 }
 
 impl<'ast> ReactiveData<'ast> {
-    pub fn mustaches(&self) -> &[(u32, SyntaxNode)] {
+    pub fn mustaches(&self) -> IdSlice<SyntaxNode> {
         self.mustaches.as_ref()
     }
 
-    pub fn special_blocks(&self) -> &[(u32, &SpecialBlock<'_, FragmentMetadata>)] {
+    pub fn special_blocks(&self) -> IdSlice<&SpecialBlock<'_, FragmentMetadata>> {
         self.special_blocks.as_ref()
     }
 
-    pub fn key_values(&self) -> &[(u32, Rc<[(SmolStr, SyntaxNode)]>)] {
+    pub fn key_values(&self) -> IdSlice<Rc<[(SmolStr, SyntaxNode)]>> {
         self.key_values.as_ref()
     }
 
-    pub fn event_listeners(&self) -> &[(u32, Rc<[(SmolStr, SyntaxNode)]>)] {
+    pub fn event_listeners(&self) -> IdSlice<Rc<[(SmolStr, SyntaxNode)]>> {
         self.event_listeners.as_ref()
     }
 
     pub fn flat_listeners(&self) -> impl Iterator<Item = (&u32, &SmolStr, &SyntaxNode)> + '_ {
         self.event_listeners()
             .iter()
-            .map(|(id, listeners)| listeners.iter().map(move |(ev, expr)| (id, ev, expr)))
-            .flatten()
+            .flat_map(|(id, listeners)| listeners.iter().map(move |(ev, expr)| (id, ev, expr)))
     }
 
     pub fn flat_kvs(&self) -> impl Iterator<Item = (&u32, &SmolStr, &SyntaxNode)> + '_ {
         self.key_values()
             .iter()
-            .map(|(id, kvs)| kvs.iter().map(move |(k, expr)| (id, k, expr)))
-            .flatten()
+            .flat_map(|(id, kvs)| kvs.iter().map(move |(k, expr)| (id, k, expr)))
     }
 }
