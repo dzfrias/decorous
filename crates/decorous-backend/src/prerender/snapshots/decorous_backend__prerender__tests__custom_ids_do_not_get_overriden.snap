@@ -9,7 +9,7 @@ node.replaceWith(text);
 return text;
 }
 
-const elems = {"custom":document.getElementById("custom"),"2":replace(document.getElementById("2")),};
+const elems = {"2":replace(document.getElementById("2")),"custom":document.getElementById("custom"),"custom":document.getElementById("custom"),};
 function __init_ctx() {
 let __closure1 = () => console.log(1 + 1);
 let x = 3;

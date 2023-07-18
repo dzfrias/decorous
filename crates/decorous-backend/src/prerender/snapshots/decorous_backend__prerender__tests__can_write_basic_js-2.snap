@@ -9,7 +9,7 @@ node.replaceWith(text);
 return text;
 }
 
-const elems = {"2":replace(document.getElementById("2")),"4":document.getElementById("4"),"7":replace(document.getElementById("7")),};
+const elems = {"2":replace(document.getElementById("2")),"7":replace(document.getElementById("7")),"4":document.getElementById("4"),};
 function __init_ctx() {
 let __closure1 = () => __schedule_update(0, x = 444);
 let x = 3;

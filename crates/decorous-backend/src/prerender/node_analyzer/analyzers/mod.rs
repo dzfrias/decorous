@@ -2,8 +2,6 @@ mod hoist_analyzer;
 mod id_analyzer;
 mod reactivity_analyzer;
 
-use std::collections::HashMap;
-
 use decorous_frontend::Component;
 pub use hoist_analyzer::*;
 pub use id_analyzer::*;
@@ -14,7 +12,7 @@ use super::NodeAnalyzer;
 #[derive(Debug, Clone)]
 pub struct Analysis<'a> {
     id_overwrites: IdOverwrites,
-    elem_data: HashMap<u32, ReactiveData<'a>>,
+    elem_data: ReactiveData<'a>,
     hoistables: Hoistables<'a>,
 }
 
@@ -36,7 +34,7 @@ impl<'a> Analysis<'a> {
         }
     }
 
-    pub fn reactive_data(&self) -> &HashMap<u32, ReactiveData> {
+    pub fn reactive_data(&self) -> &ReactiveData<'a> {
         &self.elem_data
     }
 
