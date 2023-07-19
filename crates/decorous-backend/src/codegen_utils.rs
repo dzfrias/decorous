@@ -1,9 +1,13 @@
-use std::fmt::{self, Write};
+use std::{
+    fmt::{self, Write},
+    iter,
+};
 
 use decorous_frontend::DeclaredVariables;
+use itertools::Itertools;
 use rslint_parser::{
-    ast::{ArrowExpr, AssignExpr, NameRef},
-    AstNode, SyntaxNode, SyntaxNodeExt,
+    ast::{ArrowExpr, ArrowExprParams, AssignExpr, NameRef},
+    AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
 };
 use rslint_text_edit::{apply_indels, Indel, TextRange};
 
@@ -22,6 +26,9 @@ impl DirtyIndices {
 
 impl fmt::Display for DirtyIndices {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_empty() {
+            return write!(f, "true");
+        }
         let mut all = String::new();
         for (i, (idx, bitmask)) in self.0.iter().enumerate() {
             write!(all, "dirty[{idx}] & {bitmask}")?;
@@ -39,15 +46,25 @@ impl fmt::Display for DirtyIndices {
 /// JavaScript side. BITMASK is a bit mask for the changed variables in the corresponding u8.
 /// For example, if the 9th variable had to be dirty, this would return [(1, 0b1)]. Or if the
 /// 9th and tenth were dirty, it work be [(1, 0b11)].
-pub fn calc_dirty(unbound: &[NameRef], declared: &DeclaredVariables) -> DirtyIndices {
+pub fn calc_dirty(
+    unbound: &[NameRef],
+    declared: &DeclaredVariables,
+    scope_id: Option<u32>,
+) -> DirtyIndices {
     let mut dirty_indices = DirtyIndices::new();
     for unbound in unbound {
         let Some(ident) = unbound.ident_token().map(|tok| tok.text().clone()) else {
-                    continue;
-                };
-        let Some(idx) = declared.get_var(&ident) else {
-                    continue;
-                };
+            continue;
+        };
+        let Some(idx) = declared.get_var(&ident, scope_id) else {
+            continue;
+        };
+        // If the variable is a "scoped" variable (i.e. declared in a {#for} block), do not
+        // calculate it's dirty value. Scoped variables, by nature, can't be mutated, so they can
+        // never be dirty.
+        if scope_id.is_some_and(|id| declared.is_scope_var(&ident, id)) {
+            continue;
+        }
         // Get the byte index for the dirty bitmap. Need to subtract one because
         // ceiling division only results in 0 if x == 0.
         let dirty_idx = ((idx + 7) / 8).saturating_sub(1) as usize;
@@ -71,13 +88,14 @@ pub fn replace_namerefs(
     syntax_node: &SyntaxNode,
     name_refs: &[NameRef],
     toplevel_vars: &DeclaredVariables,
+    scope_id: Option<u32>,
 ) -> String {
     let mut node_text = syntax_node.to_string();
 
     if let Some(first_child) = syntax_node.first_child() {
         if first_child.is::<ArrowExpr>() {
             let expr = first_child.to();
-            let Some(idx) = toplevel_vars.get_arrow_expr(&expr) else {
+            let Some((idx, _)) = toplevel_vars.get_arrow_expr(&expr) else {
                 return node_text;
             };
 
@@ -97,7 +115,7 @@ pub fn replace_namerefs(
         {
             continue;
         };
-        let Some(var_idx) = toplevel_vars.get_var(unbound.text()) else {
+        let Some(var_idx) = toplevel_vars.get_var(unbound.text(), scope_id) else {
             continue;
         };
         let replacement = format!("ctx[{}]", var_idx);
@@ -112,6 +130,7 @@ pub fn replace_namerefs(
         syntax_node,
         name_refs,
         toplevel_vars,
+        scope_id,
     ));
     apply_indels(&indels, &mut node_text);
 
@@ -122,9 +141,49 @@ pub fn replace_assignments(
     syntax_node: &SyntaxNode,
     name_refs: &[NameRef],
     toplevel_vars: &DeclaredVariables,
+    scope_id: Option<u32>,
 ) -> String {
     let mut node_text = syntax_node.to_string();
-    let indels = replace_assignments_indels(syntax_node, name_refs, toplevel_vars);
+    let mut indels = vec![];
+
+    if syntax_node.is::<ArrowExpr>() {
+        let arrow_expr = syntax_node.to::<ArrowExpr>();
+
+        let params = arrow_expr.params().expect("arrow expr should have params");
+        let to_append = name_refs.iter().filter_map(|nref| {
+            let tok = nref.ident_token().unwrap();
+            let ident = tok.text();
+            if !toplevel_vars.all_vars().contains_key(ident)
+                && toplevel_vars.get_var(ident, scope_id).is_some()
+            {
+                Some(ident.clone())
+            } else {
+                None
+            }
+        });
+        let all_params = match &params {
+            ArrowExprParams::Name(n) => iter::once(n.ident_token().unwrap().text().clone())
+                .chain(to_append)
+                .join(", "),
+            ArrowExprParams::ParameterList(plist) => plist
+                .parameters()
+                .map(|pat| SmolStr::new(&pat.text()))
+                .chain(to_append)
+                .join(", "),
+        };
+        let replacement = format!("({all_params})");
+        indels.push(Indel {
+            insert: replacement,
+            delete: params.range(),
+        })
+    }
+
+    indels.extend(replace_assignments_indels(
+        syntax_node,
+        name_refs,
+        toplevel_vars,
+        scope_id,
+    ));
     apply_indels(&indels, &mut node_text);
 
     node_text
@@ -134,6 +193,7 @@ fn replace_assignments_indels(
     syntax_node: &SyntaxNode,
     name_refs: &[NameRef],
     toplevel_vars: &DeclaredVariables,
+    scope_id: Option<u32>,
 ) -> Vec<Indel> {
     let mut indels = vec![];
     for name_ref in name_refs {
@@ -143,7 +203,7 @@ fn replace_assignments_indels(
         let Some(name) = name_ref.ident_token() else {
             continue;
         };
-        let Some(idx) = toplevel_vars.get_var(name.text()) else {
+        let Some(idx) = toplevel_vars.get_var(name.text(), scope_id) else {
             continue;
         };
         let replacement = format!("__schedule_update({}, {})", idx, assignment);

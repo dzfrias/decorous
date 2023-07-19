@@ -44,6 +44,7 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
                         &node.node,
                         &utils::get_unbound_refs(&node.node),
                         component.declared_vars(),
+                        None,
                     )
                 } else {
                     node.node.to_string()
@@ -52,23 +53,24 @@ pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Res
             .join("\n")
     )?;
 
-    for (arrow_expr, idx) in component.declared_vars().all_arrow_exprs() {
+    for (arrow_expr, (idx, scope)) in component.declared_vars().all_arrow_exprs() {
         writeln!(
             render_to,
             "let __closure{idx} = {};",
             codegen_utils::replace_assignments(
                 arrow_expr.syntax(),
                 &utils::get_unbound_refs(arrow_expr.syntax()),
-                component.declared_vars()
+                component.declared_vars(),
+                *scope
             )
         )?;
     }
 
-    let mut ctx = vec![Cow::Borrowed(""); component.declared_vars().len()];
+    let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
     for (name, idx) in component.declared_vars().all_vars() {
         ctx[*idx as usize] = Cow::Borrowed(name);
     }
-    for idx in component.declared_vars().all_arrow_exprs().values() {
+    for (idx, _) in component.declared_vars().all_arrow_exprs().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
     }
     writeln!(render_to, "return [{}];", ctx.join(","))?;
@@ -173,5 +175,15 @@ mod tests {
     #[test]
     fn can_render_else_blocks() {
         test_render!("---js let hello = 0; --- {#if hello == 0} wow {:else} woah {/if}");
+    }
+
+    #[test]
+    fn can_render_for_blocks() {
+        test_render!("{#for i in [1, 2, 3]} {i} {/for}");
+    }
+
+    #[test]
+    fn closures_with_scoped_var_as_part_of_body_take_the_scoped_var_as_argument() {
+        test_render!("{#for i in [1, 2, 3]} #button[@click={() => console.log(i)}]:Click {/for}");
     }
 }

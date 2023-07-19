@@ -13,6 +13,7 @@ expression: component.fragment_tree
                 line: 1,
                 column: 1,
             },
+            scope: None,
         },
         node_type: Element(
             Element {
@@ -31,6 +32,7 @@ expression: component.fragment_tree
                                 line: 1,
                                 column: 6,
                             },
+                            scope: None,
                         },
                         node_type: Element(
                             Element {
@@ -49,6 +51,7 @@ expression: component.fragment_tree
                                                 line: 0,
                                                 column: 0,
                                             },
+                                            scope: None,
                                         },
                                         node_type: Text(
                                             Text(
@@ -72,6 +75,7 @@ expression: component.fragment_tree
                                 line: 1,
                                 column: 18,
                             },
+                            scope: None,
                         },
                         node_type: Element(
                             Element {
@@ -90,6 +94,7 @@ expression: component.fragment_tree
                                                 line: 0,
                                                 column: 0,
                                             },
+                                            scope: None,
                                         },
                                         node_type: Text(
                                             Text(

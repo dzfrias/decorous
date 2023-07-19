@@ -1,0 +1,61 @@
+---
+source: crates/decorous-backend/src/dom_render/mod.rs
+expression: "String::from_utf8(out).unwrap()"
+---
+const dirty = new Uint8Array(new ArrayBuffer(1));
+function create_main_block(target, anchor) {
+function mount(target, newNode, anchor) {
+target.insertBefore(newNode, anchor || null);
+}
+const e0_anchor = document.createTextNode("");
+function create_0_block(target, anchor) {
+function mount(target, newNode, anchor) {
+target.insertBefore(newNode, anchor || null);
+}
+const e1 = document.createTextNode(ctx[0]);
+const e2 = document.createTextNode(" ");
+mount(target, e1, anchor);
+mount(target, e2, anchor);
+return {
+u(dirty) {
+if (true) e1.data = ctx[0];
+},
+d() {
+e1.parentNode.removeChild(e1);
+e2.parentNode.removeChild(e2);
+}
+};
+}
+
+mount(target, e0_anchor, anchor);
+let e0_blocks = [];
+([1, 2, 3]).forEach((v, i) => { ctx[0] = v; e0_blocks[i] = create_0_block(e0_anchor.parentNode, e0_anchor); });
+return {
+u(dirty) {
+([1, 2, 3]).forEach((v, i) => { if (i >= e0_blocks.length) { e0_blocks[i] = create_0_block(e0_anchor.parentNode, e0_anchor) }; ctx[0] = v; e0_blocks[i].u(dirty); });
+},
+d() {
+for (let i = 0; i < e0_blocks.length; i++) { e0_blocks[i].d() }
+e0_anchor.parentNode.removeChild(e0_anchor);
+}
+};
+}
+function __init_ctx() {
+
+return [undefined];
+}
+const ctx = __init_ctx();
+const fragment = create_main_block(document.getElementById("app"));
+let updating = false;
+function __schedule_update(ctx_idx, val) {
+ctx[ctx_idx] = val;
+dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
+if (updating) return;
+updating = true;
+Promise.resolve().then(() => {
+fragment.u(dirty);
+updating = false;
+dirty.fill(0);
+});
+}
+

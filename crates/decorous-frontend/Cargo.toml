@@ -13,3 +13,5 @@ thiserror = "1.0.40"
 
 [dev-dependencies]
 insta = { workspace = true }
+serde = { version = "1.0.131", features = ["derive"] }
+serde_derive = { version = "1.0.131" }

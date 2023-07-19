@@ -3,7 +3,7 @@ mod fragment;
 
 use rslint_parser::{
     ast::{ArrowExpr, FnDecl, ImportDecl, VarDecl},
-    SyntaxNode, SyntaxNodeExt,
+    SmolStr, SyntaxNode, SyntaxNodeExt,
 };
 
 use crate::{
@@ -12,6 +12,8 @@ use crate::{
 };
 pub use declared_vars::DeclaredVariables;
 pub use fragment::FragmentMetadata;
+
+use self::declared_vars::Scope;
 
 #[derive(Debug)]
 pub struct Component<'a> {
@@ -115,13 +117,24 @@ impl<'a> Component<'a> {
         let mut fragment_tree = vec![];
 
         for node in ast {
+            let mut current_scope_id = None;
             let mut node = node.cast_meta(&mut |node| {
                 let id = self.generate_elem_id();
-                FragmentMetadata::new(id, None, *node.metadata())
+                let fragment = FragmentMetadata::new(id, None, *node.metadata(), current_scope_id);
+                // Set scope after generating metadata because a {#for}'s scope can't contain
+                // itself
+                if matches!(
+                    node.node_type(),
+                    NodeType::SpecialBlock(SpecialBlock::For(_))
+                ) {
+                    current_scope_id = Some(id);
+                }
+                fragment
             });
 
             let id = node.metadata().id();
-            self.build_fragment_tree_from_node(&mut node, id);
+            let mut current_scopes = vec![];
+            self.build_fragment_tree_from_node(&mut node, id, &mut current_scopes);
             node.metadata_mut().set_parent_id(None);
 
             fragment_tree.push(node);
@@ -133,43 +146,55 @@ impl<'a> Component<'a> {
         &mut self,
         node: &mut Node<'_, FragmentMetadata>,
         parent_id: u32,
+        current_scopes: &mut Vec<Scope>,
     ) {
         node.metadata_mut().set_parent_id(Some(parent_id));
 
         let id = node.metadata().id();
+        let scope = node.metadata().scope();
         match node.node_type_mut() {
             NodeType::Element(elem) => {
                 for attr in elem.attrs() {
                     if let Attribute::EventHandler(handler) = attr {
                         if let Some(first_child) = handler.expr().first_child() {
                             if first_child.is::<ArrowExpr>() {
-                                self.declared_vars.insert_arrow_expr(first_child.to());
+                                self.declared_vars
+                                    .insert_arrow_expr(first_child.to(), scope);
                             }
                         }
                     }
                 }
 
-                elem.children_mut()
-                    .iter_mut()
-                    .for_each(|child| self.build_fragment_tree_from_node(child, id));
+                elem.children_mut().iter_mut().for_each(|child| {
+                    self.build_fragment_tree_from_node(child, id, current_scopes)
+                });
             }
+
             NodeType::SpecialBlock(block) => match block {
                 SpecialBlock::If(if_block) => {
-                    if_block
-                        .inner_mut()
-                        .iter_mut()
-                        .for_each(|child| self.build_fragment_tree_from_node(child, id));
+                    if_block.inner_mut().iter_mut().for_each(|child| {
+                        self.build_fragment_tree_from_node(child, id, current_scopes)
+                    });
                     if let Some(else_block) = if_block.else_block_mut() {
                         for n in else_block.iter_mut() {
-                            self.build_fragment_tree_from_node(n, id);
+                            self.build_fragment_tree_from_node(n, id, current_scopes);
                         }
                     }
                 }
-                SpecialBlock::For(for_block) => for_block
-                    .inner_mut()
-                    .iter_mut()
-                    .for_each(|child| self.build_fragment_tree_from_node(child, id)),
+                SpecialBlock::For(for_block) => {
+                    current_scopes.push(Scope::new());
+                    let var_id = self.declared_vars.generate_id();
+                    for scope in current_scopes.iter_mut() {
+                        scope.add(SmolStr::new(for_block.binding()), var_id);
+                    }
+                    for_block.inner_mut().iter_mut().for_each(|child| {
+                        self.build_fragment_tree_from_node(child, id, current_scopes)
+                    });
+                    let scope = current_scopes.pop().unwrap();
+                    self.declared_vars.insert_scope(id, scope);
+                }
             },
+
             _ => {}
         }
     }
@@ -185,6 +210,7 @@ impl<'a> Component<'a> {
 mod tests {
     use std::collections::HashMap;
 
+    use itertools::Itertools;
     use rslint_parser::SmolStr;
 
     use super::*;
@@ -235,5 +261,29 @@ mod tests {
     fn can_extract_closures_from_html() {
         let component = make_component("#button[@click={() => console.log(\"hello\")}]/button");
         insta::assert_debug_snapshot!(component.declared_vars());
+    }
+
+    #[test]
+    fn can_build_fragment_tree_with_scopes_of_for_blocks() {
+        let component = make_component("{#for i in [1, 2, 3]} #div hello /div {/for}");
+        insta::assert_debug_snapshot!(component.fragment_tree);
+    }
+
+    #[test]
+    fn can_extract_scopes() {
+        let component =
+            make_component("{#for i in [1, 2, 3]} hello {/for} {#for i in [1, 2, 3]} hello {/for}");
+        insta::assert_yaml_snapshot!(component.declared_vars().all_scopes().iter().sorted_by(|(a, _), (b, _)| a.cmp(b)).collect_vec(), {
+            "[][1].env" => insta::sorted_redaction()
+        });
+    }
+
+    #[test]
+    fn can_extract_nested_scopes() {
+        let component =
+            make_component("{#for i in [1, 2, 3]} {#for x in [2, 3, 4]} eee {/for} {/for}");
+        insta::assert_yaml_snapshot!(component.declared_vars().all_scopes().iter().sorted_by(|(a, _), (b, _)| a.cmp(b)).collect_vec(), {
+            "[][1].env" => insta::sorted_redaction()
+        });
     }
 }

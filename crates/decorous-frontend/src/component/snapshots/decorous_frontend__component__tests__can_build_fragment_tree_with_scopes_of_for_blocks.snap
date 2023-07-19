@@ -1,0 +1,91 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component.fragment_tree
+---
+[
+    Node {
+        metadata: FragmentMetadata {
+            id: 0,
+            parent_id: None,
+            location: Location {
+                offset: 0,
+                length: 44,
+                line: 1,
+                column: 1,
+            },
+            scope: None,
+        },
+        node_type: SpecialBlock(
+            For(
+                ForBlock {
+                    binding: "i",
+                    index: None,
+                    expr: EXPR_STMT@0..9
+                      ARRAY_EXPR@0..9
+                        L_BRACK@0..1 "["
+                        LITERAL@1..2
+                          NUMBER@1..2 "1"
+                        COMMA@2..3 ","
+                        WHITESPACE@3..4 " "
+                        LITERAL@4..5
+                          NUMBER@4..5 "2"
+                        COMMA@5..6 ","
+                        WHITESPACE@6..7 " "
+                        LITERAL@7..8
+                          NUMBER@7..8 "3"
+                        R_BRACK@8..9 "]"
+                    ,
+                    inner: [
+                        Node {
+                            metadata: FragmentMetadata {
+                                id: 1,
+                                parent_id: Some(
+                                    0,
+                                ),
+                                location: Location {
+                                    offset: 22,
+                                    length: 16,
+                                    line: 1,
+                                    column: 23,
+                                },
+                                scope: Some(
+                                    0,
+                                ),
+                            },
+                            node_type: Element(
+                                Element {
+                                    tag: "div",
+                                    attrs: [],
+                                    children: [
+                                        Node {
+                                            metadata: FragmentMetadata {
+                                                id: 2,
+                                                parent_id: Some(
+                                                    1,
+                                                ),
+                                                location: Location {
+                                                    offset: 27,
+                                                    length: 6,
+                                                    line: 1,
+                                                    column: 28,
+                                                },
+                                                scope: Some(
+                                                    0,
+                                                ),
+                                            },
+                                            node_type: Text(
+                                                Text(
+                                                    "hello",
+                                                ),
+                                            ),
+                                        },
+                                    ],
+                                },
+                            ),
+                        },
+                    ],
+                },
+            ),
+        ),
+    },
+]

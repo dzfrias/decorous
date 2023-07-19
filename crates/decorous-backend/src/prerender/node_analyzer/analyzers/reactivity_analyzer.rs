@@ -8,15 +8,15 @@ use rslint_parser::{SmolStr, SyntaxNode};
 
 use crate::prerender::node_analyzer::NodeAnalyzer;
 
-pub type IdVec<T> = Vec<(u32, T)>;
-pub type IdSlice<'a, T> = &'a [(u32, T)];
+pub type IdVec<'a, T> = Vec<(&'a FragmentMetadata, T)>;
+pub type IdSlice<'a, T> = &'a [(&'a FragmentMetadata, T)];
 
 #[derive(Debug, Clone)]
 pub struct ReactiveData<'ast> {
-    mustaches: IdVec<SyntaxNode>,
-    key_values: IdVec<Rc<[(SmolStr, SyntaxNode)]>>,
-    event_listeners: IdVec<Rc<[(SmolStr, SyntaxNode)]>>,
-    special_blocks: IdVec<&'ast SpecialBlock<'ast, FragmentMetadata>>,
+    mustaches: IdVec<'ast, SyntaxNode>,
+    key_values: IdVec<'ast, Rc<[(SmolStr, SyntaxNode)]>>,
+    event_listeners: IdVec<'ast, Rc<[(SmolStr, SyntaxNode)]>>,
+    special_blocks: IdVec<'ast, &'ast SpecialBlock<'ast, FragmentMetadata>>,
 }
 
 #[derive(Debug)]
@@ -63,23 +63,23 @@ impl<'a> NodeAnalyzer<'a> for ReactivityAnalyzer<'a> {
                 if !kvs.is_empty() {
                     self.reactive_data
                         .key_values
-                        .push((node.metadata().id(), kvs.into()));
+                        .push((node.metadata(), kvs.into()));
                 }
                 if !listeners.is_empty() {
                     self.reactive_data
                         .event_listeners
-                        .push((node.metadata().id(), listeners.into()));
+                        .push((node.metadata(), listeners.into()));
                 }
             }
             NodeType::Mustache(Mustache(js)) => {
                 self.reactive_data
                     .mustaches
-                    .push((node.metadata().id(), js.clone()));
+                    .push((node.metadata(), js.clone()));
             }
             NodeType::SpecialBlock(block) => self
                 .reactive_data
                 .special_blocks
-                .push((node.metadata().id(), block)),
+                .push((node.metadata(), block)),
             _ => {}
         };
     }
@@ -106,15 +106,19 @@ impl<'ast> ReactiveData<'ast> {
         self.event_listeners.as_ref()
     }
 
-    pub fn flat_listeners(&self) -> impl Iterator<Item = (&u32, &SmolStr, &SyntaxNode)> + '_ {
+    pub fn flat_listeners(
+        &self,
+    ) -> impl Iterator<Item = (&FragmentMetadata, &SmolStr, &SyntaxNode)> + '_ {
         self.event_listeners()
             .iter()
-            .flat_map(|(id, listeners)| listeners.iter().map(move |(ev, expr)| (id, ev, expr)))
+            .flat_map(|(meta, listeners)| listeners.iter().map(move |(ev, expr)| (*meta, ev, expr)))
     }
 
-    pub fn flat_kvs(&self) -> impl Iterator<Item = (&u32, &SmolStr, &SyntaxNode)> + '_ {
+    pub fn flat_kvs(
+        &self,
+    ) -> impl Iterator<Item = (&FragmentMetadata, &SmolStr, &SyntaxNode)> + '_ {
         self.key_values()
             .iter()
-            .flat_map(|(id, kvs)| kvs.iter().map(move |(k, expr)| (id, k, expr)))
+            .flat_map(|(meta, kvs)| kvs.iter().map(move |(k, expr)| (*meta, k, expr)))
     }
 }

@@ -1,0 +1,11 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: "component.declared_vars().all_scopes().iter().sorted_by(|(a, _), (b, _)|\n            a.cmp(b)).collect_vec()"
+---
+- - 0
+  - env:
+      i: 0
+- - 3
+  - env:
+      i: 1
+

@@ -7,4 +7,4 @@ members = [
 
 [workspace.dependencies]
 rslint_parser = "0.3.1"
-insta = "1.30.0"
+insta = { version = "1.30.0", features = ["yaml", "redactions"] }

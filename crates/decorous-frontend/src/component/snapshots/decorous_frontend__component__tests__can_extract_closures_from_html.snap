@@ -26,7 +26,11 @@ DeclaredVariables {
                     STRING@18..25 "\"hello\""
                   R_PAREN@25..26 ")"
             ,
-        }: 0,
+        }: (
+            0,
+            None,
+        ),
     },
+    scopes: {},
     current_id: 1,
 }

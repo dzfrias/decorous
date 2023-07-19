@@ -45,22 +45,36 @@ where
 fn render_hoists<'a>(component: &Component<'a>, analysis: &Analysis<'a>) -> String {
     let mut out = String::new();
 
-    for (id, if_block) in analysis.hoistables().if_blocks() {
-        let rendered = dom_render_fragment(
-            if_block.inner(),
-            Some(*id),
-            component.declared_vars(),
-            &id.to_string(),
-        );
-        out.push_str(&rendered);
-        if let Some(else_block) = if_block.else_block() {
-            let rendered = dom_render_fragment(
-                else_block,
-                Some(*id),
-                component.declared_vars(),
-                &format!("{id}_else"),
-            );
-            out.push_str(&rendered);
+    // TODO: For blocks here
+    for (meta, block) in analysis.reactive_data().special_blocks() {
+        match block {
+            SpecialBlock::If(if_block) => {
+                let rendered = dom_render_fragment(
+                    if_block.inner(),
+                    Some(meta.id()),
+                    component.declared_vars(),
+                    &meta.id().to_string(),
+                );
+                out.push_str(&rendered);
+                if let Some(else_block) = if_block.else_block() {
+                    let rendered = dom_render_fragment(
+                        else_block,
+                        Some(meta.id()),
+                        component.declared_vars(),
+                        &format!("{}_else", meta.id()),
+                    );
+                    out.push_str(&rendered);
+                }
+            }
+            SpecialBlock::For(for_block) => {
+                let rendered = dom_render_fragment(
+                    for_block.inner(),
+                    Some(meta.id()),
+                    component.declared_vars(),
+                    &meta.id().to_string(),
+                );
+                out.push_str(&rendered);
+            }
         }
     }
 
@@ -74,23 +88,23 @@ fn render_elements(analysis: &Analysis) -> String {
     // this allows us to manipulate its contents by reference. For special blocks like `if`
     // and `for`, this creates a marker point for where to insert the contents of the
     // special block, as they have to be generated at runtime by JavaScript.
-    for (id, _) in analysis.reactive_data().mustaches() {
-        let id = analysis.id_overwrites().try_get(*id);
+    for (meta, _) in analysis.reactive_data().mustaches() {
+        let id = analysis.id_overwrites().try_get(meta.id());
         write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),")
             .expect("string formatting should not fail");
     }
-    for (id, _) in analysis
+    for (meta, _) in analysis
         .reactive_data()
         .key_values()
         .iter()
         .chain(analysis.reactive_data().event_listeners())
     {
-        let id = analysis.id_overwrites().try_get(*id);
+        let id = analysis.id_overwrites().try_get(meta.id());
         write!(out, "\"{id}\":document.getElementById(\"{id}\"),")
             .expect("string formatting should not fail");
     }
-    for (id, block) in analysis.reactive_data().special_blocks() {
-        let id = analysis.id_overwrites().try_get(*id);
+    for (meta, block) in analysis.reactive_data().special_blocks() {
+        let id = analysis.id_overwrites().try_get(meta.id());
         match *block {
             SpecialBlock::If(block) => {
                 // This is an anchor point to attach the special block to
@@ -104,7 +118,12 @@ fn render_elements(analysis: &Analysis) -> String {
                     write!(out, "\"{id}_on\":true,").expect("string formatting should not fail");
                 }
             }
-            SpecialBlock::For(_block) => todo!("for block"),
+            SpecialBlock::For(_) => {
+                write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),")
+                    .expect("string formatting should not fail");
+                // {id}_block has the list of nodes of the for block
+                write!(out, "\"{id}_block\":[],").expect("string formatting should not fail");
+            }
         }
     }
     write!(out, "}}").expect("string formatting should not fail");
@@ -114,14 +133,15 @@ fn render_elements(analysis: &Analysis) -> String {
 fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
     let mut out = String::new();
 
-    for (arrow_expr, idx) in component.declared_vars().all_arrow_exprs() {
+    for (arrow_expr, (idx, scope_id)) in component.declared_vars().all_arrow_exprs() {
         writeln!(
             out,
             "let __closure{idx} = {};",
             codegen_utils::replace_assignments(
                 arrow_expr.syntax(),
                 &utils::get_unbound_refs(arrow_expr.syntax()),
-                component.declared_vars()
+                component.declared_vars(),
+                *scope_id
             )
         )
         .expect("string format should not fail");
@@ -132,6 +152,7 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
                 &node.node,
                 &utils::get_unbound_refs(&node.node),
                 component.declared_vars(),
+                None,
             );
             writeln!(out, "{}", replacement).expect("string formatting should not fail");
         } else {
@@ -139,12 +160,13 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
         }
     }
 
-    for (id, event, expr) in analysis.reactive_data().flat_listeners() {
-        let id = analysis.id_overwrites().try_get(*id);
+    for (meta, event, expr) in analysis.reactive_data().flat_listeners() {
+        let id = analysis.id_overwrites().try_get(meta.id());
         let replaced = codegen_utils::replace_assignments(
             expr,
             &utils::get_unbound_refs(expr),
             component.declared_vars(),
+            None,
         );
         writeln!(
             out,
@@ -153,11 +175,11 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
         .expect("writing to format string should not fail");
     }
 
-    let mut ctx = vec![Cow::Borrowed(""); component.declared_vars().len()];
+    let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
     for (name, idx) in component.declared_vars().all_vars() {
         ctx[*idx as usize] = Cow::Borrowed(name);
     }
-    for idx in component.declared_vars().all_arrow_exprs().values() {
+    for (idx, _) in component.declared_vars().all_arrow_exprs().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
     }
     writeln!(out, "return [{}];", ctx.join(",")).expect("string format should not fail");
@@ -168,21 +190,24 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
 fn render_update_body(component: &Component, analysis: &Analysis) -> String {
     let mut out = String::new();
 
-    for (idx, js) in analysis.reactive_data().mustaches() {
+    for (meta, js) in analysis.reactive_data().mustaches() {
         let unbound = utils::get_unbound_refs(js);
-        let dirty_indices = codegen_utils::calc_dirty(&unbound, component.declared_vars());
-        let replaced = codegen_utils::replace_namerefs(js, &unbound, component.declared_vars());
+        let dirty_indices =
+            codegen_utils::calc_dirty(&unbound, component.declared_vars(), meta.scope());
+        let replaced =
+            codegen_utils::replace_namerefs(js, &unbound, component.declared_vars(), meta.scope());
 
+        let id = meta.id();
         if dirty_indices.is_empty() {
-            writeln!(out, "elems[{idx}].data = {replaced}")
+            writeln!(out, "elems[{id}].data = {replaced}")
                 .expect("string formatting should not fail");
         } else {
-            writeln!(out, "if ({dirty_indices}) elems[{idx}].data = {replaced};",)
+            writeln!(out, "if ({dirty_indices}) elems[{id}].data = {replaced};",)
                 .expect("writing to string format should not fail");
         }
     }
 
-    for (id, special_block) in analysis.reactive_data().special_blocks() {
+    for (meta, special_block) in analysis.reactive_data().special_blocks() {
         match special_block {
             SpecialBlock::If(if_block) => {
                 let unbound = utils::get_unbound_refs(if_block.expr());
@@ -190,8 +215,10 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
                     if_block.expr(),
                     &unbound,
                     component.declared_vars(),
+                    meta.scope(),
                 );
 
+                let id = meta.id();
                 if if_block.else_block().is_some() {
                     writeln!(out, include_str!("./templates/if.js"), replaced = replaced, id = id)
                 } else {
@@ -202,15 +229,34 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
                 }
                 .expect("string formatting should not fail");
             }
-            SpecialBlock::For(_) => todo!(),
+            SpecialBlock::For(block) => {
+                let unbound = utils::get_unbound_refs(block.expr());
+                let replaced = codegen_utils::replace_namerefs(
+                    block.expr(),
+                    &unbound,
+                    component.declared_vars(),
+                    meta.scope(),
+                );
+                let var_idx = component
+                    .declared_vars()
+                    .all_scopes()
+                    .get(&meta.id())
+                    .expect("BUG: for block should have an assigned scope")
+                    .get(block.binding())
+                    .expect("BUG: for block's scope should contain the binding");
+                let id = meta.id();
+                writeln!(out, "({replaced}).forEach((v, i) => {{ if (i >= elems[\"{id}_block\"].length) {{ elems[\"{id}_block\"][i] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} ctx[{var_idx}] = v; elems[\"{id}_block\"][i].u(dirty) }})").expect("string format should not fail");
+            }
         }
     }
 
-    for (id, attr, js) in analysis.reactive_data().flat_kvs() {
-        let id = analysis.id_overwrites().try_get(*id);
+    for (meta, attr, js) in analysis.reactive_data().flat_kvs() {
+        let id = analysis.id_overwrites().try_get(meta.id());
         let unbound = utils::get_unbound_refs(js);
-        let dirty_indices = codegen_utils::calc_dirty(&unbound, component.declared_vars());
-        let replaced = codegen_utils::replace_namerefs(js, &unbound, component.declared_vars());
+        let dirty_indices =
+            codegen_utils::calc_dirty(&unbound, component.declared_vars(), meta.scope());
+        let replaced =
+            codegen_utils::replace_namerefs(js, &unbound, component.declared_vars(), meta.scope());
         if dirty_indices.is_empty() {
             writeln!(out, "elems[\"{id}\"].setAttribute(\"{attr}\", {replaced});")
                 .expect("string formatting should not fail");
@@ -292,5 +338,10 @@ mod tests {
             "---js let x = 0; --- {#if x == 0} wow {/if}",
             "---js let x = 0; --- {#if x == 0} wow {:else} wow!! {/if}"
         );
+    }
+
+    #[test]
+    fn can_render_for() {
+        test_render!("{#for i in [1, 2, 3]} {i} {/for}");
     }
 }
