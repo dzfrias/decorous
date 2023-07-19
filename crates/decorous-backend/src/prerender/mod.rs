@@ -6,7 +6,10 @@ mod node_analyzer;
 use decorous_frontend::{ast::SpecialBlock, utils, Component};
 use rslint_parser::AstNode;
 
-use crate::{codegen_utils, dom_render::render_fragment as dom_render_fragment};
+use crate::{
+    codegen_utils::{self, force_write, force_writeln},
+    dom_render::render_fragment as dom_render_fragment,
+};
 
 use self::{html_render::HtmlFmt, node_analyzer::analyzers::Analysis};
 
@@ -83,15 +86,14 @@ fn render_hoists<'a>(component: &Component<'a>, analysis: &Analysis<'a>) -> Stri
 
 fn render_elements(analysis: &Analysis) -> String {
     let mut out = String::new();
-    write!(out, "{{").expect("string formatting should not fail");
+    force_write!(out, "{{");
     // Replace mustache tags and special blocks with an empty text node. For mustache tags,
     // this allows us to manipulate its contents by reference. For special blocks like `if`
     // and `for`, this creates a marker point for where to insert the contents of the
     // special block, as they have to be generated at runtime by JavaScript.
     for (meta, _) in analysis.reactive_data().mustaches() {
         let id = analysis.id_overwrites().try_get(meta.id());
-        write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),")
-            .expect("string formatting should not fail");
+        force_write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),");
     }
     for (meta, _) in analysis
         .reactive_data()
@@ -100,33 +102,30 @@ fn render_elements(analysis: &Analysis) -> String {
         .chain(analysis.reactive_data().event_listeners())
     {
         let id = analysis.id_overwrites().try_get(meta.id());
-        write!(out, "\"{id}\":document.getElementById(\"{id}\"),")
-            .expect("string formatting should not fail");
+        force_write!(out, "\"{id}\":document.getElementById(\"{id}\"),");
     }
     for (meta, block) in analysis.reactive_data().special_blocks() {
         let id = analysis.id_overwrites().try_get(meta.id());
         match *block {
             SpecialBlock::If(block) => {
                 // This is an anchor point to attach the special block to
-                write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),")
-                    .expect("string formatting should not fail");
+                force_write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),");
                 // {id}_block is the actual fragment that's attached to the DOM
-                write!(out, "\"{id}_block\":null,").expect("string formatting should not fail");
+                force_write!(out, "\"{id}_block\":null,");
                 if block.else_block().is_some() {
                     // Designates if the if block is in it's main or else body. True if main, false
                     // if else
-                    write!(out, "\"{id}_on\":true,").expect("string formatting should not fail");
+                    force_write!(out, "\"{id}_on\":true,");
                 }
             }
             SpecialBlock::For(_) => {
-                write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),")
-                    .expect("string formatting should not fail");
+                force_write!(out, "\"{id}\":replace(document.getElementById(\"{id}\")),");
                 // {id}_block has the list of nodes of the for block
-                write!(out, "\"{id}_block\":[],").expect("string formatting should not fail");
+                force_write!(out, "\"{id}_block\":[],");
             }
         }
     }
-    write!(out, "}}").expect("string formatting should not fail");
+    force_write!(out, "}}");
     out
 }
 
@@ -134,7 +133,7 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
     let mut out = String::new();
 
     for (arrow_expr, (idx, scope_id)) in component.declared_vars().all_arrow_exprs() {
-        writeln!(
+        force_writeln!(
             out,
             "let __closure{idx} = {};",
             codegen_utils::replace_assignments(
@@ -143,8 +142,7 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
                 component.declared_vars(),
                 *scope_id
             )
-        )
-        .expect("string format should not fail");
+        );
     }
     for node in component.toplevel_nodes() {
         if node.substitute_assign_refs {
@@ -154,9 +152,9 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
                 component.declared_vars(),
                 None,
             );
-            writeln!(out, "{}", replacement).expect("string formatting should not fail");
+            force_writeln!(out, "{}", replacement);
         } else {
-            writeln!(out, "{}", node.node).expect("string formatting should not fail");
+            force_writeln!(out, "{}", node.node);
         }
     }
 
@@ -168,11 +166,10 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
             component.declared_vars(),
             None,
         );
-        writeln!(
+        force_writeln!(
             out,
             "elems[\"{id}\"].addEventListener(\"{event}\", {replaced});"
-        )
-        .expect("writing to format string should not fail");
+        );
     }
 
     let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
@@ -182,7 +179,7 @@ fn render_ctx_init(component: &Component, analysis: &Analysis) -> String {
     for (idx, _) in component.declared_vars().all_arrow_exprs().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
     }
-    writeln!(out, "return [{}];", ctx.join(",")).expect("string format should not fail");
+    force_writeln!(out, "return [{}];", ctx.join(","));
 
     out
 }
@@ -199,11 +196,9 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
 
         let id = meta.id();
         if dirty_indices.is_empty() {
-            writeln!(out, "elems[{id}].data = {replaced}")
-                .expect("string formatting should not fail");
+            force_writeln!(out, "elems[{id}].data = {replaced}");
         } else {
-            writeln!(out, "if ({dirty_indices}) elems[{id}].data = {replaced};",)
-                .expect("writing to string format should not fail");
+            force_writeln!(out, "if ({dirty_indices}) elems[{id}].data = {replaced};");
         }
     }
 
@@ -245,7 +240,7 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
                     .get(block.binding())
                     .expect("BUG: for block's scope should contain the binding");
                 let id = meta.id();
-                writeln!(out, "({replaced}).forEach((v, i) => {{ if (i >= elems[\"{id}_block\"].length) {{ elems[\"{id}_block\"][i] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} ctx[{var_idx}] = v; elems[\"{id}_block\"][i].u(dirty) }})").expect("string format should not fail");
+                force_writeln!(out, "({replaced}).forEach((v, i) => {{ if (i >= elems[\"{id}_block\"].length) {{ elems[\"{id}_block\"][i] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} ctx[{var_idx}] = v; elems[\"{id}_block\"][i].u(dirty) }})");
             }
         }
     }
@@ -258,14 +253,12 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
         let replaced =
             codegen_utils::replace_namerefs(js, &unbound, component.declared_vars(), meta.scope());
         if dirty_indices.is_empty() {
-            writeln!(out, "elems[\"{id}\"].setAttribute(\"{attr}\", {replaced});")
-                .expect("string formatting should not fail");
+            force_writeln!(out, "elems[\"{id}\"].setAttribute(\"{attr}\", {replaced});");
         } else {
-            writeln!(
+            force_writeln!(
                 out,
-                "if ({dirty_indices}) elems[\"{id}\"].setAttribute(\"{attr}\", {replaced});",
-            )
-            .expect("writing to string format should not fail");
+                "if ({dirty_indices}) elems[\"{id}\"].setAttribute(\"{attr}\", {replaced});"
+            );
         }
     }
 

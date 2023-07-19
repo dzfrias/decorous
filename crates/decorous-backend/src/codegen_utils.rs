@@ -11,6 +11,21 @@ use rslint_parser::{
 };
 use rslint_text_edit::{apply_indels, Indel, TextRange};
 
+macro_rules! force_writeln {
+    ($($arg:tt)*) => {
+        writeln!($($arg)*).expect("write should not fail")
+    };
+}
+
+macro_rules! force_write {
+    ($($arg:tt)*) => {
+        write!($($arg)*).expect("write should not fail")
+    };
+}
+
+pub(crate) use force_write;
+pub(crate) use force_writeln;
+
 #[derive(Debug, Clone)]
 pub struct DirtyIndices(pub(self) Vec<(usize, u8)>);
 
@@ -100,7 +115,7 @@ pub fn replace_namerefs(
             };
 
             node_text.clear();
-            write!(&mut node_text, "ctx[{idx}]").expect("should be able to write to string");
+            force_write!(&mut node_text, "ctx[{idx}]");
             return node_text;
         }
     }
