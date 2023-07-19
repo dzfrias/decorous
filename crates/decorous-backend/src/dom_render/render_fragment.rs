@@ -75,7 +75,7 @@ fn render_decl(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &Dec
                     writeln!(f, "e{id}.textContent = \"{}\";", collapse_whitespace(t))
                 }
                 Some(CollapsedChildrenType::Html(html)) => {
-                    writeln!(f, "e{id}.innerHtml = \"{html}\";")
+                    writeln!(f, "e{id}.innerHTML = \"{html}\";")
                 }
                 None => Ok(()),
             }
