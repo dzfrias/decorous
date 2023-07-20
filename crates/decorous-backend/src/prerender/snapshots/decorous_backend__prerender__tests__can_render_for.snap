@@ -37,7 +37,7 @@ dirty.fill(255);
 __update(dirty);
 dirty.fill(0);
 function __update(dirty) {
-([1, 2, 3]).forEach((v, i) => { if (i >= elems["0_block"].length) { elems["0_block"][i] = create_0_block(elems["0"].parentNode, elems["0"]); } ctx[0] = v; elems["0_block"][i].u(dirty) })
+let i = 0; for (const v of ([1, 2, 3])) { if (i >= elems["0_block"].length) { elems["0_block"][i] = create_0_block(elems["0"].parentNode, elems["0"]); } ctx[0] = v; elems["0_block"][i].u(dirty); i += 1; } elems["0_block"].slice(i).forEach((b) => b.d()); elems["9_block"].length = i;
 }
 function __schedule_update(ctx_idx, val) {
 ctx[ctx_idx] = val;

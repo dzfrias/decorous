@@ -28,10 +28,11 @@ e1.parentNode.removeChild(e1);
 
 mount(target, e0_anchor, anchor);
 let e0_blocks = [];
-([1, 2, 3]).forEach((v, i) => { ctx[0] = v; e0_blocks[i] = create_0_block(e0_anchor.parentNode, e0_anchor); });
+let i = 0;
+for (const v of ([1, 2, 3])) { ctx[0] = v; e0_blocks[i] = create_0_block(e0_anchor.parentNode, e0_anchor); i += 1; }
 return {
 u(dirty) {
-([1, 2, 3]).forEach((v, i) => { if (i >= e0_blocks.length) { e0_blocks[i] = create_0_block(e0_anchor.parentNode, e0_anchor) }; ctx[0] = v; e0_blocks[i].u(dirty); });
+let i = 0; for (const v of ([1, 2, 3])) { if (i >= e0_blocks.length) { e0_blocks[i] = create_0_block(e0_anchor.parentNode, e0_anchor) }; ctx[0] = v; e0_blocks[i].u(dirty); i += 1; } e0_blocks.slice(i).forEach(b => b.d()); e0_blocks.length = i;
 },
 d() {
 for (let i = 0; i < e0_blocks.length; i++) { e0_blocks[i].d() }

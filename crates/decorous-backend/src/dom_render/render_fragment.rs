@@ -236,7 +236,7 @@ fn render_mount(
                 .unwrap();
             force_writeln!(f, "mount(target, e{id}_anchor, anchor);");
             force_writeln!(f,
-            "let e{id}_blocks = [];\n({expr}).forEach((v, i) => {{ ctx[{var_idx}] = v; e{id}_blocks[i] = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); }});")
+            "let e{id}_blocks = [];\nlet i = 0;\nfor (const v of ({expr})) {{ ctx[{var_idx}] = v; e{id}_blocks[i] = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); i += 1; }}")
         }
 
         _ => {
@@ -321,7 +321,7 @@ fn render_update(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &D
                 node.metadata().scope(),
             );
             force_writeln!(f,
-            "({expr}).forEach((v, i) => {{ if (i >= e{id}_blocks.length) {{ e{id}_blocks[i] = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor) }}; ctx[{var_idx}] = v; e{id}_blocks[i].u(dirty); }});");
+            "let i = 0; for (const v of ({expr})) {{ if (i >= e{id}_blocks.length) {{ e{id}_blocks[i] = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor) }}; ctx[{var_idx}] = v; e{id}_blocks[i].u(dirty); i += 1; }} e{id}_blocks.slice(i).forEach(b => b.d()); e{id}_blocks.length = i;");
         }
 
         _ => {}
