@@ -1,0 +1,19 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component.hoist()
+---
+[
+    VAR_DECL@1..10
+      IDENT@1..4 "let"
+      WHITESPACE@4..5 " "
+      DECLARATOR@5..10
+        SINGLE_PATTERN@5..6
+          NAME@5..6
+            IDENT@5..6 "x"
+        WHITESPACE@6..7 " "
+        EQ@7..8 "="
+        WHITESPACE@8..9 " "
+        LITERAL@9..10
+          NUMBER@9..10 "0"
+    ,
+]

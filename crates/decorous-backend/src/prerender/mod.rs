@@ -48,7 +48,10 @@ where
 fn render_hoists<'a>(component: &Component<'a>, analysis: &Analysis<'a>) -> String {
     let mut out = String::new();
 
-    // TODO: For blocks here
+    for hoist in component.hoist() {
+        force_writeln!(out, "{hoist}");
+    }
+
     for (meta, block) in analysis.reactive_data().special_blocks() {
         match block {
             SpecialBlock::If(if_block) => {
@@ -196,7 +199,7 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
 
         let id = meta.id();
         if dirty_indices.is_empty() {
-            force_writeln!(out, "elems[{id}].data = {replaced}");
+            force_writeln!(out, "if (initial) elems[{id}].data = {replaced}");
         } else {
             force_writeln!(out, "if ({dirty_indices}) elems[{id}].data = {replaced};");
         }
@@ -253,7 +256,10 @@ fn render_update_body(component: &Component, analysis: &Analysis) -> String {
         let replaced =
             codegen_utils::replace_namerefs(js, &unbound, component.declared_vars(), meta.scope());
         if dirty_indices.is_empty() {
-            force_writeln!(out, "elems[\"{id}\"].setAttribute(\"{attr}\", {replaced});");
+            force_writeln!(
+                out,
+                "if (initial) elems[\"{id}\"].setAttribute(\"{attr}\", {replaced});"
+            );
         } else {
             force_writeln!(
                 out,

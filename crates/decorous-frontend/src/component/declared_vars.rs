@@ -79,7 +79,15 @@ impl DeclaredVariables {
         self.len() == 0
     }
 
-    pub fn generate_id(&mut self) -> u32 {
+    pub fn remove_var<K>(&mut self, var: &K) -> bool
+    where
+        SmolStr: Borrow<K>,
+        K: Hash + Eq + ?Sized,
+    {
+        self.vars.remove(var).is_some()
+    }
+
+    pub(crate) fn generate_id(&mut self) -> u32 {
         let old = self.current_id;
         self.current_id += 1;
         old

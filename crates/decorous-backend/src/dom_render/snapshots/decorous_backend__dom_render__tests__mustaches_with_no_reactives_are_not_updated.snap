@@ -2,33 +2,32 @@
 source: crates/decorous-backend/src/dom_render/mod.rs
 expression: "String::from_utf8(out).unwrap()"
 ---
-const dirty = new Uint8Array(new ArrayBuffer(1));
+const dirty = new Uint8Array(new ArrayBuffer(0));
 function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
-const e0 = document.createElement("p");
-const e1 = document.createTextNode(`${ctx[1]}hello`);
-const e2 = document.createElement("button");
-e2.textContent = "Click me";
-e2.addEventListener("click", ctx[0])
+const e0 = document.createTextNode(1 + 1);
+const e1 = document.createTextNode(" ");
+const e2 = document.createElement("p");
+e2.textContent = "Woah";
+e2.setAttribute("class", 11);
 mount(target, e0, anchor);
-e0.appendChild(e1);
+mount(target, e1, anchor);
 mount(target, e2, anchor);
 return {
 u(dirty) {
-if (dirty[0] & 2) e1.data = `${ctx[1]}hello`;
 },
 d() {
 e0.parentNode.removeChild(e0);
+e1.parentNode.removeChild(e1);
 e2.parentNode.removeChild(e2);
 }
 };
 }
 function __init_ctx() {
-let x = 3;
-function remake_x() { __schedule_update(1, x = 44); }
-return [remake_x,x];
+
+return [];
 }
 const ctx = __init_ctx();
 const fragment = create_main_block(document.getElementById("app"));

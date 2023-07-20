@@ -186,4 +186,9 @@ mod tests {
     fn closures_with_scoped_var_as_part_of_body_take_the_scoped_var_as_argument() {
         test_render!("{#for i in [1, 2, 3]} #button[@click={() => console.log(i)}]:Click {/for}");
     }
+
+    #[test]
+    fn mustaches_with_no_reactives_are_not_updated() {
+        test_render!("{1 + 1} #p[class={11}]:Woah");
+    }
 }

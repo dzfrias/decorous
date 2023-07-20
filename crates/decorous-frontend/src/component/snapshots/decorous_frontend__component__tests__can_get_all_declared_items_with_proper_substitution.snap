@@ -21,7 +21,7 @@ expression: component.toplevel_nodes()
         substitute_assign_refs: true,
     },
     ToplevelNodeData {
-        node: FN_DECL@12..42
+        node: FN_DECL@12..39
           FUNCTION_KW@12..20 "function"
           WHITESPACE@20..21 " "
           NAME@21..25
@@ -30,31 +30,29 @@ expression: component.toplevel_nodes()
             L_PAREN@25..26 "("
             R_PAREN@26..27 ")"
           WHITESPACE@27..28 " "
-          BLOCK_STMT@28..42
+          BLOCK_STMT@28..39
             L_CURLY@28..29 "{"
             WHITESPACE@29..30 " "
-            RETURN_STMT@30..40
-              RETURN_KW@30..36 "return"
-              WHITESPACE@36..37 " "
-              LITERAL@37..39
-                NUMBER@37..39 "33"
-              SEMICOLON@39..40 ";"
-            WHITESPACE@40..41 " "
-            R_CURLY@41..42 "}"
+            EXPR_STMT@30..37
+              ASSIGN_EXPR@30..36
+                NAME_REF@30..31
+                  IDENT@30..31 "x"
+                WHITESPACE@31..32 " "
+                EQ@32..33 "="
+                WHITESPACE@33..34 " "
+                LITERAL@34..36
+                  NUMBER@34..36 "44"
+              SEMICOLON@36..37 ";"
+            WHITESPACE@37..38 " "
+            R_CURLY@38..39 "}"
         ,
         substitute_assign_refs: true,
     },
     ToplevelNodeData {
-        node: EMPTY_STMT@42..43
-          SEMICOLON@42..43 ";"
-        ,
-        substitute_assign_refs: false,
-    },
-    ToplevelNodeData {
-        node: EXPR_STMT@44..53
-          NAME_REF@44..52
-            IDENT@44..52 "variable"
-          SEMICOLON@52..53 ";"
+        node: EXPR_STMT@40..49
+          NAME_REF@40..48
+            IDENT@40..48 "variable"
+          SEMICOLON@48..49 ";"
         ,
         substitute_assign_refs: false,
     },

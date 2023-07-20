@@ -18,7 +18,6 @@ mount(target, e1, anchor);
 mount(target, e2, anchor);
 return {
 u(dirty) {
-if (true) e1.data = ctx[0];
 },
 d() {
 e1.parentNode.removeChild(e1);
@@ -34,9 +33,9 @@ return [undefined];
 const ctx = __init_ctx();
 let updating = false;
 dirty.fill(255);
-__update(dirty);
+__update(dirty, true);
 dirty.fill(0);
-function __update(dirty) {
+function __update(dirty, initial) {
 let i = 0; for (const v of ([1, 2, 3])) { if (i >= elems["0_block"].length) { elems["0_block"][i] = create_0_block(elems["0"].parentNode, elems["0"]); } ctx[0] = v; elems["0_block"][i].u(dirty); i += 1; } elems["0_block"].slice(i).forEach((b) => b.d()); elems["9_block"].length = i;
 }
 function __schedule_update(ctx_idx, val) {
@@ -45,7 +44,7 @@ dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
 if (updating) return;
 updating = true;
 Promise.resolve().then(() => {
-__update(dirty);
+__update(dirty, false);
 updating = false;
 dirty.fill(0);
 });

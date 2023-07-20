@@ -1,19 +1,21 @@
 mod declared_vars;
 mod fragment;
 
+use std::mem;
+
 use rslint_parser::{
     ast::{ArrowExpr, FnDecl, ImportDecl, VarDecl},
-    SmolStr, SyntaxNode, SyntaxNodeExt,
+    AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
 };
 
 use crate::{
-    ast::{Attribute, DecorousAst, Location, Node, NodeIter, NodeType, SpecialBlock},
+    ast::{
+        Attribute, AttributeValue, DecorousAst, Location, Node, NodeIter, NodeType, SpecialBlock,
+    },
     utils,
 };
-pub use declared_vars::DeclaredVariables;
+pub use declared_vars::{DeclaredVariables, Scope};
 pub use fragment::FragmentMetadata;
-
-use self::declared_vars::Scope;
 
 #[derive(Debug)]
 pub struct Component<'a> {
@@ -21,6 +23,8 @@ pub struct Component<'a> {
     declared_vars: DeclaredVariables,
     toplevel_nodes: Vec<ToplevelNodeData>,
     hoist: Vec<SyntaxNode>,
+
+    referenced: Vec<SmolStr>,
 
     current_id: u32,
 }
@@ -39,6 +43,7 @@ impl<'a> Component<'a> {
             declared_vars: DeclaredVariables::new(),
             toplevel_nodes: vec![],
             hoist: vec![],
+            referenced: vec![],
             current_id: 0,
         };
         c.compute(ast);
@@ -70,27 +75,43 @@ impl<'a> Component<'a> {
 impl<'a> Component<'a> {
     fn compute(&mut self, ast: DecorousAst<'a>) {
         let (nodes, script, _css) = ast.into_components();
+        let mut declared = vec![];
         if let Some(script) = script {
-            self.extract_toplevel_data(script);
+            let all_declared_vars = self.extract_toplevel_data(script);
+            declared.extend(all_declared_vars);
         }
-        self.build_fragment_tree(nodes);
+        self.build_fragment_tree(nodes, declared);
     }
 
-    fn extract_toplevel_data(&mut self, script: SyntaxNode) {
+    fn extract_toplevel_data(&mut self, script: SyntaxNode) -> Vec<(VarDecl, Vec<SmolStr>)> {
+        let mut all_declared_vars = vec![];
         // Only go to top level assignments
         for child in script.children() {
+            self.apply_refs(&child);
+
             if child.is::<VarDecl>() {
                 let var_decl = child.to::<VarDecl>();
-                for pattern in var_decl.declared().filter_map(|decl| decl.pattern()) {
-                    let idents = utils::get_idents_from_pattern(pattern);
+                let mut declared = vec![];
+                for decl in var_decl.declared() {
+                    let idents = utils::get_idents_from_pattern(decl.pattern().unwrap());
+                    if let Some(val) = decl.value() {
+                        let len_ref = self.referenced.len();
+                        self.apply_refs(val.syntax());
+                        // If there were any mutated variables, mark this variable as referenced.
+                        if len_ref != self.referenced.len() {
+                            self.referenced.extend(idents.clone());
+                        }
+                    }
                     for ident in idents {
-                        self.declared_vars.insert_var(ident);
+                        declared.push(ident);
                     }
                 }
                 self.toplevel_nodes.push(ToplevelNodeData {
                     node: child,
                     substitute_assign_refs: true,
                 });
+
+                all_declared_vars.push((var_decl, declared));
             } else if child.is::<FnDecl>() {
                 let fn_decl = child.to::<FnDecl>();
                 let Some(ident) = fn_decl.name().and_then(|name| name.ident_token()) else {
@@ -111,11 +132,18 @@ impl<'a> Component<'a> {
                 });
             }
         }
+
+        all_declared_vars
     }
 
-    fn build_fragment_tree(&mut self, ast: Vec<Node<'a, Location>>) {
+    fn build_fragment_tree(
+        &mut self,
+        ast: Vec<Node<'a, Location>>,
+        all_declared_vars: Vec<(VarDecl, Vec<SmolStr>)>,
+    ) {
         let mut fragment_tree = vec![];
 
+        let mut current_scopes = vec![];
         for node in ast {
             let mut current_scope_id = None;
             let mut node = node.cast_meta(&mut |node| {
@@ -133,12 +161,12 @@ impl<'a> Component<'a> {
             });
 
             let id = node.metadata().id();
-            let mut current_scopes = vec![];
             self.build_fragment_tree_from_node(&mut node, id, &mut current_scopes);
             node.metadata_mut().set_parent_id(None);
 
             fragment_tree.push(node);
         }
+        self.handle_unreferenced_vars(all_declared_vars);
         self.fragment_tree = fragment_tree;
     }
 
@@ -155,13 +183,21 @@ impl<'a> Component<'a> {
         match node.node_type_mut() {
             NodeType::Element(elem) => {
                 for attr in elem.attrs() {
-                    if let Attribute::EventHandler(handler) = attr {
-                        if let Some(first_child) = handler.expr().first_child() {
-                            if first_child.is::<ArrowExpr>() {
-                                self.declared_vars
-                                    .insert_arrow_expr(first_child.to(), scope);
+                    match attr {
+                        Attribute::EventHandler(handler) => {
+                            if let Some(arrow_expr) = handler
+                                .expr()
+                                .first_child()
+                                .and_then(|child| child.try_to::<ArrowExpr>())
+                            {
+                                self.apply_refs(&arrow_expr.syntax());
+                                self.declared_vars.insert_arrow_expr(arrow_expr, scope);
                             }
                         }
+                        Attribute::KeyValue(_, Some(AttributeValue::JavaScript(js))) => {
+                            self.apply_refs(js)
+                        }
+                        _ => continue,
                     }
                 }
 
@@ -170,11 +206,16 @@ impl<'a> Component<'a> {
                 });
             }
 
+            NodeType::Mustache(js) => {
+                self.apply_refs(js);
+            }
+
             NodeType::SpecialBlock(block) => match block {
                 SpecialBlock::If(if_block) => {
                     if_block.inner_mut().iter_mut().for_each(|child| {
                         self.build_fragment_tree_from_node(child, id, current_scopes)
                     });
+                    self.apply_refs(if_block.expr());
                     if let Some(else_block) = if_block.else_block_mut() {
                         for n in else_block.iter_mut() {
                             self.build_fragment_tree_from_node(n, id, current_scopes);
@@ -190,12 +231,44 @@ impl<'a> Component<'a> {
                     for_block.inner_mut().iter_mut().for_each(|child| {
                         self.build_fragment_tree_from_node(child, id, current_scopes)
                     });
+                    self.apply_refs(for_block.expr());
                     let scope = current_scopes.pop().unwrap();
                     self.declared_vars.insert_scope(id, scope);
                 }
             },
 
             _ => {}
+        }
+    }
+
+    fn handle_unreferenced_vars(&mut self, all_declared_vars: Vec<(VarDecl, Vec<SmolStr>)>) {
+        let ref_vars = mem::take(&mut self.referenced);
+        for (decl, declared) in all_declared_vars {
+            if declared.iter().any(|v| ref_vars.contains(v)) {
+                for declared in declared {
+                    self.declared_vars.insert_var(declared);
+                }
+                continue;
+            }
+
+            self.hoist.push(decl.syntax().clone());
+            let pos = self
+                .toplevel_nodes
+                .iter()
+                .position(|node| &node.node == decl.syntax())
+                .expect("all var decls should have a corresponding toplevel node");
+            self.toplevel_nodes.remove(pos);
+        }
+    }
+
+    fn apply_refs(&mut self, syntax_node: &SyntaxNode) {
+        for unbound in utils::get_unbound_refs(syntax_node) {
+            let tok = unbound.ident_token().unwrap();
+            let ident = tok.text();
+            if !utils::is_from_assignment(&unbound) {
+                continue;
+            }
+            self.referenced.push(ident.clone());
         }
     }
 
@@ -223,14 +296,16 @@ mod tests {
 
     #[test]
     fn can_extract_toplevel_variables() {
-        let component =
-            make_component("---js let x, z = (3, 2); const y = 55; const [...l] = thing---");
+        let component = make_component(
+            "---js let x, z = (3, 2); let y = 55; let [...l] = thing--- #button[@click={() => { x = 0; z = 0; l = 0; y = 0; }}]:Click me",
+        );
+        dbg!(component.hoist());
         assert_eq!(
             &(&[
-                (SmolStr::from("x"), 0),
-                (SmolStr::from("z"), 1),
-                (SmolStr::from("y"), 2),
-                (SmolStr::from("l"), 3)
+                (SmolStr::from("x"), 1),
+                (SmolStr::from("z"), 2),
+                (SmolStr::from("y"), 3),
+                (SmolStr::from("l"), 4)
             ]
             .into_iter()
             .collect::<HashMap<SmolStr, u32>>()),
@@ -247,13 +322,13 @@ mod tests {
     #[test]
     fn can_get_all_declared_items_with_proper_substitution() {
         let component =
-            make_component("---js let x = 3; function func() { return 33; }; variable; ---");
+            make_component("---js let x = 3; function func() { x = 44; } variable; ---");
         insta::assert_debug_snapshot!(component.toplevel_nodes());
     }
 
     #[test]
     fn hoists_imports() {
-        let component = make_component("---js let x = 3; let y = 4; import data from \"data\"---");
+        let component = make_component("---js import data from \"data\"---");
         insta::assert_debug_snapshot!(component.hoist());
     }
 
@@ -285,5 +360,17 @@ mod tests {
         insta::assert_yaml_snapshot!(component.declared_vars().all_scopes().iter().sorted_by(|(a, _), (b, _)| a.cmp(b)).collect_vec(), {
             "[][1].env" => insta::sorted_redaction()
         });
+    }
+
+    #[test]
+    fn does_not_hoist_var_if_mutated_in_script() {
+        let component = make_component("---js let x = 0; let mutate_x = () => x = 4;---");
+        assert!(component.hoist().is_empty());
+    }
+
+    #[test]
+    fn hoists_var_if_never_mutated() {
+        let component = make_component("---js let x = 0--- {x}");
+        insta::assert_debug_snapshot!(component.hoist());
     }
 }

@@ -264,7 +264,9 @@ fn render_update(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &D
                 declared,
                 node.metadata().scope(),
             );
-            force_writeln!(f, "if ({dirty_indices}) e{id}.data = {new_text};");
+            if !dirty_indices.is_empty() {
+                force_writeln!(f, "if ({dirty_indices}) e{id}.data = {new_text};");
+            }
         }
 
         NodeType::Element(elem) => {
@@ -282,10 +284,12 @@ fn render_update(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &D
                     declared,
                     node.metadata().scope(),
                 );
-                force_writeln!(
-                    f,
-                    "if ({dirty_indices}) e{id}.setAttribute(\"{key}\", {replacement});"
-                );
+                if !dirty_indices.is_empty() {
+                    force_writeln!(
+                        f,
+                        "if ({dirty_indices}) e{id}.setAttribute(\"{key}\", {replacement});"
+                    );
+                }
             }
         }
 

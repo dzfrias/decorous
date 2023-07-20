@@ -1,7 +1,7 @@
 use rslint_parser::{
     ast::{
-        ArrowExpr, ArrowExprParams, BlockStmt, Decl, Expr, ExprOrBlock, ExprStmt, NameRef,
-        ObjectPatternProp, Pattern, Stmt,
+        ArrowExpr, ArrowExprParams, AssignExpr, BlockStmt, Decl, Expr, ExprOrBlock, ExprStmt,
+        NameRef, ObjectPatternProp, Pattern, Stmt,
     },
     AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
 };
@@ -47,6 +47,63 @@ pub fn get_unbound_refs(syntax_node: &SyntaxNode) -> Vec<NameRef> {
         });
     }
     all
+}
+
+pub fn is_from_assignment(nref: &NameRef) -> bool {
+    nref.syntax()
+        .parent()
+        .and_then(|parent| parent.try_to::<AssignExpr>())
+        .is_some()
+}
+
+/// Gets the identifiers from a pattern. This is useful for complex assignments.
+pub fn get_idents_from_pattern(pat: Pattern) -> Vec<SmolStr> {
+    let mut idents = vec![];
+
+    match pat {
+        Pattern::SinglePattern(single) => {
+            if let Some(ident) = single
+                .name()
+                .and_then(|name| name.ident_token())
+                .map(|ident| ident.text().clone())
+            {
+                idents.push(ident);
+            }
+        }
+        Pattern::ArrayPattern(array) => {
+            idents.extend(array.elements().flat_map(get_idents_from_pattern));
+        }
+        Pattern::RestPattern(rest) if rest.pat().is_some() => {
+            idents.extend(get_idents_from_pattern(rest.pat().unwrap()));
+        }
+        Pattern::AssignPattern(assign) if assign.key().is_some() => {
+            idents.extend(get_idents_from_pattern(assign.key().unwrap()));
+        }
+        Pattern::ObjectPattern(obj) => {
+            for elem in obj.elements() {
+                let elem_idents = match elem {
+                    ObjectPatternProp::AssignPattern(assign) => {
+                        get_idents_from_pattern(assign.into())
+                    }
+                    ObjectPatternProp::KeyValuePattern(key_value) => {
+                        if let Some(value) = key_value.value() {
+                            get_idents_from_pattern(value)
+                        } else {
+                            continue;
+                        }
+                    }
+                    ObjectPatternProp::RestPattern(rest) => get_idents_from_pattern(rest.into()),
+                    ObjectPatternProp::SinglePattern(single) => {
+                        get_idents_from_pattern(single.into())
+                    }
+                };
+                idents.extend(elem_idents);
+            }
+        }
+        _ => {}
+    }
+
+    idents
 }
 
 fn get_unbound_refs_from_arrow_expr(
@@ -185,56 +242,6 @@ fn get_unbound_refs_from_block(
             }),
         }
     }
-}
-
-/// Gets the identifiers from a pattern. This is useful for complex assignments.
-pub fn get_idents_from_pattern(pat: Pattern) -> Vec<SmolStr> {
-    let mut idents = vec![];
-
-    match pat {
-        Pattern::SinglePattern(single) => {
-            if let Some(ident) = single
-                .name()
-                .and_then(|name| name.ident_token())
-                .map(|ident| ident.text().clone())
-            {
-                idents.push(ident);
-            }
-        }
-        Pattern::ArrayPattern(array) => {
-            idents.extend(array.elements().flat_map(get_idents_from_pattern));
-        }
-        Pattern::RestPattern(rest) if rest.pat().is_some() => {
-            idents.extend(get_idents_from_pattern(rest.pat().unwrap()));
-        }
-        Pattern::AssignPattern(assign) if assign.key().is_some() => {
-            idents.extend(get_idents_from_pattern(assign.key().unwrap()));
-        }
-        Pattern::ObjectPattern(obj) => {
-            for elem in obj.elements() {
-                let elem_idents = match elem {
-                    ObjectPatternProp::AssignPattern(assign) => {
-                        get_idents_from_pattern(assign.into())
-                    }
-                    ObjectPatternProp::KeyValuePattern(key_value) => {
-                        if let Some(value) = key_value.value() {
-                            get_idents_from_pattern(value)
-                        } else {
-                            continue;
-                        }
-                    }
-                    ObjectPatternProp::RestPattern(rest) => get_idents_from_pattern(rest.into()),
-                    ObjectPatternProp::SinglePattern(single) => {
-                        get_idents_from_pattern(single.into())
-                    }
-                };
-                idents.extend(elem_idents);
-            }
-        }
-        _ => {}
-    }
-
-    idents
 }
 
 #[cfg(test)]

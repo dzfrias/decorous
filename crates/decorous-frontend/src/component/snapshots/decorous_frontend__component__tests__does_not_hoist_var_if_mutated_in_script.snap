@@ -1,0 +1,5 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component.hoist()
+---
+[]

@@ -18,7 +18,6 @@ mount(target, e1, anchor);
 mount(target, e2, anchor);
 return {
 u(dirty) {
-if (true) e1.data = ctx[0];
 },
 d() {
 e1.parentNode.removeChild(e1);
