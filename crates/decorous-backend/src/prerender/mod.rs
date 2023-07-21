@@ -22,11 +22,6 @@ enum WriteStatus {
 
 impl WriteStatus {
     #[must_use]
-    fn wrote_nothing(&self) -> bool {
-        matches!(self, Self::Nothing)
-    }
-
-    #[must_use]
     fn wrote_something(&self) -> bool {
         matches!(self, Self::Something)
     }
@@ -136,6 +131,7 @@ fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result
                 .ends_with("};\n")
                 .build(),
         )?
+        // For mustache tags, replace the marked tags (<span>s with id's) with text nodes.
         .write_all_trailing(
             analysis
                 .reactive_data()
@@ -147,6 +143,7 @@ fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result
                 }),
             ",",
         )?
+        // For reactive key-value attributes, just get element by it's generated id
         .write_all_trailing(
             analysis
                 .reactive_data()
@@ -164,6 +161,9 @@ fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result
         let id = analysis.id_overwrites().try_get(meta.id());
         match *block {
             SpecialBlock::If(block) => {
+                // {id} acts as an anchor for the eventual id_block that will be attached to the
+                // DOM. It's an empty text node. {id}_block is the reference to the DOM rendered if
+                // block. It is null when the condition is false (or the else block).
                 write!(
                     formatter,
                     "\"{id}\":replace(document.getElementById(\"{id}\")),\"{id}_block\":null,"
@@ -175,6 +175,8 @@ fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result
                 }
             }
             SpecialBlock::For(_) => {
+                // Much like the if block, {id} acts as the anchor point for all the rendered
+                // {#for} block children on the DOM. {id}_block holds these children
                 write!(
                     formatter,
                     "\"{id}\":replace(document.getElementById(\"{id}\")),\"{id}_block\":[],"
@@ -210,6 +212,8 @@ fn render_ctx_init<T: io::Write>(
             .build(),
     )?;
 
+    // Write anonymous functions. Arrow exprs are pulled from the template (they're usually from
+    // event listeners).
     formatter.write_all_trailing(
         component
             .declared_vars()
