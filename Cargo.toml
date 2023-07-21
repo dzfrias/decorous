@@ -3,6 +3,7 @@ members = [
     "crates/decorous-frontend",
     "crates/decorous-backend",
     "crates/cli",
+    "crates/superfmt",
 ]
 
 [workspace.dependencies]

@@ -4,17 +4,16 @@ expression: "format!(\"{}\\n---\\n{}\", String :: from_utf8(js_out).unwrap(), St
 ---
 const dirty = new Uint8Array(new ArrayBuffer(1));
 function replace(node) {
-const text = document.createTextNode("");
-node.replaceWith(text);
-return text;
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
 }
-
 const elems = {"2":replace(document.getElementById("2")),"7":replace(document.getElementById("7")),"4":document.getElementById("4"),};
 function __init_ctx() {
-let __closure0 = () => __schedule_update(1, x = 444);
-let x = 3;
-elems["4"].addEventListener("click", () => __schedule_update(1, x = 444));
-return [__closure0,x];
+  let __closure0 = () => __schedule_update(1, x = 444);
+  let x = 3;
+  elems["4"].addEventListener("click", () => __schedule_update(1, x = 444));
+  return [__closure0,x];
 }
 const ctx = __init_ctx();
 let updating = false;
@@ -22,19 +21,19 @@ dirty.fill(255);
 __update(dirty, true);
 dirty.fill(0);
 function __update(dirty, initial) {
-if (dirty[0] & 2) elems[2].data = ctx[1];
-if (dirty[0] & 2) elems[7].data = ctx[1];
+  if (dirty[0] & 2) elems[2].data = ctx[1];
+  if (dirty[0] & 2) elems[7].data = ctx[1];
 }
 function __schedule_update(ctx_idx, val) {
-ctx[ctx_idx] = val;
-dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
-if (updating) return;
-updating = true;
-Promise.resolve().then(() => {
-__update(dirty, false);
-updating = false;
-dirty.fill(0);
-});
+  ctx[ctx_idx] = val;
+  dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
+  if (updating) return;
+  updating = true;
+  Promise.resolve().then(() => {
+    __update(dirty, false);
+    updating = false;
+    dirty.fill(0);
+  });
 }
 
 ---
