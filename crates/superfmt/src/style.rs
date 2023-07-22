@@ -39,13 +39,21 @@ pub enum Color {
 bitflags! {
     #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct Modifiers: u32 {
+        #[allow(clippy::unreadable_literal)]
         const BOLD = 0b00000001;
+        #[allow(clippy::unreadable_literal)]
         const ITALIC = 0b00000010;
+        #[allow(clippy::unreadable_literal)]
         const DIMMED = 0b00000100;
+        #[allow(clippy::unreadable_literal)]
         const UNDERLINED = 0b00001000;
+        #[allow(clippy::unreadable_literal)]
         const BLINKING = 0b00010000;
+        #[allow(clippy::unreadable_literal)]
         const REVERSED = 0b00100000;
+        #[allow(clippy::unreadable_literal)]
         const HIDDEN = 0b01000000;
+        #[allow(clippy::unreadable_literal)]
         const STRUCKTHROUGH = 0b10000000;
     }
 }
@@ -171,15 +179,15 @@ impl<'a> From<Color> for Cow<'a, str> {
 
 impl Modifiers {
     fn try_to_ansi_code(&self) -> Result<u8, u32> {
-        let val = match self {
-            &Self::BOLD => 1,
-            &Self::DIMMED => 2,
-            &Self::ITALIC => 3,
-            &Self::UNDERLINED => 4,
-            &Self::BLINKING => 5,
-            &Self::REVERSED => 7,
-            &Self::HIDDEN => 8,
-            &Self::STRUCKTHROUGH => 9,
+        let val = match *self {
+            Self::BOLD => 1,
+            Self::DIMMED => 2,
+            Self::ITALIC => 3,
+            Self::UNDERLINED => 4,
+            Self::BLINKING => 5,
+            Self::REVERSED => 7,
+            Self::HIDDEN => 8,
+            Self::STRUCKTHROUGH => 9,
 
             _ => return Err(self.bits()),
         };
@@ -211,7 +219,7 @@ mod tests {
         ];
 
         for (style, expected) in styles.into_iter().zip(expecteds) {
-            assert_eq!(expected, style.to_string().as_str())
+            assert_eq!(expected, style.to_string().as_str());
         }
     }
 }

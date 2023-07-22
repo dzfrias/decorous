@@ -72,7 +72,7 @@ impl DeclaredVariables {
     pub fn len(&self) -> usize {
         self.vars.len()
             + self.arrow_exprs.len()
-            + self.scopes.iter().map(|(_, s)| s.env.len()).sum::<usize>()
+            + self.scopes.values().map(|s| s.env.len()).sum::<usize>()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -94,7 +94,7 @@ impl DeclaredVariables {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(test, derive(Serialize))]
 pub struct Scope {
     env: HashMap<SmolStr, u32>,

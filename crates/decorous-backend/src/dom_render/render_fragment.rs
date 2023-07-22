@@ -90,7 +90,7 @@ fn render_decl(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &Dec
                                 declared,
                                 node.metadata().scope()
                             )
-                        )
+                        );
                     }
                     Attribute::KeyValue(key, None) => {
                         force_writeln!(f, "e{id}.setAttribute(\"{key}\", \"\")");
@@ -163,7 +163,7 @@ fn render_decl(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &Dec
                             "e{id}.addEventListener(\"{}\", (...args) => {}({added_args} ...args))",
                             event_handler.event(),
                             replaced
-                        )
+                        );
                     }
                     Attribute::Binding(_) => todo!(),
                 }
@@ -236,7 +236,7 @@ fn render_mount(
                 .unwrap();
             force_writeln!(f, "mount(target, e{id}_anchor, anchor);");
             force_writeln!(f,
-            "let e{id}_blocks = [];\nlet i = 0;\nfor (const v of ({expr})) {{ ctx[{var_idx}] = v; e{id}_blocks[i] = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); i += 1; }}")
+            "let e{id}_blocks = [];\nlet i = 0;\nfor (const v of ({expr})) {{ ctx[{var_idx}] = v; e{id}_blocks[i] = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); i += 1; }}");
         }
 
         _ => {

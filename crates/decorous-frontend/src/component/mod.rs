@@ -190,19 +190,19 @@ impl<'a> Component<'a> {
                                 .first_child()
                                 .and_then(|child| child.try_to::<ArrowExpr>())
                             {
-                                self.apply_refs(&arrow_expr.syntax());
+                                self.apply_refs(arrow_expr.syntax());
                                 self.declared_vars.insert_arrow_expr(arrow_expr, scope);
                             }
                         }
                         Attribute::KeyValue(_, Some(AttributeValue::JavaScript(js))) => {
-                            self.apply_refs(js)
+                            self.apply_refs(js);
                         }
                         _ => continue,
                     }
                 }
 
                 elem.children_mut().iter_mut().for_each(|child| {
-                    self.build_fragment_tree_from_node(child, id, current_scopes)
+                    self.build_fragment_tree_from_node(child, id, current_scopes);
                 });
             }
 
@@ -213,7 +213,7 @@ impl<'a> Component<'a> {
             NodeType::SpecialBlock(block) => match block {
                 SpecialBlock::If(if_block) => {
                     if_block.inner_mut().iter_mut().for_each(|child| {
-                        self.build_fragment_tree_from_node(child, id, current_scopes)
+                        self.build_fragment_tree_from_node(child, id, current_scopes);
                     });
                     self.apply_refs(if_block.expr());
                     if let Some(else_block) = if_block.else_block_mut() {
@@ -229,7 +229,7 @@ impl<'a> Component<'a> {
                         scope.add(SmolStr::new(for_block.binding()), var_id);
                     }
                     for_block.inner_mut().iter_mut().for_each(|child| {
-                        self.build_fragment_tree_from_node(child, id, current_scopes)
+                        self.build_fragment_tree_from_node(child, id, current_scopes);
                     });
                     self.apply_refs(for_block.expr());
                     let scope = current_scopes.pop().unwrap();
@@ -299,7 +299,6 @@ mod tests {
         let component = make_component(
             "---js let x, z = (3, 2); let y = 55; let [...l] = thing--- #button[@click={() => { x = 0; z = 0; l = 0; y = 0; }}]:Click me",
         );
-        dbg!(component.hoist());
         assert_eq!(
             &(&[
                 (SmolStr::from("x"), 1),

@@ -332,12 +332,12 @@ fn render_update_body<T: io::Write>(
                         include_str!("./templates/if.js"),
                         replaced = replaced,
                         id = id
-                    )?
+                    )?;
                 } else {
                     writeln!(
                         formatter,
                         "if ({replaced}) {{ if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].u(dirty); }} else {{ elems[\"{id}_block\"] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} }} else if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].d(); elems[\"{id}_block\"] = null; }}"
-                    )?
+                    )?;
                 }
             }
             SpecialBlock::For(block) => {

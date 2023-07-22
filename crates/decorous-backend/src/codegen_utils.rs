@@ -182,7 +182,7 @@ pub fn replace_assignments(
                 .join(", "),
             ArrowExprParams::ParameterList(plist) => plist
                 .parameters()
-                .map(|pat| SmolStr::new(&pat.text()))
+                .map(|pat| SmolStr::new(pat.text()))
                 .chain(to_append)
                 .join(", "),
         };
@@ -190,7 +190,7 @@ pub fn replace_assignments(
         indels.push(Indel {
             insert: replacement,
             delete: params.range(),
-        })
+        });
     }
 
     indels.extend(replace_assignments_indels(

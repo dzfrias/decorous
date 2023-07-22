@@ -102,7 +102,7 @@ where
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.should_prepend {
             for ctx in &self.ctx {
-                self.writer.write(ctx.prepend.to_string().as_bytes())?;
+                self.writer.write_all(ctx.prepend.to_string().as_bytes())?;
             }
             self.should_prepend = false;
         }
@@ -112,9 +112,9 @@ where
 
         if let Some(ctx) = self.ctx.last() {
             if buf.last().is_some_and(|u| u == &b'\n') && !self.ignore_next_append {
-                self.writer.write(&buf[..buf.len() - 1])?;
-                self.writer.write(ctx.append.to_string().as_bytes())?;
-                self.writer.write(b"\n")?;
+                self.writer.write_all(&buf[..buf.len() - 1])?;
+                self.writer.write_all(ctx.append.to_string().as_bytes())?;
+                self.writer.write_all(b"\n")?;
 
                 return Ok(buf.len());
             }
