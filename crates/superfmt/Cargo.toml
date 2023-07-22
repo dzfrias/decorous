@@ -3,6 +3,10 @@ name = "superfmt"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+style = ["bitflags"]
+default = ["style"]
 
-[dependencies]
+[dependencies.bitflags]
+version = "2"
+optional = true

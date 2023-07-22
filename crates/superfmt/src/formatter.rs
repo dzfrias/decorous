@@ -4,7 +4,6 @@ use std::{
     io::{self, Write},
 };
 
-#[derive(Debug)]
 pub struct Formatter<'a, T>
 where
     T: Write,
@@ -31,7 +30,7 @@ where
     }
 
     pub fn begin_context(&mut self, context: Context) -> io::Result<&mut Self> {
-        let starts_with = context.starts_with;
+        let starts_with = context.starts_with.to_string();
         self.ignore_next_append = true;
         write!(self, "{}", starts_with)?;
         self.ctx.push(context);
@@ -103,7 +102,7 @@ where
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.should_prepend {
             for ctx in &self.ctx {
-                self.writer.write(ctx.prepend.as_bytes())?;
+                self.writer.write(ctx.prepend.to_string().as_bytes())?;
             }
             self.should_prepend = false;
         }
@@ -114,7 +113,7 @@ where
         if let Some(ctx) = self.ctx.last() {
             if buf.last().is_some_and(|u| u == &b'\n') && !self.ignore_next_append {
                 self.writer.write(&buf[..buf.len() - 1])?;
-                self.writer.write(ctx.append.as_bytes())?;
+                self.writer.write(ctx.append.to_string().as_bytes())?;
                 self.writer.write(b"\n")?;
 
                 return Ok(buf.len());
