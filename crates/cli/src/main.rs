@@ -86,13 +86,13 @@ fn main() -> Result<()> {
             })?);
             render::<Prerenderer, _>(&component, &mut js)?;
 
-            formatter.write_with_context("rendered ", Color::Green)?;
-            writeln!(
-                formatter,
-                "to {} and {}!",
-                html_out.display(),
-                args.out.display()
-            )?;
+            formatter
+                .write_with_context("rendered ", Color::Green)?
+                .writeln(format_args!(
+                    "to {} and {}",
+                    html_out.display(),
+                    args.out.display()
+                ))?;
             html.flush()
                 .context("problem flushing buffered html out file")?;
             js.flush()
@@ -135,8 +135,9 @@ fn main() -> Result<()> {
                     },
                 )?;
             }
-            formatter.write_with_context("rendered ", Color::Green)?;
-            writeln!(formatter, "to {}!", args.out.display())?;
+            formatter
+                .write_with_context("rendered ", Color::Green)?
+                .writeln(format_args!("to {}!", args.out.display()))?;
             f.flush().context("problem flushing buffered js out file")?;
         }
     }
@@ -161,10 +162,7 @@ fn fmt_report<T: io::Write>(input: &str, report: &Report<Location>, out: &mut T)
         // Minus one because location_line is 1-indexed
         let line_no = err.fragment().line() - 1;
 
-        formatter.begin_context(Color::Red)?;
-        write!(formatter, "error: {}", err.err_type())?;
-        formatter.pop_ctx()?;
-        writeln!(formatter)?;
+        formatter.writeln_with_context(format_args!("error: {}", err.err_type()), Color::Red)?;
         // Write the error description
         if let Some(help_line) = err
             .help()
@@ -190,18 +188,15 @@ fn fmt_report<T: io::Write>(input: &str, report: &Report<Location>, out: &mut T)
         // Plus one because line_no is 0 indexed, so we need to get the actual line number
         let line_no_len = count_digits(line_no + 1) as usize;
         let col = err.fragment().column() + line_no_len + 2;
-        formatter.begin_context(
+        formatter.writeln_with_context(
+            format_args!("{arrow:>col$}", arrow = "^"),
             Style::default()
                 .fg(Color::Yellow)
                 .modifiers(Modifiers::BOLD),
         )?;
-        writeln!(formatter, "{arrow:>col$}", arrow = "^")?;
-        formatter.pop_ctx()?;
 
         if let Some(help) = err.help() {
-            formatter.begin_context(Modifiers::BOLD)?;
-            writeln!(formatter, "help: {help}")?;
-            formatter.pop_ctx()?;
+            formatter.writeln_with_context(format_args!("help: {help}"), Modifiers::BOLD)?;
         }
         writeln!(formatter)?;
     }
