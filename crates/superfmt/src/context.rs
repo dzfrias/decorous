@@ -1,40 +1,39 @@
 #[cfg(feature = "style")]
 use crate::style::{Color, Style};
-use std::fmt::Display;
+use std::borrow::Cow;
 
+#[derive(Default)]
 pub struct Context {
-    pub(super) starts_with: Box<dyn Display>,
-    pub(super) ends_with: Box<dyn Display>,
-    pub(super) prepend: Box<dyn Display>,
-    pub(super) append: Box<dyn Display>,
+    pub(super) starts_with: Cow<'static, str>,
+    pub(super) ends_with: Cow<'static, str>,
+    pub(super) prepend: Cow<'static, str>,
+    pub(super) append: Cow<'static, str>,
 }
 
 #[derive(Default)]
 pub struct ContextBuilder {
-    starts_with: Option<Box<dyn Display>>,
-    prepend: Option<Box<dyn Display>>,
-    ends_with: Option<Box<dyn Display>>,
-    append: Option<Box<dyn Display>>,
+    starts_with: Option<Cow<'static, str>>,
+    prepend: Option<Cow<'static, str>>,
+    ends_with: Option<Cow<'static, str>>,
+    append: Option<Cow<'static, str>>,
 }
 
 impl Context {
     #[cfg(feature = "style")]
     pub fn style(s: Style) -> Self {
         Self {
-            starts_with: Box::new(s),
-            ends_with: Box::new(Style::reset()),
-            prepend: Box::new(""),
-            append: Box::new(""),
+            starts_with: Cow::Owned(s.to_string()),
+            ends_with: Cow::Owned(s.to_string()),
+            ..Default::default()
         }
     }
 
     #[cfg(feature = "style")]
     pub fn color(c: Color) -> Self {
         Self {
-            starts_with: Box::new(c),
-            ends_with: Box::new(Color::Reset),
-            prepend: Box::new(""),
-            append: Box::new(""),
+            starts_with: Cow::Owned(c.to_string()),
+            ends_with: Cow::Owned(Color::Reset.to_string()),
+            ..Default::default()
         }
     }
 }
@@ -45,35 +44,35 @@ impl ContextBuilder {
     }
 
     #[must_use]
-    pub fn starts_with<T: Display + 'static>(mut self, starts_with: T) -> Self {
-        self.starts_with = Some(Box::new(starts_with));
+    pub fn starts_with<T: Into<Cow<'static, str>>>(mut self, starts_with: T) -> Self {
+        self.starts_with = Some(starts_with.into());
         self
     }
 
     #[must_use]
-    pub fn ends_with<T: Display + 'static>(mut self, ends_with: T) -> Self {
-        self.ends_with = Some(Box::new(ends_with));
+    pub fn ends_with<T: Into<Cow<'static, str>>>(mut self, ends_with: T) -> Self {
+        self.ends_with = Some(ends_with.into());
         self
     }
 
     #[must_use]
-    pub fn prepend<T: Display + 'static>(mut self, prepend: T) -> Self {
-        self.prepend = Some(Box::new(prepend));
+    pub fn prepend<T: Into<Cow<'static, str>>>(mut self, prepend: T) -> Self {
+        self.prepend = Some(prepend.into());
         self
     }
 
     #[must_use]
-    pub fn append<T: Display + 'static>(mut self, append: T) -> Self {
-        self.append = Some(Box::new(append));
+    pub fn append<T: Into<Cow<'static, str>>>(mut self, append: T) -> Self {
+        self.append = Some(append.into());
         self
     }
 
     pub fn build(self) -> Context {
         Context {
-            starts_with: self.starts_with.unwrap_or(Box::new("")),
-            prepend: self.prepend.unwrap_or(Box::new("")),
-            ends_with: self.ends_with.unwrap_or(Box::new("")),
-            append: self.append.unwrap_or(Box::new("")),
+            starts_with: self.starts_with.unwrap_or_default(),
+            prepend: self.prepend.unwrap_or_default(),
+            ends_with: self.ends_with.unwrap_or_default(),
+            append: self.append.unwrap_or_default(),
         }
     }
 }

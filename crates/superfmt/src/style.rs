@@ -1,4 +1,7 @@
-use std::fmt::{self, Display};
+use std::{
+    borrow::Cow,
+    fmt::{self, Display},
+};
 
 use bitflags::bitflags;
 
@@ -115,6 +118,12 @@ impl Display for Style {
     }
 }
 
+impl<'a> From<Style> for Cow<'a, str> {
+    fn from(value: Style) -> Self {
+        Self::Owned(value.to_string())
+    }
+}
+
 impl Color {
     fn ansi_fg_code(&self) -> u8 {
         match self {
@@ -151,6 +160,12 @@ impl Color {
 impl Display for Color {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "\x1b[{}m", self.ansi_fg_code())
+    }
+}
+
+impl<'a> From<Color> for Cow<'a, str> {
+    fn from(value: Color) -> Self {
+        Self::Owned(value.to_string())
     }
 }
 
