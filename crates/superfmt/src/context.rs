@@ -1,8 +1,6 @@
-#[cfg(feature = "style")]
-use crate::style::{Color, Style};
 use std::borrow::Cow;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Context {
     pub(super) starts_with: Cow<'static, str>,
     pub(super) ends_with: Cow<'static, str>,
@@ -16,26 +14,6 @@ pub struct ContextBuilder {
     prepend: Option<Cow<'static, str>>,
     ends_with: Option<Cow<'static, str>>,
     append: Option<Cow<'static, str>>,
-}
-
-impl Context {
-    #[cfg(feature = "style")]
-    pub fn style(s: Style) -> Self {
-        Self {
-            starts_with: Cow::Owned(s.to_string()),
-            ends_with: Cow::Owned(s.to_string()),
-            ..Default::default()
-        }
-    }
-
-    #[cfg(feature = "style")]
-    pub fn color(c: Color) -> Self {
-        Self {
-            starts_with: Cow::Owned(c.to_string()),
-            ends_with: Cow::Owned(Color::Reset.to_string()),
-            ..Default::default()
-        }
-    }
 }
 
 impl ContextBuilder {

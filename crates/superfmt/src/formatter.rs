@@ -29,7 +29,8 @@ where
         }
     }
 
-    pub fn begin_context(&mut self, context: Context) -> io::Result<&mut Self> {
+    pub fn begin_context(&mut self, context: impl Into<Context>) -> io::Result<&mut Self> {
+        let context = context.into();
         let starts_with = context.starts_with.to_string();
         self.ignore_next_append = true;
         write!(self, "{}", starts_with)?;
@@ -48,6 +49,26 @@ where
     pub fn write(&mut self, display: impl Display) -> io::Result<&mut Self> {
         write!(self, "{display}")?;
         Ok(self)
+    }
+
+    pub fn write_with_context(
+        &mut self,
+        display: impl Display,
+        context: impl Into<Context>,
+    ) -> io::Result<&mut Self> {
+        self.begin_context(context)?;
+        self.write(display)?;
+        self.pop_ctx()
+    }
+
+    pub fn writeln_with_context(
+        &mut self,
+        display: impl Display,
+        context: impl Into<Context>,
+    ) -> io::Result<&mut Self> {
+        self.begin_context(context)?;
+        self.writeln(display)?;
+        self.pop_ctx()
     }
 
     pub fn pop_ctx(&mut self) -> io::Result<&mut Self> {

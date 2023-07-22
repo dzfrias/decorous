@@ -5,6 +5,8 @@ use std::{
 
 use bitflags::bitflags;
 
+use crate::Context;
+
 #[derive(Debug, Clone, PartialEq, Copy, Default)]
 pub struct Style {
     fg: Option<Color>,
@@ -132,6 +134,16 @@ impl<'a> From<Style> for Cow<'a, str> {
     }
 }
 
+impl From<Style> for Context {
+    fn from(s: Style) -> Self {
+        Context {
+            starts_with: Cow::Owned(s.to_string()),
+            ends_with: Cow::Owned(Style::reset().to_string()),
+            ..Default::default()
+        }
+    }
+}
+
 impl Color {
     fn ansi_fg_code(&self) -> u8 {
         match self {
@@ -177,6 +189,16 @@ impl<'a> From<Color> for Cow<'a, str> {
     }
 }
 
+impl From<Color> for Context {
+    fn from(c: Color) -> Self {
+        Context {
+            starts_with: Cow::Owned(c.to_string()),
+            ends_with: Cow::Owned(Color::Reset.to_string()),
+            ..Default::default()
+        }
+    }
+}
+
 impl Modifiers {
     fn try_to_ansi_code(&self) -> Result<u8, u32> {
         let val = match *self {
@@ -192,6 +214,16 @@ impl Modifiers {
             _ => return Err(self.bits()),
         };
         Ok(val)
+    }
+}
+
+impl From<Modifiers> for Context {
+    fn from(mods: Modifiers) -> Self {
+        Context {
+            starts_with: Cow::Owned(Style::default().modifiers(mods).to_string()),
+            ends_with: Cow::Owned(Style::reset().to_string()),
+            ..Default::default()
+        }
     }
 }
 
