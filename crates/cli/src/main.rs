@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, Write},
+    io::{self, BufWriter, Write},
     path::PathBuf,
 };
 
@@ -58,19 +58,23 @@ fn main() -> Result<()> {
     println!("\x1b[1mrendering...\x1b[0m");
     match args.render_method {
         RenderMethod::Prerender if args.stdout => {
-            render::<Prerenderer, _>(&component, &mut io::stdout())?;
-            render::<HtmlPrerenderer, _>(&component, &mut io::stdout())?;
+            let mut stdout = BufWriter::new(io::stdout());
+            render::<Prerenderer, _>(&component, &mut stdout)
+                .context("problem prerendering to stdout")?;
+            render::<HtmlPrerenderer, _>(&component, &mut stdout)
+                .context("problem prerendering html to stdout")?;
             println!("\x1b[1;32mrendered\x1b[0m to stdout!");
+            stdout.flush().context("problem flushing buffered stdout")?;
         }
         RenderMethod::Prerender => {
             let html_out = args.html.unwrap_or("./out.html".into());
-            let mut html = File::create(&html_out).with_context(|| {
+            let mut html = BufWriter::new(File::create(&html_out).with_context(|| {
                 format!("problem creating {} for prerendering", html_out.display())
-            })?;
+            })?);
             render::<HtmlPrerenderer, _>(&component, &mut html)?;
-            let mut js = File::create(&args.out).with_context(|| {
+            let mut js = BufWriter::new(File::create(&args.out).with_context(|| {
                 format!("problem creating {} for prerendering", args.out.display())
-            })?;
+            })?);
             render::<Prerenderer, _>(&component, &mut js)?;
 
             println!(
@@ -78,27 +82,48 @@ fn main() -> Result<()> {
                 html_out.display(),
                 args.out.display()
             );
+            html.flush()
+                .context("problem flushing buffered html out file")?;
+            js.flush()
+                .context("problem flushing buffered js out file")?;
         }
         RenderMethod::Dom if args.stdout => {
-            render::<DomRenderer, _>(&component, &mut io::stdout())?;
+            let mut stdout = BufWriter::new(io::stdout());
+            render::<DomRenderer, _>(&component, &mut stdout)
+                .context("problem dom rending to stdout")?;
 
             if let Some(ref html) = args.html {
-                let mut f = File::create(html)?;
-                write!(f, include_str!("./template.html"), args.out.display())?;
+                let mut f = File::create(html).with_context(|| {
+                    format!("problem creating {} for dom rendering", html.display())
+                })?;
+                write!(f, include_str!("./template.html"), args.out.display()).with_context(
+                    || format!("problem writing to {} for dom rendering", html.display()),
+                )?;
             }
             println!("\x1b[1;32mrendered\x1b[0m to stdout!");
+            stdout.flush().context("problem flushing buffered stdout")?;
         }
         RenderMethod::Dom => {
-            let mut f = File::create(&args.out).with_context(|| {
-                format!("problem dom rendering component to {}", args.out.display())
-            })?;
-            render::<DomRenderer, _>(&component, &mut f)?;
+            let mut f = BufWriter::new(
+                File::create(&args.out)
+                    .with_context(|| format!("problem creating {}", args.out.display()))?,
+            );
+            render::<DomRenderer, _>(&component, &mut f)
+                .with_context(|| format!("problem dom rendering to {}", args.out.display()))?;
 
             if let Some(ref html) = args.html {
                 let mut f = File::create(html)?;
-                write!(f, include_str!("./template.html"), args.out.display())?;
+                write!(f, include_str!("./template.html"), args.out.display()).with_context(
+                    || {
+                        format!(
+                            "problem html writing to {} for dom rendering",
+                            args.out.display()
+                        )
+                    },
+                )?;
             }
             println!("\x1b[1;32mrendered\x1b[0m to {}!", args.out.display());
+            f.flush().context("problem flushing buffered js out file")?;
         }
     }
 
