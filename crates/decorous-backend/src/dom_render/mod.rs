@@ -5,10 +5,18 @@ use itertools::Itertools;
 use rslint_parser::AstNode;
 use std::{borrow::Cow, io};
 
-use crate::codegen_utils;
+use crate::{codegen_utils, RenderBackend};
 pub(crate) use render_fragment::render_fragment;
 
-pub fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Result<()> {
+pub struct DomRenderer;
+
+impl RenderBackend for DomRenderer {
+    fn render<T: io::Write>(out: &mut T, component: &Component) -> io::Result<()> {
+        render(component, out)
+    }
+}
+
+fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Result<()> {
     // Hoisted syntax nodes should come first
     for hoist in component.hoist() {
         writeln!(render_to, "{hoist}")?;

@@ -7,7 +7,24 @@ use decorous_frontend::{
     FragmentMetadata,
 };
 
-pub trait HtmlFmt<T: io::Write> {
+use crate::RenderBackend;
+
+pub struct HtmlPrerenderer;
+
+impl RenderBackend for HtmlPrerenderer {
+    fn render<T: io::Write>(
+        out: &mut T,
+        component: &decorous_frontend::Component,
+    ) -> io::Result<()> {
+        for node in component.fragment_tree() {
+            node.html_fmt(out, &())?;
+        }
+
+        Ok(())
+    }
+}
+
+trait HtmlFmt<T: io::Write> {
     type Metadata;
 
     fn html_fmt(&self, f: &mut T, metadata: &Self::Metadata) -> io::Result<()>;

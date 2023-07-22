@@ -7,7 +7,11 @@ use std::{
 use anyhow::{Context, Result};
 use clap::{Parser as ArgParser, ValueEnum};
 use clap_stdin::FileOrStdin;
-use decorous_backend::{dom_render::render as dom_render, prerender::render as prerender};
+use decorous_backend::{
+    dom_render::DomRenderer,
+    prerender::{HtmlPrerenderer, Prerenderer},
+    render,
+};
 use decorous_frontend::{ast::Location, errors::Report, parse, Component};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -54,7 +58,8 @@ fn main() -> Result<()> {
     println!("\x1b[1mrendering...\x1b[0m");
     match args.render_method {
         RenderMethod::Prerender if args.stdout => {
-            prerender(&component, &mut io::stdout(), &mut io::stdout())?;
+            render::<Prerenderer, _>(&component, &mut io::stdout())?;
+            render::<HtmlPrerenderer, _>(&component, &mut io::stdout())?;
             println!("\x1b[1;32mrendered\x1b[0m to stdout!");
         }
         RenderMethod::Prerender => {
@@ -62,11 +67,12 @@ fn main() -> Result<()> {
             let mut html = File::create(&html_out).with_context(|| {
                 format!("problem creating {} for prerendering", html_out.display())
             })?;
+            render::<HtmlPrerenderer, _>(&component, &mut html)?;
             let mut js = File::create(&args.out).with_context(|| {
                 format!("problem creating {} for prerendering", args.out.display())
             })?;
+            render::<Prerenderer, _>(&component, &mut js)?;
 
-            prerender(&component, &mut js, &mut html)?;
             println!(
                 "\x1b[1;32mrendered\x1b[0m to {} and {}!",
                 html_out.display(),
@@ -74,8 +80,7 @@ fn main() -> Result<()> {
             );
         }
         RenderMethod::Dom if args.stdout => {
-            dom_render(&component, &mut io::stdout())
-                .context("problem dom rendering component to stdout")?;
+            render::<DomRenderer, _>(&component, &mut io::stdout())?;
 
             if let Some(ref html) = args.html {
                 let mut f = File::create(html)?;
@@ -87,9 +92,7 @@ fn main() -> Result<()> {
             let mut f = File::create(&args.out).with_context(|| {
                 format!("problem dom rendering component to {}", args.out.display())
             })?;
-            dom_render(&component, &mut f).with_context(|| {
-                format!("problem dom rendering component to {}", args.out.display())
-            })?;
+            render::<DomRenderer, _>(&component, &mut f)?;
 
             if let Some(ref html) = args.html {
                 let mut f = File::create(html)?;

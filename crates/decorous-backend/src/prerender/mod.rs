@@ -11,8 +11,9 @@ use lazy_format::lazy_format;
 use rslint_parser::AstNode;
 use superfmt::{ContextBuilder, Formatter};
 
-use self::{html_render::HtmlFmt, node_analyzer::analyzers::Analysis};
-use crate::{codegen_utils, dom_render::render_fragment as dom_render_fragment};
+pub use self::html_render::HtmlPrerenderer;
+use self::node_analyzer::analyzers::Analysis;
+use crate::{codegen_utils, dom_render::render_fragment as dom_render_fragment, RenderBackend};
 
 #[derive(Debug, PartialEq, Eq)]
 enum WriteStatus {
@@ -27,15 +28,18 @@ impl WriteStatus {
     }
 }
 
-pub fn render<T, U>(component: &Component, js_out: &mut T, html_out: &mut U) -> io::Result<()>
+pub struct Prerenderer;
+
+impl RenderBackend for Prerenderer {
+    fn render<T: io::Write>(out: &mut T, component: &Component) -> io::Result<()> {
+        render(component, out)
+    }
+}
+
+fn render<T>(component: &Component, js_out: &mut T) -> io::Result<()>
 where
     T: io::Write,
-    U: io::Write,
 {
-    for node in component.fragment_tree() {
-        node.html_fmt(html_out, &())?;
-    }
-
     let analysis = Analysis::analyze(component);
 
     let has_reactive_variables = component.declared_vars().all_vars().is_empty();
@@ -398,7 +402,8 @@ mod tests {
                 let component = make_component($input);
                 let mut js_out = Vec::new();
                 let mut html_out = Vec::new();
-                render(&component, &mut js_out, &mut html_out).unwrap();
+                render(&component, &mut js_out).unwrap();
+                <HtmlPrerenderer as RenderBackend>::render(&mut html_out, &component).unwrap();
                 insta::assert_snapshot!(format!("{}\n---\n{}", String::from_utf8(js_out).unwrap(), String::from_utf8(html_out).unwrap()));
              )+
         };
