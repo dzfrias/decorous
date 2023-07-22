@@ -13,6 +13,10 @@ use decorous_backend::{
     render,
 };
 use decorous_frontend::{ast::Location, errors::Report, parse, Component};
+use superfmt::{
+    style::{Color, Modifiers, Style},
+    Formatter,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
@@ -51,11 +55,14 @@ struct Cli {
 
 fn main() -> Result<()> {
     let args = Cli::parse();
-    println!("\x1b[1mparsing...\x1b[0m");
-    let component = parse_component(&args.input)?;
-    println!("\x1b[1;32mparsed!\x1b[0m");
+    let mut stdout = io::stdout();
+    let mut formatter = Formatter::new(&mut stdout);
 
-    println!("\x1b[1mrendering...\x1b[0m");
+    formatter.writeln_with_context("parsing...", Modifiers::BOLD)?;
+    let component = parse_component(&args.input)?;
+    formatter.writeln_with_context("parsed!", Color::Green)?;
+
+    formatter.writeln_with_context("rendering...", Modifiers::BOLD)?;
     match args.render_method {
         RenderMethod::Prerender if args.stdout => {
             let mut stdout = BufWriter::new(io::stdout());
@@ -63,7 +70,9 @@ fn main() -> Result<()> {
                 .context("problem prerendering to stdout")?;
             render::<HtmlPrerenderer, _>(&component, &mut stdout)
                 .context("problem prerendering html to stdout")?;
-            println!("\x1b[1;32mrendered\x1b[0m to stdout!");
+            formatter
+                .write_with_context("rendered ", Color::Green)?
+                .writeln("to stdout!")?;
             stdout.flush().context("problem flushing buffered stdout")?;
         }
         RenderMethod::Prerender => {
@@ -77,11 +86,13 @@ fn main() -> Result<()> {
             })?);
             render::<Prerenderer, _>(&component, &mut js)?;
 
-            println!(
-                "\x1b[1;32mrendered\x1b[0m to {} and {}!",
+            formatter.write_with_context("rendered ", Color::Green)?;
+            writeln!(
+                formatter,
+                "to {} and {}!",
                 html_out.display(),
                 args.out.display()
-            );
+            )?;
             html.flush()
                 .context("problem flushing buffered html out file")?;
             js.flush()
@@ -100,7 +111,9 @@ fn main() -> Result<()> {
                     || format!("problem writing to {} for dom rendering", html.display()),
                 )?;
             }
-            println!("\x1b[1;32mrendered\x1b[0m to stdout!");
+            formatter
+                .write_with_context("rendered ", Color::Green)?
+                .writeln("to stdout!")?;
             stdout.flush().context("problem flushing buffered stdout")?;
         }
         RenderMethod::Dom => {
@@ -122,7 +135,8 @@ fn main() -> Result<()> {
                     },
                 )?;
             }
-            println!("\x1b[1;32mrendered\x1b[0m to {}!", args.out.display());
+            formatter.write_with_context("rendered ", Color::Green)?;
+            writeln!(formatter, "to {}!", args.out.display())?;
             f.flush().context("problem flushing buffered js out file")?;
         }
     }
@@ -141,13 +155,17 @@ fn parse_component(input: &str) -> Result<Component> {
 }
 
 fn fmt_report<T: io::Write>(input: &str, report: &Report<Location>, out: &mut T) -> io::Result<()> {
+    let mut formatter = Formatter::new(out);
     for err in report.errors() {
         let lines = input.lines().enumerate();
         // Minus one because location_line is 1-indexed
         let line_no = err.fragment().line() - 1;
 
+        formatter.begin_context(Color::Red)?;
+        write!(formatter, "error: {}", err.err_type())?;
+        formatter.pop_ctx()?;
+        writeln!(formatter)?;
         // Write the error description
-        writeln!(out, "\n\x1b[1;31merror: {}\x1b[0m", err.err_type())?;
         if let Some(help_line) = err
             .help()
             .and_then(|help| help.corresponding_line())
@@ -157,9 +175,10 @@ fn fmt_report<T: io::Write>(input: &str, report: &Report<Location>, out: &mut T)
                 .clone()
                 .find(|(n, _)| *n as u32 == help_line - 1)
                 .expect("should be in lines");
-            writeln!(out, "{help_line}| {} \x1b[1;33m<--- this line\x1b[0m", line,)?;
+            write!(formatter, "{help_line}| {} ", line)?;
+            formatter.writeln_with_context("<--- this line", Color::Yellow)?;
             if help_line + 1 != line_no {
-                writeln!(out, "...")?;
+                formatter.writeln("...")?;
             }
         }
         let (i, line) = lines
@@ -167,16 +186,24 @@ fn fmt_report<T: io::Write>(input: &str, report: &Report<Location>, out: &mut T)
             .find(|(n, _)| (*n as u32) + 1 == line_no)
             .expect("line should be in input");
 
-        writeln!(out, "{}| {line}", i + 1)?;
+        writeln!(formatter, "{}| {line}", i + 1)?;
         // Plus one because line_no is 0 indexed, so we need to get the actual line number
         let line_no_len = count_digits(line_no + 1) as usize;
         let col = err.fragment().column() + line_no_len + 2;
-        writeln!(out, "\x1b[1;33m{arrow:>col$}\x1b[0m", arrow = "^")?;
+        formatter.begin_context(
+            Style::default()
+                .fg(Color::Yellow)
+                .modifiers(Modifiers::BOLD),
+        )?;
+        writeln!(formatter, "{arrow:>col$}", arrow = "^")?;
+        formatter.pop_ctx()?;
 
         if let Some(help) = err.help() {
-            writeln!(out, "\x1b[1mhelp: {help}\x1b[0m")?;
+            formatter.begin_context(Modifiers::BOLD)?;
+            writeln!(formatter, "help: {help}")?;
+            formatter.pop_ctx()?;
         }
-        writeln!(out)?;
+        writeln!(formatter)?;
     }
     Ok(())
 }

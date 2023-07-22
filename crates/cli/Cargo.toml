@@ -11,5 +11,6 @@ path = "src/main.rs"
 clap = { version = "4.3.11", features = ["derive"] }
 decorous-frontend = { path = "../decorous-frontend" }
 decorous-backend = { path = "../decorous-backend" }
+superfmt = { path = "../superfmt" }
 clap-stdin = "0.2.0"
 anyhow = "1.0.71"
