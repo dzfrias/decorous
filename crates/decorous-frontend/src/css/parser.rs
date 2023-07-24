@@ -47,14 +47,14 @@ impl<'a> Parser<'a> {
         debug_assert_eq!(Some('@'), self.harpoon.consume());
         let name = self
             .harpoon
-            .collect_from(|h| {
+            .harpoon(|h| {
                 h.consume_while(|c| !c.is_whitespace());
             })
             .text();
         self.skip_whitespace();
         let additional = self
             .harpoon
-            .collect_from(|h| {
+            .harpoon(|h| {
                 h.consume_while(|c| !matches!(c, '{' | ';'));
             })
             .text();
@@ -92,7 +92,7 @@ impl<'a> Parser<'a> {
     fn parse_selector_part(&mut self) -> SelectorPart<'a> {
         fn parse_any<'a>(harpoon: &mut Harpoon<'a>) -> &'a str {
             harpoon
-                .collect_from(|harpoon| {
+                .harpoon(|harpoon| {
                     harpoon.consume_while(|c| !matches!(c, '{' | ':' | ',') && !c.is_whitespace())
                 })
                 .text()
@@ -113,7 +113,7 @@ impl<'a> Parser<'a> {
             } else {
                 let class_name = self
                     .harpoon
-                    .collect_from(|harpoon| {
+                    .harpoon(|harpoon| {
                         harpoon.consume_while(|c| {
                             !c.is_whitespace() && !matches!(c, '{' | ':' | '(' | ',')
                         })
@@ -123,7 +123,7 @@ impl<'a> Parser<'a> {
                     debug_assert_eq!(Some('('), self.harpoon.consume());
                     let v = self
                         .harpoon
-                        .collect_from(|harpoon| harpoon.consume_until(')'))
+                        .harpoon(|harpoon| harpoon.consume_until(')'))
                         .text();
                     self.expect_consume(')');
                     Some(v)
@@ -143,7 +143,7 @@ impl<'a> Parser<'a> {
     fn parse_declaration(&mut self) -> Declaration<'a> {
         let name = self
             .harpoon
-            .collect_from(|harpoon| harpoon.consume_until(':'))
+            .harpoon(|harpoon| harpoon.consume_until(':'))
             .text();
         self.expect_consume(':');
         self.skip_whitespace();
@@ -170,13 +170,13 @@ impl<'a> Parser<'a> {
     fn parse_value(&mut self) -> Value<'a> {
         if self.harpoon.peek_is('{') {
             debug_assert_eq!(Some('{'), self.harpoon.consume());
-            let contents = self.harpoon.collect_from(|h| h.consume_until('}')).text();
+            let contents = self.harpoon.harpoon(|h| h.consume_until('}')).text();
             self.expect_consume('}');
             Value::Mustache(contents)
         } else {
             let t = self
                 .harpoon
-                .collect_from(|h| h.consume_while(|c| !matches!(c, ';' | '{')))
+                .harpoon(|h| h.consume_while(|c| !matches!(c, ';' | '{')))
                 .text();
             Value::Css(t)
         }

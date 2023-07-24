@@ -66,7 +66,7 @@ impl<'a> Harpoon<'a> {
         }
     }
 
-    pub fn harpoon(&mut self) -> Span<'a> {
+    pub fn end_checkpoint(&mut self) -> Span<'a> {
         let Some(start) = self.checkpoints.pop() else {
             panic!("attempted to harpoon when no checkpoints exist");
         };
@@ -156,13 +156,13 @@ impl<'a> Harpoon<'a> {
         !self.checkpoints.is_empty()
     }
 
-    pub fn collect_from<F>(&mut self, mut f: F) -> Span<'a>
+    pub fn harpoon<F>(&mut self, mut f: F) -> Span<'a>
     where
         F: FnMut(&mut Harpoon),
     {
         self.checkpoint();
         f(self);
-        self.harpoon()
+        self.end_checkpoint()
     }
 }
 
@@ -187,7 +187,7 @@ mod tests {
         harpoon.checkpoint();
         assert_eq!(Some('1'), harpoon.consume());
         assert_eq!(Some('2'), harpoon.consume());
-        let span = harpoon.harpoon();
+        let span = harpoon.end_checkpoint();
         assert_eq!(0, span.start());
         assert_eq!(2, span.end());
         assert_eq!("12", span.text());
