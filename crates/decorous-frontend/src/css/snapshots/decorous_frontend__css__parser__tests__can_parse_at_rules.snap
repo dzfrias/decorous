@@ -2,14 +2,16 @@
 source: crates/decorous-frontend/src/css/parser.rs
 expression: parser.parse()
 ---
-Css {
-    rules: [
-        At(
-            AtRule {
-                name: "import",
-                additional: "\"style.css\"",
-                contents: None,
-            },
-        ),
-    ],
-}
+Ok(
+    Css {
+        rules: [
+            At(
+                AtRule {
+                    name: "import",
+                    additional: "\"style.css\"",
+                    contents: None,
+                },
+            ),
+        ],
+    },
+)

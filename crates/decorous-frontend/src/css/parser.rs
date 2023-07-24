@@ -1,8 +1,12 @@
 use harpoon::Harpoon;
 
-use crate::css::ast::{AtRule, Pseudo};
+use super::{
+    ast::{AtRule, Css, Declaration, Pseudo, RegularRule, Rule, Selector, SelectorPart, Value},
+    error::{ParseError, ParseErrorType},
+};
+use crate::location::Location;
 
-use super::ast::{Css, Declaration, RegularRule, Rule, Selector, SelectorPart, Value};
+pub type Result<T> = std::result::Result<T, ParseError<Location>>;
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -16,34 +20,34 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(mut self) -> Css<'a> {
+    pub fn parse(mut self) -> Result<Css<'a>> {
         let mut rules = vec![];
         while self.harpoon.peek().is_some() {
-            rules.push(self.parse_rule());
+            rules.push(self.parse_rule()?);
             self.skip_whitespace();
         }
-        Css::new(rules)
+        Ok(Css::new(rules))
     }
 
-    fn parse_rule(&mut self) -> Rule<'a> {
+    fn parse_rule(&mut self) -> Result<Rule<'a>> {
         if self.harpoon.peek_is('@') {
-            return Rule::At(self.parse_at_rule());
+            return Ok(Rule::At(self.parse_at_rule()?));
         }
 
-        let selector = self.parse_selector();
-        self.expect_consume('{');
+        let selector = self.parse_selector()?;
+        self.expect_consume('{')?;
         let mut declarations = vec![];
         self.skip_whitespace();
         while !self.harpoon.peek_is('}') && !self.harpoon.peek().is_none() {
-            declarations.push(self.parse_declaration());
+            declarations.push(self.parse_declaration()?);
             self.skip_whitespace();
         }
-        self.expect_consume('}');
+        self.expect_consume('}')?;
 
-        Rule::Regular(RegularRule::new(selector, declarations))
+        Ok(Rule::Regular(RegularRule::new(selector, declarations)))
     }
 
-    fn parse_at_rule(&mut self) -> AtRule<'a> {
+    fn parse_at_rule(&mut self) -> Result<AtRule<'a>> {
         debug_assert_eq!(Some('@'), self.harpoon.consume());
         let name = self
             .harpoon
@@ -51,6 +55,12 @@ impl<'a> Parser<'a> {
                 h.consume_while(|c| !c.is_whitespace());
             })
             .text();
+        if name.is_empty() {
+            return Err(ParseError::new(
+                ParseErrorType::ExpectedMediaQueryName,
+                Location::from_source(self.harpoon.offset(), self.harpoon.source()),
+            ));
+        }
         self.skip_whitespace();
         let additional = self
             .harpoon
@@ -60,36 +70,36 @@ impl<'a> Parser<'a> {
             .text();
         if self.harpoon.peek_is(';') {
             debug_assert_eq!(Some(';'), self.harpoon.consume());
-            return AtRule::new(name, additional, None);
+            return Ok(AtRule::new(name, additional, None));
         }
 
-        self.expect_consume('{');
+        self.expect_consume('{')?;
         self.skip_whitespace();
         let mut rules = vec![];
         while !self.harpoon.peek_is('}') && !self.harpoon.peek().is_none() {
-            rules.push(self.parse_rule());
+            rules.push(self.parse_rule()?);
             self.skip_whitespace();
         }
-        self.expect_consume('}');
+        self.expect_consume('}')?;
 
-        AtRule::new(name, additional, Some(rules))
+        Ok(AtRule::new(name, additional, Some(rules)))
     }
 
-    fn parse_selector(&mut self) -> Selector<'a> {
+    fn parse_selector(&mut self) -> Result<Selector<'a>> {
         let mut parts = vec![];
-        parts.push(self.parse_selector_part());
+        parts.push(self.parse_selector_part()?);
         self.skip_whitespace();
         while self.harpoon.peek_is(',') {
             debug_assert_eq!(Some(','), self.harpoon.consume());
             self.skip_whitespace();
-            parts.push(self.parse_selector_part());
+            parts.push(self.parse_selector_part()?);
             self.skip_whitespace();
         }
 
-        Selector::new(parts)
+        Ok(Selector::new(parts))
     }
 
-    fn parse_selector_part(&mut self) -> SelectorPart<'a> {
+    fn parse_selector_part(&mut self) -> Result<SelectorPart<'a>> {
         fn parse_any<'a>(harpoon: &mut Harpoon<'a>) -> &'a str {
             harpoon
                 .harpoon(|harpoon| {
@@ -125,7 +135,7 @@ impl<'a> Parser<'a> {
                         .harpoon
                         .harpoon(|harpoon| harpoon.consume_until(')'))
                         .text();
-                    self.expect_consume(')');
+                    self.expect_consume(')')?;
                     Some(v)
                 } else {
                     None
@@ -137,48 +147,51 @@ impl<'a> Parser<'a> {
             }
         }
 
-        SelectorPart::new(text, pseudoes)
+        Ok(SelectorPart::new(text, pseudoes))
     }
 
-    fn parse_declaration(&mut self) -> Declaration<'a> {
+    fn parse_declaration(&mut self) -> Result<Declaration<'a>> {
         let name = self
             .harpoon
             .harpoon(|harpoon| harpoon.consume_until(':'))
             .text();
-        self.expect_consume(':');
+        self.expect_consume(':')?;
         self.skip_whitespace();
         let mut values = vec![];
-        values.push(self.parse_value());
+        values.push(self.parse_value()?);
         self.skip_whitespace();
-        while !self.harpoon.peek_is(';') && !self.harpoon.peek().is_none() {
-            values.push(self.parse_value());
+        while !self.harpoon.peek_is_any(";{}:") && !self.harpoon.peek().is_none() {
+            values.push(self.parse_value()?);
             self.skip_whitespace();
         }
-        self.expect_consume(';');
-        Declaration::new(name, values)
+        self.expect_consume(';')?;
+        Ok(Declaration::new(name, values))
     }
 
-    fn expect_consume(&mut self, expected: char) -> bool {
+    fn expect_consume(&mut self, expected: char) -> Result<()> {
         if self.harpoon.peek_is(expected) {
             self.harpoon.consume();
-            true
+            Ok(())
         } else {
-            todo!("error");
+            Err(ParseError::new(
+                ParseErrorType::ExpectedCharacter(expected),
+                Location::from_source(self.harpoon.offset(), self.harpoon.source()),
+            ))
         }
     }
 
-    fn parse_value(&mut self) -> Value<'a> {
+    fn parse_value(&mut self) -> Result<Value<'a>> {
         if self.harpoon.peek_is('{') {
             debug_assert_eq!(Some('{'), self.harpoon.consume());
             let contents = self.harpoon.harpoon(|h| h.consume_until('}')).text();
-            self.expect_consume('}');
-            Value::Mustache(contents)
+            self.expect_consume('}')?;
+            Ok(Value::Mustache(contents))
         } else {
             let t = self
                 .harpoon
-                .harpoon(|h| h.consume_while(|c| !matches!(c, ';' | '{')))
+                .harpoon(|h| h.consume_while(|c| !matches!(c, ';' | '{' | '}' | ':')))
                 .text();
-            Value::Css(t)
+            Ok(Value::Css(t))
         }
     }
 
@@ -246,6 +259,17 @@ mod tests {
             "@import \"style.css\";",
             "@media (hover: hover) { p { color: green; } }",
             "@media (hover: hover) {}"
+        );
+    }
+
+    #[test]
+    fn parser_throws_errors_on_invalid_input() {
+        parser_test!(
+            "@ \"style.css\";",
+            "@media (hover: hover)  p { color: green; } }",
+            "p.green { color: green color: red; }",
+            "p  color: green; }",
+            "p { color: green; "
         );
     }
 }

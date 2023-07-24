@@ -3,7 +3,7 @@ use std::fmt;
 use nom_locate::LocatedSpan;
 use thiserror::Error;
 
-use crate::ast::Location;
+use crate::location::Location;
 
 #[derive(Debug, Error, PartialEq, Clone)]
 pub enum ParseErrorType {

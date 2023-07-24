@@ -1,8 +1,9 @@
 use std::fmt;
 
 use itertools::Itertools;
-use nom_locate::LocatedSpan;
 use rslint_parser::SyntaxNode;
+
+use crate::location::Location;
 
 /// The collection of the three main parts of decorous syntax: the HTML-like template (`nodes`),
 /// the script (`script`), and styling (`css`). The main way to obtain a `DecorousAst` is to use the
@@ -27,52 +28,6 @@ pub struct DecorousAst<'a> {
 pub struct Node<'a, T> {
     metadata: T,
     node_type: NodeType<'a, T>,
-}
-
-#[derive(Debug, PartialEq, Clone, Copy, Default)]
-pub struct Location {
-    offset: usize,
-    length: usize,
-    line: u32,
-    column: usize,
-}
-
-impl Location {
-    pub fn from_spans<'a>(span1: LocatedSpan<&'a str>, span2: LocatedSpan<&'a str>) -> Self {
-        Self {
-            offset: span1.location_offset(),
-            length: span2.location_offset() - span1.location_offset(),
-            line: span1.location_line(),
-            column: span1.get_column(),
-        }
-    }
-
-    pub fn offset(&self) -> usize {
-        self.offset
-    }
-
-    pub fn length(&self) -> usize {
-        self.length
-    }
-
-    pub fn line(&self) -> u32 {
-        self.line
-    }
-
-    pub fn column(&self) -> usize {
-        self.column
-    }
-}
-
-impl<'a> From<LocatedSpan<&'a str>> for Location {
-    fn from(span: LocatedSpan<&'a str>) -> Self {
-        Self {
-            offset: span.location_offset(),
-            length: 1,
-            line: span.location_line(),
-            column: span.get_column(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

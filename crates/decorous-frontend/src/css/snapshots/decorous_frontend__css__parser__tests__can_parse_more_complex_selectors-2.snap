@@ -2,36 +2,38 @@
 source: crates/decorous-frontend/src/css/parser.rs
 expression: parser.parse()
 ---
-Css {
-    rules: [
-        Regular(
-            RegularRule {
-                selector: Selector {
-                    parts: [
-                        SelectorPart {
-                            text: Some(
-                                "p.green",
-                            ),
-                            pseudoes: [
-                                Class {
-                                    name: "hover",
-                                    value: None,
-                                },
+Ok(
+    Css {
+        rules: [
+            Regular(
+                RegularRule {
+                    selector: Selector {
+                        parts: [
+                            SelectorPart {
+                                text: Some(
+                                    "p.green",
+                                ),
+                                pseudoes: [
+                                    Class {
+                                        name: "hover",
+                                        value: None,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                    declarations: [
+                        Declaration {
+                            name: "color",
+                            values: [
+                                Css(
+                                    "green",
+                                ),
                             ],
                         },
                     ],
                 },
-                declarations: [
-                    Declaration {
-                        name: "color",
-                        values: [
-                            Css(
-                                "green",
-                            ),
-                        ],
-                    },
-                ],
-            },
-        ),
-    ],
-}
+            ),
+        ],
+    },
+)

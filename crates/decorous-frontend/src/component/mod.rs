@@ -9,9 +9,8 @@ use rslint_parser::{
 };
 
 use crate::{
-    ast::{
-        Attribute, AttributeValue, DecorousAst, Location, Node, NodeIter, NodeType, SpecialBlock,
-    },
+    ast::{Attribute, AttributeValue, DecorousAst, Node, NodeIter, NodeType, SpecialBlock},
+    location::Location,
     utils,
 };
 pub use declared_vars::{DeclaredVariables, Scope};

@@ -1,4 +1,4 @@
-use crate::ast::Location;
+use crate::location::Location;
 
 #[derive(Debug, Clone)]
 pub struct FragmentMetadata {

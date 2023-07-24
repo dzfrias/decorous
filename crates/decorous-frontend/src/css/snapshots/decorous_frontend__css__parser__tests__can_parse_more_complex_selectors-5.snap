@@ -2,45 +2,47 @@
 source: crates/decorous-frontend/src/css/parser.rs
 expression: parser.parse()
 ---
-Css {
-    rules: [
-        Regular(
-            RegularRule {
-                selector: Selector {
-                    parts: [
-                        SelectorPart {
-                            text: Some(
-                                "p.green",
-                            ),
-                            pseudoes: [
-                                Class {
-                                    name: "has",
-                                    value: Some(
-                                        "h1, h2",
+Ok(
+    Css {
+        rules: [
+            Regular(
+                RegularRule {
+                    selector: Selector {
+                        parts: [
+                            SelectorPart {
+                                text: Some(
+                                    "p.green",
+                                ),
+                                pseudoes: [
+                                    Class {
+                                        name: "has",
+                                        value: Some(
+                                            "h1, h2",
+                                        ),
+                                    },
+                                    Class {
+                                        name: "hover",
+                                        value: None,
+                                    },
+                                    Element(
+                                        "after",
                                     ),
-                                },
-                                Class {
-                                    name: "hover",
-                                    value: None,
-                                },
-                                Element(
-                                    "after",
+                                ],
+                            },
+                        ],
+                    },
+                    declarations: [
+                        Declaration {
+                            name: "color",
+                            values: [
+                                Css(
+                                    "green",
                                 ),
                             ],
                         },
                     ],
                 },
-                declarations: [
-                    Declaration {
-                        name: "color",
-                        values: [
-                            Css(
-                                "green",
-                            ),
-                        ],
-                    },
-                ],
-            },
-        ),
-    ],
-}
+            ),
+        ],
+    },
+)

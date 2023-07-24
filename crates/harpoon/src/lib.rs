@@ -87,6 +87,10 @@ impl<'a> Harpoon<'a> {
         self.peek().is_some_and(|c| c == expected)
     }
 
+    pub fn peek_is_any(&mut self, expecteds: &str) -> bool {
+        self.peek().is_some_and(|c| expecteds.contains(c))
+    }
+
     pub fn peek_n_const<const N: usize>(&mut self) -> Peeked<N> {
         let mut arrvec = ArrayVec::new();
         let remaining = N.saturating_sub(self.peek_buf.len());
@@ -163,6 +167,10 @@ impl<'a> Harpoon<'a> {
         self.checkpoint();
         f(self);
         self.end_checkpoint()
+    }
+
+    pub fn source(&self) -> &'a str {
+        self.source
     }
 }
 

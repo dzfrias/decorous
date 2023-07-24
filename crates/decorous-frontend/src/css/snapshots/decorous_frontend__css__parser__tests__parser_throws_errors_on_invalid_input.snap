@@ -1,0 +1,15 @@
+---
+source: crates/decorous-frontend/src/css/parser.rs
+expression: parser.parse()
+---
+Err(
+    ParseError {
+        fragment: Location {
+            offset: 1,
+            length: 1,
+            line: 1,
+            column: 1,
+        },
+        err_type: ExpectedMediaQueryName,
+    },
+)

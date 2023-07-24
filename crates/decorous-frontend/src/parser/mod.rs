@@ -16,9 +16,12 @@ use nom_locate::{position, LocatedSpan};
 use rslint_parser::{parse_module, SyntaxNode};
 
 use self::errors::{Help, ParseError, ParseErrorType, Report};
-use crate::ast::{
-    Attribute, AttributeValue, Comment, DecorousAst, Element, EventHandler, ForBlock, IfBlock,
-    Location, Mustache, Node, NodeType, SpecialBlock, Text,
+use crate::{
+    ast::{
+        Attribute, AttributeValue, Comment, DecorousAst, Element, EventHandler, ForBlock, IfBlock,
+        Mustache, Node, NodeType, SpecialBlock, Text,
+    },
+    location::Location,
 };
 
 type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report<NomSpan<'a>>>;
