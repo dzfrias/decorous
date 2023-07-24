@@ -10,6 +10,7 @@ nom_locate = "4.1.0"
 rslint_errors = "0.2.0"
 rslint_parser = { workspace = true }
 thiserror = "1.0.40"
+harpoon = { path = "../harpoon" }
 
 [dev-dependencies]
 insta = { workspace = true }

@@ -1,0 +1,32 @@
+---
+source: crates/decorous-frontend/src/css/parser.rs
+expression: parser.parse()
+---
+Css {
+    rules: [
+        Regular(
+            RegularRule {
+                selector: Selector {
+                    parts: [
+                        SelectorPart {
+                            text: Some(
+                                "p",
+                            ),
+                            pseudoes: [],
+                        },
+                    ],
+                },
+                declarations: [
+                    Declaration {
+                        name: "color",
+                        values: [
+                            Css(
+                                "rgba(1, 2, 3, 4)",
+                            ),
+                        ],
+                    },
+                ],
+            },
+        ),
+    ],
+}

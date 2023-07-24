@@ -1,5 +1,6 @@
 pub mod ast;
 mod component;
+pub mod css;
 mod parser;
 pub mod utils;
 

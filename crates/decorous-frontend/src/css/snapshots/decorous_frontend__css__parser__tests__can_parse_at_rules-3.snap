@@ -1,0 +1,17 @@
+---
+source: crates/decorous-frontend/src/css/parser.rs
+expression: parser.parse()
+---
+Css {
+    rules: [
+        At(
+            AtRule {
+                name: "media",
+                additional: "(hover: hover) ",
+                contents: Some(
+                    [],
+                ),
+            },
+        ),
+    ],
+}
