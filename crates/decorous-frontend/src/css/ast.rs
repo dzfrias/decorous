@@ -1,3 +1,5 @@
+use rslint_parser::SyntaxNode;
+
 #[derive(Debug)]
 pub struct Css<'a> {
     rules: Vec<Rule<'a>>,
@@ -50,7 +52,7 @@ pub struct Declaration<'a> {
 
 #[derive(Debug, PartialEq)]
 pub enum Value<'a> {
-    Mustache(&'a str),
+    Mustache(SyntaxNode),
     Css(&'a str),
 }
 

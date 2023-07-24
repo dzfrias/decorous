@@ -12,7 +12,7 @@ use decorous_backend::{
     prerender::{HtmlPrerenderer, Prerenderer},
     render,
 };
-use decorous_frontend::{ast::Location, errors::Report, parse, Component};
+use decorous_frontend::{errors::Report, location::Location, parse, Component};
 use superfmt::{
     style::{Color, Modifiers, Style},
     Formatter,

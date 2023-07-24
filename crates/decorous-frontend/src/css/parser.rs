@@ -1,4 +1,5 @@
 use harpoon::Harpoon;
+use rslint_parser::AstNode;
 
 use super::{
     ast::{AtRule, Css, Declaration, Pseudo, RegularRule, Rule, Selector, SelectorPart, Value},
@@ -184,9 +185,16 @@ impl<'a> Parser<'a> {
     fn parse_value(&mut self) -> Result<Value<'a>> {
         if self.harpoon.peek_is('{') {
             debug_assert_eq!(Some('{'), self.harpoon.consume());
+            let offset = self.harpoon.offset();
             let contents = self.harpoon.harpoon(|h| h.consume_until('}')).text();
             self.expect_consume('}')?;
-            Ok(Value::Mustache(contents))
+            let res = rslint_parser::parse_expr(contents, 0).ok().map_err(|err| {
+                ParseError::new(
+                    ParseErrorType::JavaScriptParseError(err),
+                    Location::from_source(offset, self.harpoon.source()),
+                )
+            })?;
+            Ok(Value::Mustache(res.syntax().clone()))
         } else {
             let t = self
                 .harpoon
@@ -270,7 +278,8 @@ mod tests {
             "@media (hover: hover)  p { color: green; } }",
             "p.green { color: green color: red; }",
             "p  color: green; }",
-            "p { color: green; "
+            "p { color: green; ",
+            "p { color: {###}; }"
         );
     }
 }

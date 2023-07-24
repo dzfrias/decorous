@@ -8,6 +8,8 @@ pub enum ParseErrorType {
     ExpectedMediaQueryName,
     #[error("expected selector")]
     ExpectedSelector,
+    #[error("parse error in JavaScript: {}", 0.to_string())]
+    JavaScriptParseError(Vec<rslint_errors::Diagnostic>),
 }
 
 #[derive(Debug, PartialEq, Error, Clone)]

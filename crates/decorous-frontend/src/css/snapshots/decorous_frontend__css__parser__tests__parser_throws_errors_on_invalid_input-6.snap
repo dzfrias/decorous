@@ -1,0 +1,40 @@
+---
+source: crates/decorous-frontend/src/css/parser.rs
+expression: parser.parse()
+---
+Err(
+    ParseError {
+        fragment: Location {
+            offset: 12,
+            length: 1,
+            line: 1,
+            column: 12,
+        },
+        err_type: JavaScriptParseError(
+            [
+                Diagnostic {
+                    file_id: 0,
+                    severity: Error,
+                    code: Some(
+                        "",
+                    ),
+                    title: "expected `!` following a `#`, but found none",
+                    tag: None,
+                    primary: Some(
+                        SubDiagnostic {
+                            severity: Error,
+                            msg: "",
+                            span: FileSpan {
+                                file: 0,
+                                range: 0..1,
+                            },
+                        },
+                    ),
+                    children: [],
+                    suggestions: [],
+                    footers: [],
+                },
+            ],
+        ),
+    },
+)

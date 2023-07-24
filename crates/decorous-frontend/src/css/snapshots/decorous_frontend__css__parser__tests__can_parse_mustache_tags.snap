@@ -22,7 +22,9 @@ Ok(
                             name: "color",
                             values: [
                                 Mustache(
-                                    "color",
+                                    NAME_REF@0..5
+                                      IDENT@0..5 "color"
+                                    ,
                                 ),
                             ],
                         },

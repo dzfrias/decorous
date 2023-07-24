@@ -22,7 +22,9 @@ Ok(
                             name: "width",
                             values: [
                                 Mustache(
-                                    "w",
+                                    NAME_REF@0..1
+                                      IDENT@0..1 "w"
+                                    ,
                                 ),
                                 Css(
                                     "px",
