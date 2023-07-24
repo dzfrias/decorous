@@ -22,6 +22,7 @@ impl<'a> Parser<'a> {
 
     pub fn parse(mut self) -> Result<Css<'a>> {
         let mut rules = vec![];
+        self.skip_whitespace();
         while self.harpoon.peek().is_some() {
             rules.push(self.parse_rule()?);
             self.skip_whitespace();

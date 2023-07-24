@@ -3,7 +3,7 @@ use std::fmt;
 use nom_locate::LocatedSpan;
 use thiserror::Error;
 
-use crate::location::Location;
+use crate::{css, location::Location};
 
 #[derive(Debug, Error, PartialEq, Clone)]
 pub enum ParseErrorType {
@@ -28,11 +28,14 @@ pub enum ParseErrorType {
     },
     #[error("invalid special block type: {0}. Only `for` and `if` are accepted.")]
     InvalidSpecialBlockType(String),
+    #[error("css parsing error: {0}")]
+    CssParsingError(css::error::ParseError<Location>),
     #[error("byte processing error: {}", 0.to_string())]
     Nom(nom::error::ErrorKind),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Error)]
+#[error("parser error: {err_type}")]
 pub struct ParseError<T> {
     fragment: T,
     help: Option<Help>,

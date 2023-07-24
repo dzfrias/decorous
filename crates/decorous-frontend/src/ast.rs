@@ -3,7 +3,7 @@ use std::fmt;
 use itertools::Itertools;
 use rslint_parser::SyntaxNode;
 
-use crate::location::Location;
+use crate::{css::ast::Css, location::Location};
 
 /// The collection of the three main parts of decorous syntax: the HTML-like template (`nodes`),
 /// the script (`script`), and styling (`css`). The main way to obtain a `DecorousAst` is to use the
@@ -18,7 +18,7 @@ use crate::location::Location;
 pub struct DecorousAst<'a> {
     nodes: Vec<Node<'a, Location>>,
     script: Option<SyntaxNode>,
-    css: Option<&'a str>,
+    css: Option<Css<'a>>,
 }
 
 /// A node of the AST. It contains [metadata](`Self::metadata()`) (of type `T`), and the
@@ -413,7 +413,7 @@ impl<'a> DecorousAst<'a> {
     pub fn new(
         nodes: Vec<Node<'a, Location>>,
         script: Option<SyntaxNode>,
-        css: Option<&'a str>,
+        css: Option<Css<'a>>,
     ) -> Self {
         Self { nodes, script, css }
     }
@@ -431,8 +431,8 @@ impl<'a> DecorousAst<'a> {
 
     /// Gives a a shared reference to the CSS AST, if it exists. The `DecorousAst` will have
     /// no CSS AST if no `<style>` tag is specified in the template.
-    pub fn css(&self) -> Option<&'a str> {
-        self.css
+    pub fn css(&self) -> Option<&Css<'a>> {
+        self.css.as_ref()
     }
 
     /// Creates a recursive iterator over the nodes of the template.
@@ -440,7 +440,7 @@ impl<'a> DecorousAst<'a> {
         NodeIter::new(self.nodes())
     }
 
-    pub fn into_components(self) -> (Vec<Node<'a, Location>>, Option<SyntaxNode>, Option<&'a str>) {
+    pub fn into_components(self) -> (Vec<Node<'a, Location>>, Option<SyntaxNode>, Option<Css<'a>>) {
         (self.nodes, self.script, self.css)
     }
 }

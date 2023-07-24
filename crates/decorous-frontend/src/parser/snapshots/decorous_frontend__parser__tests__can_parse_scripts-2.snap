@@ -10,6 +10,33 @@ Ok(
             fragment: "",
             extra: (),
         },
-        " body { height: 100vh; } ",
+        Css {
+            rules: [
+                Regular(
+                    RegularRule {
+                        selector: Selector {
+                            parts: [
+                                SelectorPart {
+                                    text: Some(
+                                        "body",
+                                    ),
+                                    pseudoes: [],
+                                },
+                            ],
+                        },
+                        declarations: [
+                            Declaration {
+                                name: "height",
+                                values: [
+                                    Css(
+                                        "100vh",
+                                    ),
+                                ],
+                            },
+                        ],
+                    },
+                ),
+            ],
+        },
     ),
 )

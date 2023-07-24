@@ -22,4 +22,12 @@ impl<T> ParseError<T> {
     pub fn new(err_type: ParseErrorType, fragment: T) -> Self {
         Self { fragment, err_type }
     }
+
+    pub fn fragment(&self) -> &T {
+        &self.fragment
+    }
+
+    pub fn err_type(&self) -> &ParseErrorType {
+        &self.err_type
+    }
 }

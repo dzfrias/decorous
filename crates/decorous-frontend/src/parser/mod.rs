@@ -21,6 +21,7 @@ use crate::{
         Attribute, AttributeValue, Comment, DecorousAst, Element, EventHandler, ForBlock, IfBlock,
         Mustache, Node, NodeType, SpecialBlock, Text,
     },
+    css::{self, ast::Css},
     location::Location,
 };
 
@@ -78,11 +79,16 @@ fn script(input: NomSpan) -> Result<SyntaxNode> {
     }
 }
 
-fn style(input: NomSpan) -> Result<&'_ str> {
+fn style(input: NomSpan) -> Result<Css> {
     let (input, _) = tag("---css")(input)?;
     let (input, body) = take_until("---")(input)?;
     let (input, _) = take(3usize)(input)?;
-    Ok((input, &body))
+    let p = css::Parser::new(&body);
+    let css = match p.parse() {
+        Ok(css) => css,
+        Err(err) => return nom_err!(input, Failure, ParseErrorType::CssParsingError(err), None),
+    };
+    Ok((input, css))
 }
 
 fn nodes(input: NomSpan) -> Result<Vec<Node<'_, Location>>> {
