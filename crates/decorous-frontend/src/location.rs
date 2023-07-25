@@ -83,6 +83,6 @@ mod tests {
                 length: 1
             },
             Location::from_source(offset, source)
-        )
+        );
     }
 }

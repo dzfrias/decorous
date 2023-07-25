@@ -81,7 +81,7 @@ impl<'a> NodeAnalyzer<'a> for ReactivityAnalyzer<'a> {
                         Attribute::KeyValue(key, Some(AttributeValue::Literal(lit)))
                             if key == &"style" && inline_styles_candidate =>
                         {
-                            let style = self.use_style_cache(&component);
+                            let style = self.use_style_cache(component);
                             let new_js = parse_text(&format!("`{lit} {style}`"), 0).syntax();
                             kvs.push((SmolStr::new_inline("style"), new_js));
                             has_style = true;
@@ -93,7 +93,7 @@ impl<'a> NodeAnalyzer<'a> for ReactivityAnalyzer<'a> {
                         Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js)))
                             if key == &"style" && inline_styles_candidate =>
                         {
-                            let style = self.use_style_cache(&component);
+                            let style = self.use_style_cache(component);
                             let new_js = parse_text(&format!("`${{{js}}} {style}`"), 0).syntax();
                             kvs.push((SmolStr::new_inline("style"), new_js));
                             has_style = true;
@@ -112,11 +112,11 @@ impl<'a> NodeAnalyzer<'a> for ReactivityAnalyzer<'a> {
                 }
 
                 if !has_style && inline_styles_candidate {
-                    let style = self.use_style_cache(&component);
+                    let style = self.use_style_cache(component);
                     kvs.push((
                         SmolStr::new_inline("style"),
                         parse_text(&format!("`{style}`"), 0).syntax(),
-                    ))
+                    ));
                 }
 
                 if !kvs.is_empty() {

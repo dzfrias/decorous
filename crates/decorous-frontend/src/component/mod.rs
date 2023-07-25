@@ -186,7 +186,7 @@ impl<'a> Component<'a> {
                         "decor-{}",
                         self.component_id
                     )))),
-                ))
+                ));
             }
         });
     }
@@ -211,7 +211,7 @@ impl<'a> Component<'a> {
                 } else {
                     format!(".decor-{}", self.component_id)
                 };
-                *part.text_mut() = Some(Cow::Owned(new_text))
+                *part.text_mut() = Some(Cow::Owned(new_text));
             }
         }
     }

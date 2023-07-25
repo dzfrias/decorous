@@ -42,7 +42,7 @@ impl<'a> Parser<'a> {
         self.expect_consume('{')?;
         let mut declarations = vec![];
         self.skip_whitespace();
-        while !self.harpoon.peek_is('}') && !self.harpoon.peek().is_none() {
+        while !self.harpoon.peek_is('}') && self.harpoon.peek().is_some() {
             declarations.push(self.parse_declaration()?);
             self.skip_whitespace();
         }
@@ -80,7 +80,7 @@ impl<'a> Parser<'a> {
         self.expect_consume('{')?;
         self.skip_whitespace();
         let mut rules = vec![];
-        while !self.harpoon.peek_is('}') && !self.harpoon.peek().is_none() {
+        while !self.harpoon.peek_is('}') && self.harpoon.peek().is_some() {
             rules.push(self.parse_rule()?);
             self.skip_whitespace();
         }
@@ -107,7 +107,7 @@ impl<'a> Parser<'a> {
         fn parse_any<'a>(harpoon: &mut Harpoon<'a>) -> &'a str {
             harpoon
                 .harpoon(|harpoon| {
-                    harpoon.consume_while(|c| !matches!(c, '{' | ':' | ',') && !c.is_whitespace())
+                    harpoon.consume_while(|c| !matches!(c, '{' | ':' | ',') && !c.is_whitespace());
                 })
                 .text()
         }
@@ -130,7 +130,7 @@ impl<'a> Parser<'a> {
                     .harpoon(|harpoon| {
                         harpoon.consume_while(|c| {
                             !c.is_whitespace() && !matches!(c, '{' | ':' | '(' | ',')
-                        })
+                        });
                     })
                     .text();
                 let value = if self.harpoon.peek_is('(') {
@@ -164,7 +164,7 @@ impl<'a> Parser<'a> {
         let mut values = vec![];
         values.push(self.parse_value()?);
         self.skip_whitespace();
-        while !self.harpoon.peek_is_any(";{}:") && !self.harpoon.peek().is_none() {
+        while !self.harpoon.peek_is_any(";{}:") && self.harpoon.peek().is_some() {
             values.push(self.parse_value()?);
             self.skip_whitespace();
         }
@@ -207,7 +207,7 @@ impl<'a> Parser<'a> {
     }
 
     fn skip_whitespace(&mut self) {
-        self.harpoon.consume_while(|c| c.is_whitespace())
+        self.harpoon.consume_while(|c| c.is_whitespace());
     }
 }
 

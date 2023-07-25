@@ -127,7 +127,7 @@ impl<'a> Harpoon<'a> {
     }
 
     pub fn consume_until(&mut self, stopper: char) {
-        self.consume_while(|c| c != stopper)
+        self.consume_while(|c| c != stopper);
     }
 
     pub fn try_consume(&mut self, s: &str) -> bool {

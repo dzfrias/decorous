@@ -9,11 +9,9 @@ pub struct CssRenderer;
 
 impl RenderBackend for CssRenderer {
     fn render<T: io::Write>(out: &mut T, component: &Component) -> io::Result<()> {
-        if let Some(css) = component.css() {
-            render(css, out, component)
-        } else {
-            Ok(())
-        }
+        component
+            .css()
+            .map_or(Ok(()), |css| render(css, out, component))
     }
 }
 
@@ -27,7 +25,7 @@ fn render<T: io::Write>(css: &Css<'_>, out: &mut T, component: &Component) -> io
 
 fn write_rule<T: io::Write>(
     rule: &Rule<'_>,
-    mut formatter: &mut Formatter<'_, T>,
+    formatter: &mut Formatter<'_, T>,
     component: &Component,
 ) -> io::Result<()> {
     match rule {
@@ -67,7 +65,7 @@ fn write_rule<T: io::Write>(
                     .build(),
             )?;
             for decl in regular.declarations() {
-                write_decl(decl, &mut formatter, component)?;
+                write_decl(decl, formatter, component)?;
             }
             formatter.pop_ctx()?;
         }

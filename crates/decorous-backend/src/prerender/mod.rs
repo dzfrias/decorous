@@ -390,6 +390,7 @@ fn render_update_body<T: io::Write>(
 mod tests {
     use crate::css_render::CssRenderer;
     use decorous_frontend::{parse, Component};
+    use std::fmt::Write;
 
     use super::*;
 
@@ -409,7 +410,7 @@ mod tests {
                 <CssRenderer as RenderBackend>::render(&mut css_out, &component).unwrap();
                 let mut output = format!("{}\n---\n{}", String::from_utf8(js_out).unwrap(), String::from_utf8(html_out).unwrap());
                 if component.css().is_some() {
-                    output.push_str(&format!("\n---\n{}", String::from_utf8(css_out).unwrap()));
+                    write!(output, "\n---\n{}", String::from_utf8(css_out).unwrap()).unwrap();
                 }
                 insta::assert_snapshot!(output);
              )+
