@@ -26,6 +26,19 @@ macro_rules! force_write {
 pub(crate) use force_write;
 pub(crate) use force_writeln;
 
+macro_rules! sort_if_testing {
+    ($to_sort:expr, $by:expr) => {{
+        #[cfg(test)]
+        let iter = $to_sort.sorted_by($by);
+        #[cfg(not(test))]
+        let iter = $to_sort;
+
+        iter
+    }};
+}
+
+pub(crate) use sort_if_testing;
+
 #[derive(Debug, Clone)]
 pub struct DirtyIndices(pub(self) Vec<(usize, u8)>);
 

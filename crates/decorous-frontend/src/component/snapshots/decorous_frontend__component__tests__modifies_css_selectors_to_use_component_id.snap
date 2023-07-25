@@ -1,0 +1,41 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component.css()
+---
+Some(
+    Css {
+        rules: [
+            Regular(
+                RegularRule {
+                    selector: Selector {
+                        parts: [
+                            SelectorPart {
+                                text: Some(
+                                    "p.decor-0",
+                                ),
+                                pseudoes: [
+                                    Class {
+                                        name: "has",
+                                        value: Some(
+                                            "span",
+                                        ),
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                    declarations: [
+                        Declaration {
+                            name: "color",
+                            values: [
+                                Css(
+                                    "red",
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)

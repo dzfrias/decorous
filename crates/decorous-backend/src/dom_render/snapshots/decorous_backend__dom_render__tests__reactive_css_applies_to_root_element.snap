@@ -2,19 +2,18 @@
 source: crates/decorous-backend/src/dom_render/mod.rs
 expression: "String::from_utf8(out).unwrap()"
 ---
+let color = "red";
 const dirty = new Uint8Array(new ArrayBuffer(0));
 function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
-const e0 = document.createElement("div");
-e0.innerHTML = `text <div></div>`;
-mount(target, e0, anchor);
+target.setAttribute("style", `--decor-0: ${color}; `);
 return {
 u(dirty) {
+if (true) target.setAttribute("style", `--decor-0: ${color}; `);
 },
 d() {
-e0.parentNode.removeChild(e0);
 }
 };
 }

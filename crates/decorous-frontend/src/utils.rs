@@ -1,7 +1,7 @@
 use rslint_parser::{
     ast::{
         ArrowExpr, ArrowExprParams, AssignExpr, BlockStmt, Decl, Expr, ExprOrBlock, ExprStmt,
-        NameRef, ObjectPatternProp, Pattern, Stmt,
+        NameRef, ObjectPatternProp, Pattern, Script, Stmt,
     },
     AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
 };
@@ -9,6 +9,13 @@ use rslint_parser::{
 /// Get unbound variable references from a syntax element of the `rslint_parser` tree. This function
 /// also takes scoped variables into account, so it is always correct.
 pub fn get_unbound_refs(syntax_node: &SyntaxNode) -> Vec<NameRef> {
+    if syntax_node.is::<Script>() {
+        return get_unbound_refs(&syntax_node.first_child().unwrap());
+    }
+
+    if syntax_node.is::<NameRef>() {
+        return vec![syntax_node.to()];
+    }
     if syntax_node.is::<ExprStmt>() {
         let mut declared = vec![];
         let mut all = vec![];

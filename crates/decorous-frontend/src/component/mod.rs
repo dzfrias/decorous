@@ -1,15 +1,21 @@
 mod declared_vars;
 mod fragment;
 
-use std::mem;
+use std::{borrow::Cow, mem};
 
+#[cfg(not(debug_assertions))]
+use rand::Rng;
 use rslint_parser::{
     ast::{ArrowExpr, FnDecl, ImportDecl, VarDecl},
     AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
 };
 
 use crate::{
-    ast::{Attribute, AttributeValue, DecorousAst, Node, NodeIter, NodeType, SpecialBlock},
+    ast::{
+        traverse_mut, Attribute, AttributeValue, DecorousAst, Node, NodeIter, NodeType,
+        SpecialBlock,
+    },
+    css::{self, ast::Css},
     location::Location,
     utils,
 };
@@ -22,10 +28,11 @@ pub struct Component<'a> {
     declared_vars: DeclaredVariables,
     toplevel_nodes: Vec<ToplevelNodeData>,
     hoist: Vec<SyntaxNode>,
-
+    component_id: u8,
     referenced: Vec<SmolStr>,
-
     current_id: u32,
+
+    css: Option<Css<'a>>,
 }
 
 #[derive(Debug)]
@@ -44,6 +51,12 @@ impl<'a> Component<'a> {
             hoist: vec![],
             referenced: vec![],
             current_id: 0,
+            #[cfg(not(debug_assertions))]
+            component_id: rand::thread_rng().gen(),
+            #[cfg(debug_assertions)]
+            component_id: 0,
+
+            css: None,
         };
         c.compute(ast);
         c
@@ -68,18 +81,139 @@ impl<'a> Component<'a> {
     pub fn descendents(&'a self) -> NodeIter<'a, FragmentMetadata> {
         NodeIter::new(self.fragment_tree())
     }
+
+    pub fn component_id(&self) -> u8 {
+        self.component_id
+    }
+
+    pub fn css(&self) -> Option<&Css<'_>> {
+        self.css.as_ref()
+    }
 }
 
 // Private methods of Component
 impl<'a> Component<'a> {
     fn compute(&mut self, ast: DecorousAst<'a>) {
-        let (nodes, script, _css) = ast.into_components();
+        let (mut nodes, script, css) = ast.into_components();
         let mut declared = vec![];
         if let Some(script) = script {
             let all_declared_vars = self.extract_toplevel_data(script);
             declared.extend(all_declared_vars);
         }
+        if let Some(mut css) = css {
+            self.isolate_css(&mut css, &mut nodes);
+            self.css = Some(css);
+        }
         self.build_fragment_tree(nodes, declared);
+    }
+
+    fn isolate_css(&mut self, css: &mut Css<'a>, nodes: &mut [Node<'a, Location>]) {
+        self.modify_selectors(css.rules_mut());
+        self.assign_css_mustaches(css.rules_mut());
+        self.assign_node_classes(nodes);
+    }
+
+    fn assign_css_mustaches(&mut self, rules: &[css::ast::Rule<'a>]) {
+        use css::ast::*;
+        for rule in rules {
+            let rule = match rule {
+                Rule::At(at_rule) => {
+                    if let Some(contents) = at_rule.contents() {
+                        self.assign_css_mustaches(contents);
+                    }
+                    continue;
+                }
+                Rule::Regular(rule) => rule,
+            };
+
+            for decl in rule.declarations() {
+                for mustache in decl.values().iter().filter_map(|val| match val {
+                    Value::Mustache(m) => Some(m),
+                    Value::Css(_) => None,
+                }) {
+                    self.declared_vars.insert_css_mustache(mustache.clone());
+                }
+            }
+        }
+    }
+
+    fn assign_node_classes(&self, nodes: &mut [Node<'_, Location>]) {
+        traverse_mut(nodes, &mut |node| {
+            let NodeType::Element(elem) = node.node_type_mut() else {
+            return;
+        };
+            let mut has_class = false;
+            for attr in elem.attrs_mut() {
+                match attr {
+                    Attribute::KeyValue(key, None) if key == &"class" => {
+                        *attr = Attribute::KeyValue(
+                            "class",
+                            Some(AttributeValue::Literal(Cow::Owned(format!(
+                                "decor-{}",
+                                self.component_id
+                            )))),
+                        );
+                        has_class = true;
+                    }
+                    Attribute::KeyValue(key, Some(AttributeValue::Literal(lit)))
+                        if key == &"class" =>
+                    {
+                        *attr = Attribute::KeyValue(
+                            "class",
+                            Some(AttributeValue::Literal(Cow::Owned(format!(
+                                "{} decor-{}",
+                                lit, self.component_id
+                            )))),
+                        );
+                        has_class = true;
+                    }
+                    Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js)))
+                        if key == &"class" =>
+                    {
+                        let new_js = format!("`${{{js}}} decor-{}`", self.component_id);
+                        let parsed = rslint_parser::parse_text(&new_js, 0).syntax();
+                        *attr =
+                            Attribute::KeyValue("class", Some(AttributeValue::JavaScript(parsed)));
+                        has_class = true;
+                    }
+                    _ => {}
+                }
+            }
+            if !has_class {
+                elem.attrs_mut().push(Attribute::KeyValue(
+                    "class",
+                    Some(AttributeValue::Literal(Cow::Owned(format!(
+                        "decor-{}",
+                        self.component_id
+                    )))),
+                ))
+            }
+        });
+    }
+
+    fn modify_selectors(&mut self, rules: &mut [css::ast::Rule<'a>]) {
+        use css::ast::*;
+        for rule in rules {
+            let rule = match rule {
+                Rule::At(at_rule) => {
+                    if let Some(contents) = at_rule.contents_mut() {
+                        self.modify_selectors(contents);
+                    }
+                    continue;
+                }
+                Rule::Regular(rule) => rule,
+            };
+
+            let selector = rule.selector_mut();
+            for part in selector.parts_mut() {
+                let new_text = if let Some(t) = part.text() {
+                    format!("{t}.decor-{}", self.component_id)
+                } else {
+                    format!(".decor-{}", self.component_id)
+                };
+                *part.text_mut() = Some(Cow::Owned(new_text))
+            }
+        }
     }
 
     fn extract_toplevel_data(&mut self, script: SyntaxNode) -> Vec<(VarDecl, Vec<SmolStr>)> {
@@ -370,5 +504,35 @@ mod tests {
     fn hoists_var_if_never_mutated() {
         let component = make_component("---js let x = 0--- {x}");
         insta::assert_debug_snapshot!(component.hoist());
+    }
+
+    #[test]
+    fn assigns_classes_to_nodes() {
+        let component = make_component("---css p { color: red; } --- #p:Hello!");
+        insta::assert_debug_snapshot!(component.fragment_tree());
+    }
+
+    #[test]
+    fn merges_previously_assigned_class_in_reassignment() {
+        let component = make_component("---css p { color: red; } --- #p[class=\"green\"]:Hello!");
+        insta::assert_debug_snapshot!(component.fragment_tree());
+    }
+
+    #[test]
+    fn merges_previously_assigned_class_in_reassignment_with_js() {
+        let component = make_component("---css p { color: red; } --- #p[class={\"green\"}]:Hello!");
+        insta::assert_debug_snapshot!(component.fragment_tree());
+    }
+
+    #[test]
+    fn modifies_css_selectors_to_use_component_id() {
+        let component = make_component("---css p:has(span) { color: red; } ---");
+        insta::assert_debug_snapshot!(component.css());
+    }
+
+    #[test]
+    fn assigns_ids_to_mustaches_in_css() {
+        let component = make_component("---css p { color: {color}; } ---");
+        insta::assert_debug_snapshot!(component.declared_vars().css_mustaches());
     }
 }

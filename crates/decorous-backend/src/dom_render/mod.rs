@@ -35,7 +35,7 @@ fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Result<
             component.fragment_tree(),
             None,
             component.declared_vars(),
-            "main"
+            "main",
         )
     )?;
 
@@ -198,5 +198,17 @@ mod tests {
     #[test]
     fn mustaches_with_no_reactives_are_not_updated() {
         test_render!("{1 + 1} #p[class={11}]:Woah");
+    }
+
+    #[test]
+    fn reactive_css_applies_to_root_element() {
+        test_render!("---js let color = \"red\"; --- ---css p { color: {color}; } ---");
+    }
+
+    #[test]
+    fn dirty_items_from_reactive_css_are_merged_into_one() {
+        test_render!(
+            "---js let color = \"red\"; let bg = \"green\" --- ---css p { color: {color}; background: {bg}; } --- #button[@click={() => { color = 1; bg = 3; }}]:Click"
+        );
     }
 }

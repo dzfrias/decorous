@@ -1,6 +1,6 @@
 use decorous_frontend::{
     ast::{
-        traverse_with, Attribute, AttributeValue, CollapsedChildrenType, Node, NodeType,
+        traverse_with, Attribute, AttributeValue, CollapsedChildrenType, Element, Node, NodeType,
         SpecialBlock,
     },
     utils, DeclaredVariables, FragmentMetadata,
@@ -8,7 +8,7 @@ use decorous_frontend::{
 use itertools::Itertools;
 use std::{borrow::Cow, fmt::Write};
 
-use crate::codegen_utils::{self, force_write, force_writeln};
+use crate::codegen_utils::{self, force_write, force_writeln, replace_namerefs, sort_if_testing};
 
 pub(crate) fn render_fragment(
     nodes: &[Node<'_, FragmentMetadata>],
@@ -22,7 +22,7 @@ pub(crate) fn render_fragment(
     let mut detaches = String::new();
     traverse_with(
         nodes,
-        &mut |elem| elem.inner_collapsed().is_none(),
+        &mut |elem| collapse_children(elem).is_none(),
         &mut |node| {
             render_decl(&mut decls, node, declared);
             render_mount(&mut mounts, node, root, declared);
@@ -30,6 +30,12 @@ pub(crate) fn render_fragment(
             render_detach(&mut detaches, node, root);
         },
     );
+
+    // If this is being called with no root (i.e., the entire DOM should be rendered with JS),
+    // set up CSS styles
+    if root.is_none() {
+        render_reactive_css(declared, &mut updates, &mut mounts);
+    }
 
     let rendered = format!(
         include_str!("./templates/fragment.js"),
@@ -67,12 +73,12 @@ fn render_decl(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &Dec
                 elem.tag()
             );
 
-            match elem.inner_collapsed() {
+            match collapse_children(elem) {
                 Some(CollapsedChildrenType::Text(t)) => {
                     writeln!(f, "e{id}.textContent = \"{}\";", collapse_whitespace(t))
                 }
                 Some(CollapsedChildrenType::Html(html)) => {
-                    writeln!(f, "e{id}.innerHTML = \"{html}\";")
+                    writeln!(f, "e{id}.innerHTML = `{html}`;")
                 }
                 None => Ok(()),
             }
@@ -353,6 +359,57 @@ fn render_detach(f: &mut String, node: &Node<'_, FragmentMetadata>, root: Option
             force_writeln!(f, "e{}.parentNode.removeChild(e{0});", node.metadata().id());
         }
     }
+}
+
+fn render_reactive_css(declared: &DeclaredVariables, updates: &mut String, mounts: &mut String) {
+    // No reactive CSS
+    if declared.css_mustaches().is_empty() {
+        return;
+    }
+
+    let mut all_unbound = vec![];
+    let mut final_attr = "`".to_owned();
+    for (mustache, id) in sort_if_testing!(declared.css_mustaches().iter(), |a, b| a.1.cmp(b.1)) {
+        let unbound = utils::get_unbound_refs(mustache);
+        let replacement = replace_namerefs(mustache, &unbound, declared, None);
+        all_unbound.extend(unbound);
+        force_write!(final_attr, "--decor-{}: ${{{}}}; ", id, replacement);
+    }
+    final_attr.push('`');
+    let all_dirty = codegen_utils::calc_dirty(&all_unbound, declared, None);
+    force_writeln!(
+        updates,
+        "if ({all_dirty}) target.setAttribute(\"style\", {final_attr});",
+    );
+    force_writeln!(mounts, "target.setAttribute(\"style\", {final_attr});",);
+}
+
+fn collapse_children<'a>(
+    elem: &'a Element<'a, FragmentMetadata>,
+) -> Option<CollapsedChildrenType<'a>> {
+    if elem.children().len() == 1 {
+        if let NodeType::Text(t) = *elem.children().first().unwrap().node_type() {
+            return Some(CollapsedChildrenType::Text(&t));
+        }
+    }
+    if !elem.children().is_empty()
+        && elem.descendents().all(|node| match node.node_type() {
+            NodeType::Text(_) | NodeType::Comment(_) => true,
+            // For elements, check if any attributes have mustache tags
+            NodeType::Element(elem) => elem.attrs().iter().all(|attr| match attr {
+                Attribute::KeyValue(_, None) => true,
+                Attribute::KeyValue(_, Some(val)) => {
+                    matches!(val, AttributeValue::Literal(_))
+                }
+                Attribute::Binding(_) | Attribute::EventHandler(_) => false,
+            }),
+            NodeType::Mustache(_) | NodeType::SpecialBlock(_) => false,
+        })
+    {
+        return Some(CollapsedChildrenType::Html(elem.children().iter().join("")));
+    }
+
+    None
 }
 
 fn collapse_whitespace(s: &str) -> Cow<str> {

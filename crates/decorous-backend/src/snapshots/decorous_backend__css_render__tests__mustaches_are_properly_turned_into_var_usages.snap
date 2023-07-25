@@ -1,0 +1,8 @@
+---
+source: crates/decorous-backend/src/css_render.rs
+expression: "String::from_utf8(out).unwrap()"
+---
+body.decor-0 {
+  color: var(--decor-0);
+}
+

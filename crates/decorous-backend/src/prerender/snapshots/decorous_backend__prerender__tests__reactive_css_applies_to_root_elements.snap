@@ -1,0 +1,22 @@
+---
+source: crates/decorous-backend/src/prerender/mod.rs
+expression: output
+---
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+const elems = {"0":document.getElementById("0"),};
+__update(null, true);
+function __update(dirty, initial) {
+  if (initial) elems["0"].setAttribute("style", `--decor-0: ${color}; `);
+}
+
+---
+<div class="decor-0" id="0"><p class="decor-0">Hello </p></div>
+---
+p.decor-0 {
+  color: var(--decor-0);
+}
+

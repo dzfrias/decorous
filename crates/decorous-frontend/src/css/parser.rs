@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use harpoon::Harpoon;
 use rslint_parser::AstNode;
 
@@ -111,7 +113,7 @@ impl<'a> Parser<'a> {
         }
 
         let text = if !self.harpoon.peek_is(':') {
-            Some(parse_any(&mut self.harpoon))
+            Some(Cow::Borrowed(parse_any(&mut self.harpoon)))
         } else {
             None
         };

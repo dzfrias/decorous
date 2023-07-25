@@ -1,0 +1,9 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component.declared_vars().css_mustaches()
+---
+{
+    NAME_REF@0..5
+      IDENT@0..5 "color"
+    : 0,
+}

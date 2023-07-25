@@ -1,4 +1,5 @@
 pub(crate) mod codegen_utils;
+pub mod css_render;
 pub mod dom_render;
 pub mod prerender;
 

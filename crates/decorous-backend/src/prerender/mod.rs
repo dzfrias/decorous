@@ -388,6 +388,7 @@ fn render_update_body<T: io::Write>(
 
 #[cfg(test)]
 mod tests {
+    use crate::css_render::CssRenderer;
     use decorous_frontend::{parse, Component};
 
     use super::*;
@@ -402,9 +403,15 @@ mod tests {
                 let component = make_component($input);
                 let mut js_out = Vec::new();
                 let mut html_out = Vec::new();
+                let mut css_out = Vec::new();
                 render(&component, &mut js_out).unwrap();
                 <HtmlPrerenderer as RenderBackend>::render(&mut html_out, &component).unwrap();
-                insta::assert_snapshot!(format!("{}\n---\n{}", String::from_utf8(js_out).unwrap(), String::from_utf8(html_out).unwrap()));
+                <CssRenderer as RenderBackend>::render(&mut css_out, &component).unwrap();
+                let mut output = format!("{}\n---\n{}", String::from_utf8(js_out).unwrap(), String::from_utf8(html_out).unwrap());
+                if component.css().is_some() {
+                    output.push_str(&format!("\n---\n{}", String::from_utf8(css_out).unwrap()));
+                }
+                insta::assert_snapshot!(output);
              )+
         };
     }
@@ -458,5 +465,15 @@ mod tests {
     #[test]
     fn can_render_for() {
         test_render!("{#for i in [1, 2, 3]} {i} {/for}");
+    }
+
+    #[test]
+    fn reactive_css_applies_to_root_elements() {
+        test_render!("---css p { color: {color}; } --- #div #p:Hello /div");
+    }
+
+    #[test]
+    fn reactive_css_is_merged_with_existing_inline_styles() {
+        test_render!("---js let color = \"blue\" --- ---css p { color: {color}; } --- #p[style=\"background: green;\"] {color} /p", "---js let color = \"blue\" --- ---css p { color: {color}; } --- #p[style={`background: green;`}] {color} /p");
     }
 }

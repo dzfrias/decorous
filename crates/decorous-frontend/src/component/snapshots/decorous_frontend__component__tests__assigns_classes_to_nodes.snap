@@ -1,0 +1,56 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component.fragment_tree()
+---
+[
+    Node {
+        metadata: FragmentMetadata {
+            id: 0,
+            parent_id: None,
+            location: Location {
+                offset: 29,
+                length: 9,
+                line: 1,
+                column: 30,
+            },
+            scope: None,
+        },
+        node_type: Element(
+            Element {
+                tag: "p",
+                attrs: [
+                    KeyValue(
+                        "class",
+                        Some(
+                            Literal(
+                                "decor-0",
+                            ),
+                        ),
+                    ),
+                ],
+                children: [
+                    Node {
+                        metadata: FragmentMetadata {
+                            id: 1,
+                            parent_id: Some(
+                                0,
+                            ),
+                            location: Location {
+                                offset: 0,
+                                length: 0,
+                                line: 0,
+                                column: 0,
+                            },
+                            scope: None,
+                        },
+                        node_type: Text(
+                            Text(
+                                "Hello!",
+                            ),
+                        ),
+                    },
+                ],
+            },
+        ),
+    },
+]

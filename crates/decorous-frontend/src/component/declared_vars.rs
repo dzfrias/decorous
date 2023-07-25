@@ -2,14 +2,16 @@
 use serde::Serialize;
 use std::{borrow::Borrow, collections::HashMap, hash::Hash};
 
-use rslint_parser::{ast::ArrowExpr, SmolStr};
+use rslint_parser::{ast::ArrowExpr, SmolStr, SyntaxNode};
 
 #[derive(Debug, Clone, Default)]
 pub struct DeclaredVariables {
     vars: HashMap<SmolStr, u32>,
     arrow_exprs: HashMap<ArrowExpr, (u32, Option<u32>)>,
     scopes: HashMap<u32, Scope>,
+    css_mustaches: HashMap<SyntaxNode, u32>,
     current_id: u32,
+    css_current: u32,
 }
 
 impl DeclaredVariables {
@@ -25,6 +27,11 @@ impl DeclaredVariables {
     pub fn insert_arrow_expr(&mut self, var: ArrowExpr, scope_id: Option<u32>) {
         let id = self.generate_id();
         self.arrow_exprs.insert(var, (id, scope_id));
+    }
+
+    pub fn insert_css_mustache(&mut self, node: SyntaxNode) {
+        let id = self.generate_css_id();
+        self.css_mustaches.insert(node, id);
     }
 
     pub fn insert_scope(&mut self, scope_id: u32, scope: Scope) {
@@ -91,6 +98,16 @@ impl DeclaredVariables {
         let old = self.current_id;
         self.current_id += 1;
         old
+    }
+
+    pub(crate) fn generate_css_id(&mut self) -> u32 {
+        let old = self.css_current;
+        self.css_current += 1;
+        old
+    }
+
+    pub fn css_mustaches(&self) -> &HashMap<SyntaxNode, u32> {
+        &self.css_mustaches
     }
 }
 

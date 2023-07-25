@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 use itertools::Itertools;
 use rslint_parser::SyntaxNode;
@@ -127,7 +127,7 @@ pub struct EventHandler<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AttributeValue<'a> {
-    Literal(&'a str),
+    Literal(Cow<'a, str>),
     JavaScript(SyntaxNode),
 }
 
@@ -166,42 +166,26 @@ impl<'a, T> Element<'a, T> {
         NodeIter::new(self.children())
     }
 
-    /// Attempts to collapse the Element. This is useful for optimization, as `<span>Text</span>`
-    /// can be represented in the DOM as `elem.textContent = "Text"` instead of as a tree. The same
-    /// goes for regular html, as it can be rendered with `elem.innerHtml`. If the element cannot
-    /// be collapsed, this method returns [`None`].
-    ///
-    /// [`CollapsedChildrenType`] denotes the type of the collapse.
-    pub fn inner_collapsed(&self) -> Option<CollapsedChildrenType<'_>> {
-        if self.children().len() == 1 {
-            if let NodeType::Text(t) = *self.children().first().unwrap().node_type() {
-                return Some(CollapsedChildrenType::Text(&t));
+    pub fn descendents_mut<F>(&'a mut self, f: &mut F)
+    where
+        F: FnMut(&mut Node<'a, T>),
+    {
+        for child in self.children_mut() {
+            f(child);
+            if let NodeType::Element(elem) = child.node_type_mut() {
+                elem.descendents_mut(f);
             }
         }
-
-        // Test if the inner descendants are normal HTML (no mustaches or special blocks)
-        if !self.children().is_empty()
-            && self.descendents().all(|node| match node.node_type() {
-                NodeType::Text(_) | NodeType::Comment(_) => true,
-                // For elements, check if any attributes have mustache tags
-                NodeType::Element(elem) => elem.attrs().iter().all(|attr| match attr {
-                    Attribute::KeyValue(_, None) => true,
-                    Attribute::KeyValue(_, Some(val)) => matches!(val, AttributeValue::Literal(_)),
-                    Attribute::Binding(_) | Attribute::EventHandler(_) => false,
-                }),
-                NodeType::Mustache(_) | NodeType::SpecialBlock(_) => false,
-            })
-        {
-            return Some(CollapsedChildrenType::Html(self.children().iter().join("")));
-        }
-
-        None
     }
 
     pub fn has_immediate_mustache(&self) -> bool {
         self.children()
             .iter()
             .any(|child| matches!(child.node_type(), NodeType::Mustache(_)))
+    }
+
+    pub fn attrs_mut(&mut self) -> &mut Vec<Attribute<'a>> {
+        &mut self.attrs
     }
 }
 
@@ -447,8 +431,8 @@ impl<'a> DecorousAst<'a> {
 
 pub fn traverse_with<'a, T, F, G>(nodes: &'a [Node<'a, T>], predicate: &mut F, body_func: &mut G)
 where
-    F: FnMut(&'a Element<'a, T>) -> bool,
-    G: FnMut(&'a Node<'a, T>),
+    F: FnMut(&Element<'a, T>) -> bool,
+    G: FnMut(&Node<'a, T>),
 {
     for node in nodes {
         body_func(node);
@@ -457,6 +441,18 @@ where
                 continue;
             }
             traverse_with(elem.children(), predicate, body_func);
+        }
+    }
+}
+
+pub fn traverse_mut<'a, T, F>(nodes: &mut [Node<'a, T>], f: &mut F)
+where
+    F: FnMut(&mut Node<'a, T>),
+{
+    for node in nodes {
+        f(node);
+        if let NodeType::Element(elem) = node.node_type_mut() {
+            traverse_mut(elem.children_mut(), f);
         }
     }
 }
@@ -504,9 +500,12 @@ impl<'a, T> fmt::Display for Element<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "<{}{}>{}</{0}>",
+            "<{}{}{}>{}</{0}>",
             self.tag(),
             self.attrs().iter().join(" "),
+            (!self.children().is_empty())
+                .then_some(" ")
+                .unwrap_or_default(),
             self.children()
                 .iter()
                 .map(|elem| format!("  {elem}"))

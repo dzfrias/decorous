@@ -1,0 +1,40 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: parse(input.into())
+---
+Ok(
+    DecorousAst {
+        nodes: [],
+        script: None,
+        css: Some(
+            Css {
+                rules: [
+                    Regular(
+                        RegularRule {
+                            selector: Selector {
+                                parts: [
+                                    SelectorPart {
+                                        text: Some(
+                                            "body",
+                                        ),
+                                        pseudoes: [],
+                                    },
+                                ],
+                            },
+                            declarations: [
+                                Declaration {
+                                    name: "height",
+                                    values: [
+                                        Css(
+                                            "100vh",
+                                        ),
+                                    ],
+                                },
+                            ],
+                        },
+                    ),
+                ],
+            },
+        ),
+    },
+)

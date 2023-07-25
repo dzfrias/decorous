@@ -1,5 +1,7 @@
 pub mod errors;
 
+use std::borrow::Cow;
+
 use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take, take_until, take_while},
@@ -63,8 +65,8 @@ pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<Location>> 
 
 fn _parse(input: NomSpan) -> Result<DecorousAst> {
     let (input, script) = opt(ws(script))(input)?;
-    let (input, nodes) = nodes(input)?;
     let (input, css) = opt(ws(style))(input)?;
+    let (input, nodes) = nodes(input)?;
     Ok((input, DecorousAst::new(nodes, script, css)))
 }
 
@@ -263,7 +265,7 @@ fn attribute(input: NomSpan) -> Result<Attribute<'_>> {
                     }),
                 )),
             ),
-            |t| Attribute::KeyValue(&attr, Some(AttributeValue::Literal(&t))),
+            |t| Attribute::KeyValue(&attr, Some(AttributeValue::Literal(Cow::Borrowed(&t)))),
         ),
     ))(input)?;
 
@@ -553,6 +555,7 @@ mod tests {
                 "#div[@attr=\"hello\"]/div",
                 "#div[@attr]/div",
                 "#p Hi /p Hello, {name}",
+                "---css body { height: 100vh; } ---",
             ]
         )
     }
