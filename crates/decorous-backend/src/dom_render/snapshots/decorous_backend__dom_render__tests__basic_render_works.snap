@@ -31,7 +31,7 @@ function remake_x() { __schedule_update(1, x = 44); }
 return [remake_x,x];
 }
 const ctx = __init_ctx();
-const fragment = create_main_block(document.getElementById("app"));
+const fragment = create_main_block(document.getElementById("test"));
 let updating = false;
 function __schedule_update(ctx_idx, val) {
 ctx[ctx_idx] = val;

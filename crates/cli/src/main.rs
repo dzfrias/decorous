@@ -1,17 +1,16 @@
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{self, BufWriter, Stdout, Write},
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
 use clap::{Parser as ArgParser, ValueEnum};
-use clap_stdin::FileOrStdin;
 use decorous_backend::{
     css_render::CssRenderer,
     dom_render::DomRenderer,
     prerender::{HtmlPrerenderer, Prerenderer},
-    render, RenderBackend,
+    render, Metadata, RenderBackend,
 };
 use decorous_frontend::{errors::Report, location::Location, parse, Component};
 use superfmt::{
@@ -31,7 +30,7 @@ enum RenderMethod {
 struct Cli {
     /// The decor file to compile.
     #[arg(value_name = "PATH")]
-    input: FileOrStdin,
+    input: PathBuf,
 
     /// The name of the output file to generate.
     #[arg(short, long, value_name = "PATH", default_value = "out.js")]
@@ -62,36 +61,45 @@ fn main() -> Result<()> {
     let mut stdout = io::stdout();
     let mut formatter = Formatter::new(&mut stdout);
 
+    let input = fs::read_to_string(&args.input).context("error reading provided input file")?;
+    let file_name = args
+        .input
+        .file_stem()
+        .expect("file name should never be .. or /, if read was successful")
+        .to_string_lossy();
+    let metadata = Metadata { name: &file_name };
+
     formatter.writeln_with_context("parsing...", Modifiers::BOLD)?;
-    let component = parse_component(&args.input)?;
+    let component = parse_component(&input)?;
     formatter.writeln_with_context("parsed!", Color::Green)?;
 
     formatter.writeln_with_context("rendering...", Modifiers::BOLD)?;
     match args.render_method {
         RenderMethod::Prerender if args.stdout => {
             let mut stdout = BufWriter::new(io::stdout());
-            buf_render::<Prerenderer, _>(&component, &mut stdout, &mut formatter)?;
+            buf_render::<Prerenderer, _>(&component, &mut stdout, &mut formatter, &metadata)?;
         }
         RenderMethod::Prerender => {
             let html_out = args.html.unwrap_or("./out.html".into());
             let mut html = BufWriter::new(File::create(&html_out).with_context(|| {
                 format!("problem creating {} for prerendering", html_out.display())
             })?);
-            buf_render::<HtmlPrerenderer, _>(&component, &mut html, &mut formatter)?;
+            buf_render::<HtmlPrerenderer, _>(&component, &mut html, &mut formatter, &metadata)?;
             let mut js = BufWriter::new(File::create(&args.out).with_context(|| {
                 format!("problem creating {} for prerendering", args.out.display())
             })?);
-            buf_render::<Prerenderer, _>(&component, &mut js, &mut formatter)?;
+            buf_render::<Prerenderer, _>(&component, &mut js, &mut formatter, &metadata)?;
         }
         RenderMethod::Dom if args.stdout => {
             let mut stdout = BufWriter::new(io::stdout());
-            buf_render::<DomRenderer, _>(&component, &mut stdout, &mut formatter)?;
+            buf_render::<DomRenderer, _>(&component, &mut stdout, &mut formatter, &metadata)?;
 
             if let Some(html) = &args.html {
                 write_html(
                     &args.out,
                     html,
                     component.css().is_some().then_some(&args.css),
+                    &metadata,
                 )?;
             }
         }
@@ -100,13 +108,14 @@ fn main() -> Result<()> {
                 File::create(&args.out)
                     .with_context(|| format!("problem creating {}", args.out.display()))?,
             );
-            buf_render::<DomRenderer, _>(&component, &mut f, &mut formatter)?;
+            buf_render::<DomRenderer, _>(&component, &mut f, &mut formatter, &metadata)?;
 
             if let Some(html) = &args.html {
                 write_html(
                     &args.out,
                     html,
                     component.css().is_some().then_some(&args.css),
+                    &metadata,
                 )?;
             }
         }
@@ -118,10 +127,10 @@ fn main() -> Result<()> {
                 File::create(args.css)
                     .with_context(|| format!("problem creating {}", args.out.display()))?,
             );
-            buf_render::<CssRenderer, _>(&component, &mut f, &mut formatter)?;
+            buf_render::<CssRenderer, _>(&component, &mut f, &mut formatter, &metadata)?;
         } else {
             let mut stdout = BufWriter::new(io::stdout());
-            buf_render::<CssRenderer, _>(&component, &mut stdout, &mut formatter)?;
+            buf_render::<CssRenderer, _>(&component, &mut stdout, &mut formatter, &metadata)?;
         }
     }
 
@@ -132,12 +141,14 @@ fn write_html(
     script: impl AsRef<Path>,
     html: impl AsRef<Path>,
     css: Option<impl AsRef<Path>>,
+    metadata: &Metadata,
 ) -> Result<()> {
     let mut f = File::create(html)?;
     if let Some(css) = css {
         write!(
             f,
             include_str!("./template_css.html"),
+            name = metadata.name,
             css = css.as_ref().display(),
             script = script.as_ref().display()
         )
@@ -145,7 +156,8 @@ fn write_html(
         write!(
             f,
             include_str!("./template.html"),
-            script.as_ref().display()
+            script.as_ref().display(),
+            name = metadata.name,
         )
     }
     .with_context(|| format!("problem writing html to {}", script.as_ref().display()))
@@ -155,8 +167,9 @@ fn buf_render<T: RenderBackend, W: Write>(
     component: &Component<'_>,
     writer: &mut BufWriter<W>,
     formatter: &mut Formatter<'_, Stdout>,
+    metadata: &Metadata,
 ) -> Result<()> {
-    render::<T, _>(component, writer).context("problem rendering")?;
+    render::<T, _>(component, writer, metadata).context("problem rendering")?;
     writer
         .flush()
         .context("problem flushing buffered writer while rendering")?;

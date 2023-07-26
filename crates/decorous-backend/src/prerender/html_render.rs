@@ -7,7 +7,7 @@ use decorous_frontend::{
     DeclaredVariables, FragmentMetadata,
 };
 
-use crate::RenderBackend;
+use crate::{Metadata, RenderBackend};
 
 pub struct HtmlPrerenderer;
 
@@ -15,6 +15,7 @@ impl RenderBackend for HtmlPrerenderer {
     fn render<T: io::Write>(
         out: &mut T,
         component: &decorous_frontend::Component,
+        _metadata: &Metadata,
     ) -> io::Result<()> {
         for node in component.fragment_tree() {
             node.html_fmt(out, &(), component.declared_vars())?;

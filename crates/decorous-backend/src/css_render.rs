@@ -3,12 +3,16 @@ use std::io::{self, Write};
 use decorous_frontend::{css::ast::*, Component};
 use superfmt::{ContextBuilder, Formatter};
 
-use crate::RenderBackend;
+use crate::{Metadata, RenderBackend};
 
 pub struct CssRenderer;
 
 impl RenderBackend for CssRenderer {
-    fn render<T: io::Write>(out: &mut T, component: &Component) -> io::Result<()> {
+    fn render<T: io::Write>(
+        out: &mut T,
+        component: &Component,
+        _metadata: &Metadata,
+    ) -> io::Result<()> {
         component
             .css()
             .map_or(Ok(()), |css| render(css, out, component))
@@ -127,7 +131,8 @@ mod tests {
         let mut out = vec![];
         let input = "---css body { color: {color}; } ---";
         let component = make_component(input);
-        CssRenderer::render(&mut out, &component).expect("render should not fail");
+        CssRenderer::render(&mut out, &component, &Metadata { name: "test" })
+            .expect("render should not fail");
         insta::assert_snapshot!(String::from_utf8(out).unwrap());
     }
 }

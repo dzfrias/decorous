@@ -13,7 +13,9 @@ use superfmt::{ContextBuilder, Formatter};
 
 pub use self::html_render::HtmlPrerenderer;
 use self::node_analyzer::analyzers::Analysis;
-use crate::{codegen_utils, dom_render::render_fragment as dom_render_fragment, RenderBackend};
+use crate::{
+    codegen_utils, dom_render::render_fragment as dom_render_fragment, Metadata, RenderBackend,
+};
 
 #[derive(Debug, PartialEq, Eq)]
 enum WriteStatus {
@@ -31,7 +33,11 @@ impl WriteStatus {
 pub struct Prerenderer;
 
 impl RenderBackend for Prerenderer {
-    fn render<T: io::Write>(out: &mut T, component: &Component) -> io::Result<()> {
+    fn render<T: io::Write>(
+        out: &mut T,
+        component: &Component,
+        _metadata: &Metadata,
+    ) -> io::Result<()> {
         render(component, out)
     }
 }
@@ -406,8 +412,8 @@ mod tests {
                 let mut html_out = Vec::new();
                 let mut css_out = Vec::new();
                 render(&component, &mut js_out).unwrap();
-                <HtmlPrerenderer as RenderBackend>::render(&mut html_out, &component).unwrap();
-                <CssRenderer as RenderBackend>::render(&mut css_out, &component).unwrap();
+                <HtmlPrerenderer as RenderBackend>::render(&mut html_out, &component, &Metadata { name: "test" }).unwrap();
+                <CssRenderer as RenderBackend>::render(&mut css_out, &component, &Metadata { name: "test" }).unwrap();
                 let mut output = format!("{}\n---\n{}", String::from_utf8(js_out).unwrap(), String::from_utf8(html_out).unwrap());
                 if component.css().is_some() {
                     write!(output, "\n---\n{}", String::from_utf8(css_out).unwrap()).unwrap();

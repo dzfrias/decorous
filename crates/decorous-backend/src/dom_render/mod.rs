@@ -5,18 +5,26 @@ use itertools::Itertools;
 use rslint_parser::AstNode;
 use std::{borrow::Cow, io};
 
-use crate::{codegen_utils, RenderBackend};
+use crate::{codegen_utils, Metadata, RenderBackend};
 pub(crate) use render_fragment::render_fragment;
 
 pub struct DomRenderer;
 
 impl RenderBackend for DomRenderer {
-    fn render<T: io::Write>(out: &mut T, component: &Component) -> io::Result<()> {
-        render(component, out)
+    fn render<T: io::Write>(
+        out: &mut T,
+        component: &Component,
+        metadata: &Metadata,
+    ) -> io::Result<()> {
+        render(component, out, metadata)
     }
 }
 
-fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Result<()> {
+fn render<T: io::Write>(
+    component: &Component,
+    render_to: &mut T,
+    metadata: &Metadata,
+) -> io::Result<()> {
     // Hoisted syntax nodes should come first
     for hoist in component.hoist() {
         writeln!(render_to, "{hoist}")?;
@@ -87,7 +95,8 @@ fn render<T: io::Write>(component: &Component, render_to: &mut T) -> io::Result<
     writeln!(render_to, "const ctx = __init_ctx();")?;
     writeln!(
         render_to,
-        "const fragment = create_main_block(document.getElementById(\"app\"));"
+        "const fragment = create_main_block(document.getElementById(\"{}\"));",
+        metadata.name
     )?;
     writeln!(render_to, "let updating = false;")?;
     writeln!(
@@ -122,7 +131,7 @@ mod tests {
         ($input:expr) => {
             let component = make_component($input);
             let mut out = vec![];
-            render(&component, &mut out).unwrap();
+            render(&component, &mut out, &Metadata { name: "test" }).unwrap();
 
             insta::assert_snapshot!(String::from_utf8(out).unwrap());
         };

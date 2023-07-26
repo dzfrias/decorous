@@ -28,7 +28,7 @@ let __closure0 = () => { __schedule_update(1, color = 1); __schedule_update(2, b
 return [__closure0,color,bg];
 }
 const ctx = __init_ctx();
-const fragment = create_main_block(document.getElementById("app"));
+const fragment = create_main_block(document.getElementById("test"));
 let updating = false;
 function __schedule_update(ctx_idx, val) {
 ctx[ctx_idx] = val;

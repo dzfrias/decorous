@@ -20,7 +20,7 @@ x = 4;
 return [x];
 }
 const ctx = __init_ctx();
-const fragment = create_main_block(document.getElementById("app"));
+const fragment = create_main_block(document.getElementById("test"));
 let updating = false;
 function __schedule_update(ctx_idx, val) {
 ctx[ctx_idx] = val;
