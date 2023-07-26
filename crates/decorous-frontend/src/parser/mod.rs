@@ -39,6 +39,9 @@ macro_rules! nom_err {
     };
 }
 
+/// Parses a string decorous syntax into an AST.
+///
+/// A successful parse will yield a [`DecorousAst`]. An unsuccessful one will yield a [`Report`].
 pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<Location>> {
     let result = cut(alt((
         all_consuming(_parse),

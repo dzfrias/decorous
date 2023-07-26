@@ -1,5 +1,7 @@
 use nom_locate::LocatedSpan;
 
+/// Represents a location with respect to an input string. Everything is positioned based on
+/// **utf-8** character lengths, **not** code points.
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Location {
     offset: usize,
@@ -18,6 +20,12 @@ impl Location {
         }
     }
 
+    /// Constructs a new location from a span. The only information needed here is the offset
+    /// of where the location should start. Using this constructor, the length is always 1.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the offset is greater than the length of the source code.
     pub fn from_source(offset: usize, source: &str) -> Self {
         if offset > source.len() {
             panic!("offset should not be greater than source length");
@@ -26,7 +34,8 @@ impl Location {
         let mut col = 0;
         for b in source.as_bytes().iter().take(offset) {
             col += 1;
-            if *b == 0x0A {
+            const NEWLINE: u8 = 0x0A;
+            if *b == NEWLINE {
                 line += 1;
                 col = 0;
             }

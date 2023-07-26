@@ -5,15 +5,16 @@ use rslint_parser::SyntaxNode;
 
 use crate::{css::ast::Css, location::Location};
 
-/// The collection of the three main parts of decorous syntax: the HTML-like template (`nodes`),
-/// the script (`script`), and styling (`css`). The main way to obtain a `DecorousAst` is to use the
-/// [`Parser`](super::Parser).
+/// The abstract syntax tree representation of decorous source code.
+///
+/// This struct has three main components (all with respective getter methods):
+/// 1. [`nodes`](Self::nodes), for holding HTML markup.
+/// 2. [`script`](Self::script), for holding JavaScript.
+/// 3. [`css`](Self::css), for holding CSS.
 ///
 /// One of the best uses of `DecorousAst` is to hold data, read some parts, and eventually use
 /// [`into_components()`](DecorousAst::into_components()) when the time has come to apply more
 /// complex transformations that require ownership.
-///
-/// Note that by design, `DecorousAst` [`Node`]s only hold [`Location`]s for their metadata.
 #[derive(Debug)]
 pub struct DecorousAst<'a> {
     nodes: Vec<Node<'a, Location>>,
@@ -21,9 +22,10 @@ pub struct DecorousAst<'a> {
     css: Option<Css<'a>>,
 }
 
-/// A node of the AST. It contains [metadata](`Self::metadata()`) (of type `T`), and the
-/// actual node data, retrieved by [`node_type()`](`Self::node_type()`). A node is commonly created
-/// by the [parser](`super::Parser`), which produces an [abstract syntax tree](`DecorousAst`).
+/// A node of the [AST](DecorousAst).
+///
+/// It contains [metadata](`Self::metadata()`) (of type `T`), and the
+/// actual node data, retrieved by [`node_type()`](`Self::node_type()`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<'a, T> {
     metadata: T,
@@ -190,16 +192,6 @@ impl<'a, T> Element<'a, T> {
 }
 
 impl<'a, T> Node<'a, T> {
-    /// Create a new node with some metadata. [`NodeType`] contains actual data about the node,
-    /// such as its children (if it's an element) or the underlying expression (if it's in a
-    /// mustache `{}` tag).
-    ///
-    /// ```
-    /// # use decorous_frontend::ast::*;
-    /// // A new text node with no metadata.
-    /// let node = Node::new(NodeType::Text(Text("hello")), ());
-    /// assert_eq!(&NodeType::Text(Text("hello")), node.node_type());
-    /// ```
     pub fn new(ty: NodeType<'a, T>, metadata: T) -> Self {
         Self {
             metadata,
@@ -230,13 +222,6 @@ impl<'a, T> Node<'a, T> {
     /// Recursively cast each the metadata field of each node into a new type. The provided
     /// function receives the previous metadata of the node, and should return the corresponding new
     /// metadata.
-    ///
-    /// ```
-    /// # use decorous_frontend::ast::*;
-    /// // Some random metadata
-    /// let node = Node::new(NodeType::Text(Text("hello")), 11);
-    /// assert_eq!(Node::new(NodeType::Text(Text("hello")), true), node.cast_meta(&mut |node| *node.metadata() > 10));
-    /// ```
     pub fn cast_meta<U, F>(self, transfer_func: &mut F) -> Node<'a, U>
     where
         F: FnMut(&Node<'a, T>) -> U,
@@ -390,10 +375,6 @@ impl<'a, T> IfBlock<'a, T> {
 }
 
 impl<'a> DecorousAst<'a> {
-    /// Create a new `DecorousAst`. Note that this is usually not something done by hand, as ASTs
-    /// are usually produced by the [`Parser`](super::Parser). The components of the three passed
-    /// in arguments can be retrieved with [`nodes()`](`Self::nodes()`), [`script()`](`Self::script`),
-    /// and [`css()`](`Self::css()`).
     pub fn new(
         nodes: Vec<Node<'a, Location>>,
         script: Option<SyntaxNode>,

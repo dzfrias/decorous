@@ -1,3 +1,5 @@
+//! Utils for reading and manipulating [`rslint_parser::SyntaxNode`](rslint_parser::SyntaxNode)
+//! related things.
 use rslint_parser::{
     ast::{
         ArrowExpr, ArrowExprParams, AssignExpr, BlockStmt, Decl, Expr, ExprOrBlock, ExprStmt,
@@ -6,8 +8,7 @@ use rslint_parser::{
     AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
 };
 
-/// Get unbound variable references from a syntax element of the `rslint_parser` tree. This function
-/// also takes scoped variables into account, so it is always correct.
+/// Get unbound variable references from a [`SyntaxNode`](rslint_parser::SyntaxNode).
 pub fn get_unbound_refs(syntax_node: &SyntaxNode) -> Vec<NameRef> {
     if syntax_node.is::<Script>() {
         return get_unbound_refs(&syntax_node.first_child().unwrap());
@@ -56,6 +57,7 @@ pub fn get_unbound_refs(syntax_node: &SyntaxNode) -> Vec<NameRef> {
     all
 }
 
+/// Checks if a [`NameRef`]'s parent is an [`AssignExpr`].
 pub fn is_from_assignment(nref: &NameRef) -> bool {
     nref.syntax()
         .parent()

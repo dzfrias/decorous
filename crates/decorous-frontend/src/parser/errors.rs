@@ -5,6 +5,7 @@ use thiserror::Error;
 
 use crate::{css, location::Location};
 
+/// Describes possible parsing errors of the [`parse`](crate::parse) function.
 #[derive(Debug, Error, PartialEq, Clone)]
 pub enum ParseErrorType {
     #[error("invalid closing tag, expected {0}")]
@@ -34,6 +35,14 @@ pub enum ParseErrorType {
     Nom(nom::error::ErrorKind),
 }
 
+/// A parsing error, with extra metadata. The root of this struct is in
+/// [`ParseErrorType`](crate::errors::ParseErrorType).
+///
+/// For more on parsing, see the [`parse`](crate::parse) function.
+///
+/// `ParseError` can have arbitrary metadata, retrieved by the
+/// [`fragment()`](ParseError::fragment()) method. Along with metadata, `ParseError` can have
+/// attached [`Help`] data.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[error("parser error: {err_type}")]
 pub struct ParseError<T> {
@@ -42,12 +51,16 @@ pub struct ParseError<T> {
     err_type: ParseErrorType,
 }
 
+/// An error help message, commonly created alongside a [`ParseError`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Help {
     corresponding_line: Option<u32>,
     message: &'static str,
 }
 
+/// A full report of [`ParseError`]s.
+///
+/// This is usually produced along the [`parse`](crate::parse) function.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Report<T> {
     errors: Vec<ParseError<T>>,
@@ -132,6 +145,7 @@ impl Help {
         }
     }
 
+    /// Creates a new `Help`, with no corresponding line.
     pub fn with_message(message: &'static str) -> Self {
         Self {
             corresponding_line: None,
