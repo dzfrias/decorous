@@ -141,6 +141,9 @@ fn main() -> Result<()> {
         }
     }
 
+    #[cfg(feature = "dhat-heap")]
+    println!();
+
     Ok(())
 }
 
