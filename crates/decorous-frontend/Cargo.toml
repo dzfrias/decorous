@@ -3,6 +3,10 @@ name = "decorous-frontend"
 version = "0.1.0"
 edition = "2021"
 
+[[bench]]
+name = "parse"
+harness = false
+
 [dependencies]
 itertools = "0.11.0"
 nom = "7.1.3"
@@ -18,3 +22,4 @@ smallvec = "1.11.0"
 insta = { workspace = true }
 serde = { version = "1.0.131", features = ["derive"] }
 serde_derive = { version = "1.0.131" }
+criterion = "0.5"

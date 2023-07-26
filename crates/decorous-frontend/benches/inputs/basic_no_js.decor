@@ -1,0 +1,16 @@
+#h1:My Website
+
+#p Hello, world! /p
+#div[class="main"]
+  #ul
+    #li:One
+    #li:Two
+    #li:Three
+  /ul
+  #p:This is a paragraph.
+/div
+
+#section
+  #h2:Section title
+  #p:Nice!
+/section

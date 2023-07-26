@@ -1,0 +1,22 @@
+---js
+let section_title = "Wow";
+let start = 0;
+---
+
+#h1:My Website
+
+#p Hello, world! /p
+#div[class="main"]
+  #ul
+    #li {start + 1} /li
+    #li {start + 2} /li
+    #li {start + 3} /li
+  /ul
+  #p:This is a paragraph.
+/div
+
+#section
+  #h2 {section_title} /h2
+  #button[@click={() => section_title = "Woah"}]:Click to change section title
+  #p:Nice!
+/section
