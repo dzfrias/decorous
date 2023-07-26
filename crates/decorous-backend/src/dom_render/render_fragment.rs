@@ -6,20 +6,26 @@ use decorous_frontend::{
     utils, DeclaredVariables, FragmentMetadata,
 };
 use itertools::Itertools;
-use std::{borrow::Cow, fmt::Write};
+use std::{
+    borrow::Cow,
+    fmt::Write,
+    io::{self, Write as IoWrite},
+    str,
+};
 
 use crate::codegen_utils::{self, force_write, force_writeln, replace_namerefs, sort_if_testing};
 
-pub(crate) fn render_fragment(
+pub(crate) fn render_fragment<T: io::Write>(
     nodes: &[Node<'_, FragmentMetadata>],
     root: Option<u32>,
     declared: &DeclaredVariables,
     name: &str,
-) -> String {
-    let mut decls = String::new();
-    let mut mounts = String::new();
-    let mut updates = String::new();
-    let mut detaches = String::new();
+    out: &mut T,
+) -> io::Result<()> {
+    let mut decls = vec![];
+    let mut mounts = vec![];
+    let mut updates = vec![];
+    let mut detaches = vec![];
     traverse_with(
         nodes,
         &mut |elem| collapse_children(elem).is_none(),
@@ -37,19 +43,21 @@ pub(crate) fn render_fragment(
         render_reactive_css(declared, &mut updates, &mut mounts);
     }
 
-    let rendered = format!(
+    // SAFETY: The output of the corresponding render functions are always valid utf-8. There are
+    // no external sources of memory being written (save the static templates/fragment.js), so this
+    // is safe.
+    write!(
+        out,
         include_str!("./templates/fragment.js"),
         id = name,
-        decls = decls,
-        mounts = mounts,
-        update_body = updates,
-        detach_body = detaches
-    );
-
-    rendered
+        decls = unsafe { str::from_utf8_unchecked(&decls) },
+        mounts = unsafe { str::from_utf8_unchecked(&mounts) },
+        update_body = unsafe { str::from_utf8_unchecked(&updates) },
+        detach_body = unsafe { str::from_utf8_unchecked(&detaches) }
+    )
 }
 
-fn render_decl(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &DeclaredVariables) {
+fn render_decl(f: &mut Vec<u8>, node: &Node<'_, FragmentMetadata>, declared: &DeclaredVariables) {
     let id = node.metadata().id();
     match node.node_type() {
         NodeType::Text(t) => force_writeln!(
@@ -183,7 +191,7 @@ fn render_decl(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &Dec
 }
 
 fn render_mount(
-    f: &mut String,
+    f: &mut Vec<u8>,
     node: &Node<'_, FragmentMetadata>,
     root: Option<u32>,
     declared: &DeclaredVariables,
@@ -193,11 +201,11 @@ fn render_mount(
     match node.node_type() {
         // In the special case of an if block, create AND mount here
         NodeType::SpecialBlock(SpecialBlock::If(if_block)) => {
-            let block = render_fragment(if_block.inner(), Some(id), declared, &id.to_string());
-            force_writeln!(f, "{block}");
+            render_fragment(if_block.inner(), Some(id), declared, &id.to_string(), f)
+                .expect("write to in-memory vec should not fail");
             if let Some(else_block) = if_block.else_block() {
-                let block = render_fragment(else_block, Some(id), declared, &format!("{id}_else"));
-                force_writeln!(f, "{block}");
+                render_fragment(else_block, Some(id), declared, &format!("{id}_else"), f)
+                    .expect("write to in-memory vec should not fail");
             }
 
             let replacement = codegen_utils::replace_namerefs(
@@ -224,8 +232,8 @@ fn render_mount(
 
         // In the special case of a for block, create AND mount here
         NodeType::SpecialBlock(SpecialBlock::For(for_block)) => {
-            let block = render_fragment(for_block.inner(), Some(id), declared, &id.to_string());
-            force_writeln!(f, "{block}");
+            render_fragment(for_block.inner(), Some(id), declared, &id.to_string(), f)
+                .expect("write to in-memory vec should not fail");
 
             let expr = codegen_utils::replace_namerefs(
                 for_block.expr(),
@@ -257,7 +265,7 @@ fn render_mount(
     }
 }
 
-fn render_update(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &DeclaredVariables) {
+fn render_update(f: &mut Vec<u8>, node: &Node<'_, FragmentMetadata>, declared: &DeclaredVariables) {
     let id = node.metadata().id();
     match node.node_type() {
         NodeType::Mustache(mustache) => {
@@ -338,7 +346,7 @@ fn render_update(f: &mut String, node: &Node<'_, FragmentMetadata>, declared: &D
     }
 }
 
-fn render_detach(f: &mut String, node: &Node<'_, FragmentMetadata>, root: Option<u32>) {
+fn render_detach(f: &mut Vec<u8>, node: &Node<'_, FragmentMetadata>, root: Option<u32>) {
     // Only detach root elems
     if root != node.metadata().parent_id() {
         return;
@@ -361,7 +369,7 @@ fn render_detach(f: &mut String, node: &Node<'_, FragmentMetadata>, root: Option
     }
 }
 
-fn render_reactive_css(declared: &DeclaredVariables, updates: &mut String, mounts: &mut String) {
+fn render_reactive_css(declared: &DeclaredVariables, updates: &mut Vec<u8>, mounts: &mut Vec<u8>) {
     // No reactive CSS
     if declared.css_mustaches().is_empty() {
         return;

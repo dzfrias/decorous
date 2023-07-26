@@ -36,15 +36,12 @@ fn render<T: io::Write>(
         // Ceiling division to get the amount of bytes needed in the ArrayBuffer
         ((component.declared_vars().len() + 7) / 8)
     )?;
-    write!(
+    render_fragment(
+        component.fragment_tree(),
+        None,
+        component.declared_vars(),
+        "main",
         render_to,
-        "{}",
-        render_fragment(
-            component.fragment_tree(),
-            None,
-            component.declared_vars(),
-            "main",
-        )
     )?;
 
     writeln!(render_to, "function __init_ctx() {{")?;

@@ -98,31 +98,31 @@ fn render_hoists<'a, T: io::Write>(
     for (meta, block) in analysis.reactive_data().special_blocks() {
         match block {
             SpecialBlock::If(if_block) => {
-                let rendered = dom_render_fragment(
+                dom_render_fragment(
                     if_block.inner(),
                     Some(meta.id()),
                     component.declared_vars(),
                     &meta.id().to_string(),
-                );
-                write!(formatter, "{rendered}")?;
+                    out,
+                )?;
                 if let Some(else_block) = if_block.else_block() {
-                    let rendered = dom_render_fragment(
+                    dom_render_fragment(
                         else_block,
                         Some(meta.id()),
                         component.declared_vars(),
                         &format!("{}_else", meta.id()),
-                    );
-                    write!(formatter, "{rendered}")?;
+                        out,
+                    )?;
                 }
             }
             SpecialBlock::For(for_block) => {
-                let rendered = dom_render_fragment(
+                dom_render_fragment(
                     for_block.inner(),
                     Some(meta.id()),
                     component.declared_vars(),
                     &meta.id().to_string(),
-                );
-                write!(formatter, "{rendered}")?;
+                    out,
+                )?;
             }
         }
     }
