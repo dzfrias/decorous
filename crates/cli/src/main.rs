@@ -18,6 +18,10 @@ use superfmt::{
     Formatter,
 };
 
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 enum RenderMethod {
@@ -57,6 +61,9 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
+
     let args = Cli::parse();
     let mut stdout = io::stdout();
     let mut formatter = Formatter::new(&mut stdout);

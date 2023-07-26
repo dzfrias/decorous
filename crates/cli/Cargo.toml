@@ -3,6 +3,9 @@ name = "cli"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+dhat-heap = ["dhat"]
+
 [[bin]]
 name = "decorous"
 path = "src/main.rs"
@@ -13,3 +16,4 @@ decorous-frontend = { path = "../decorous-frontend" }
 decorous-backend = { path = "../decorous-backend" }
 superfmt = { path = "../superfmt" }
 anyhow = "1.0.71"
+dhat = { version = "0.3", optional = true }

@@ -1,6 +1,7 @@
 use std::fmt;
 
 use nom_locate::LocatedSpan;
+use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 
 use crate::{css, location::Location};
@@ -63,7 +64,7 @@ pub struct Help {
 /// This is usually produced along the [`parse`](crate::parse) function.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Report<T> {
-    errors: Vec<ParseError<T>>,
+    errors: SmallVec<[ParseError<T>; 3]>,
 }
 
 impl<T> Report<T> {
@@ -74,7 +75,7 @@ impl<T> Report<T> {
 
 impl From<Report<LocatedSpan<&str>>> for Report<Location> {
     fn from(report: Report<LocatedSpan<&str>>) -> Self {
-        let mut new_report = Vec::with_capacity(report.errors.len());
+        let mut new_report = SmallVec::with_capacity(report.errors.len());
         for err in report.errors {
             new_report.push(ParseError::new(err.fragment.into(), err.err_type, err.help));
         }
@@ -84,7 +85,9 @@ impl From<Report<LocatedSpan<&str>>> for Report<Location> {
 
 impl<T> From<ParseError<T>> for Report<T> {
     fn from(err: ParseError<T>) -> Self {
-        Self { errors: vec![err] }
+        Self {
+            errors: smallvec![err],
+        }
     }
 }
 
