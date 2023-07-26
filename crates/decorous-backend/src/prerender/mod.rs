@@ -362,7 +362,7 @@ fn render_update_body<T: io::Write>(
                     .get(block.binding())
                     .expect("BUG: for block's scope should contain the binding");
                 let id = meta.id();
-                writeln!(formatter, "let i = 0; for (const v of ({replaced})) {{ if (i >= elems[\"{id}_block\"].length) {{ elems[\"{id}_block\"][i] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} ctx[{var_idx}] = v; elems[\"{id}_block\"][i].u(dirty); i += 1; }} elems[\"{id}_block\"].slice(i).forEach((b) => b.d()); elems[\"9_block\"].length = i;")?;
+                writeln!(formatter, "let i = 0; for (const v of ({replaced})) {{ ctx[{var_idx}] = v; if (i >= elems[\"{id}_block\"].length) {{ elems[\"{id}_block\"][i] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} elems[\"{id}_block\"][i].u(dirty); i += 1; }} elems[\"{id}_block\"].slice(i).forEach((b) => b.d()); elems[\"{id}_block\"].length = i;")?;
             }
         }
     }
