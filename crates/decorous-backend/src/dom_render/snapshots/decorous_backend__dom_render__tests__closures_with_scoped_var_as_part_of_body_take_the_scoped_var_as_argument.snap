@@ -25,7 +25,6 @@ e1.parentNode.removeChild(e1);
 }
 };
 }
-
 mount(target, e0_anchor, anchor);
 let e0_blocks = [];
 let i = 0;
