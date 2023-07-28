@@ -1,6 +1,6 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: script(input.into())
+expression: parse_code_blocks(input.into())
 ---
 Ok(
     (
@@ -10,21 +10,27 @@ Ok(
             fragment: "",
             extra: (),
         },
-        MODULE@0..21
-          WHITESPACE@0..1 " "
-          EXPR_STMT@1..21
-            CALL_EXPR@1..21
-              DOT_EXPR@1..12
-                NAME_REF@1..8
-                  IDENT@1..8 "console"
-                DOT@8..9 "."
-                NAME@9..12
-                  IDENT@9..12 "log"
-              ARG_LIST@12..21
-                L_PAREN@12..13 "("
-                LITERAL@13..20
-                  STRING@13..20 "\"hello\""
-                R_PAREN@20..21 ")"
-        ,
+        (
+            Some(
+                MODULE@0..21
+                  WHITESPACE@0..1 " "
+                  EXPR_STMT@1..21
+                    CALL_EXPR@1..21
+                      DOT_EXPR@1..12
+                        NAME_REF@1..8
+                          IDENT@1..8 "console"
+                        DOT@8..9 "."
+                        NAME@9..12
+                          IDENT@9..12 "log"
+                      ARG_LIST@12..21
+                        L_PAREN@12..13 "("
+                        LITERAL@13..20
+                          STRING@13..20 "\"hello\""
+                        R_PAREN@20..21 ")"
+                ,
+            ),
+            None,
+            None,
+        ),
     ),
 )

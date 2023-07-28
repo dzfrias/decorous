@@ -94,7 +94,7 @@ impl<'a> Component<'a> {
 // Private methods of Component
 impl<'a> Component<'a> {
     fn compute(&mut self, ast: DecorousAst<'a>) {
-        let (mut nodes, script, css) = ast.into_components();
+        let (mut nodes, script, css, _wasm) = ast.into_components();
         let mut declared = vec![];
         if let Some(script) = script {
             let all_declared_vars = self.extract_toplevel_data(script);

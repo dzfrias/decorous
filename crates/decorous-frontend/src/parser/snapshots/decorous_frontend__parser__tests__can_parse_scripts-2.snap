@@ -1,6 +1,6 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: style(input.into())
+expression: parse_code_blocks(input.into())
 ---
 Ok(
     (
@@ -10,33 +10,39 @@ Ok(
             fragment: "",
             extra: (),
         },
-        Css {
-            rules: [
-                Regular(
-                    RegularRule {
-                        selector: Selector {
-                            parts: [
-                                SelectorPart {
-                                    text: Some(
-                                        "body",
-                                    ),
-                                    pseudoes: [],
+        (
+            None,
+            Some(
+                Css {
+                    rules: [
+                        Regular(
+                            RegularRule {
+                                selector: Selector {
+                                    parts: [
+                                        SelectorPart {
+                                            text: Some(
+                                                "body",
+                                            ),
+                                            pseudoes: [],
+                                        },
+                                    ],
                                 },
-                            ],
-                        },
-                        declarations: [
-                            Declaration {
-                                name: "height",
-                                values: [
-                                    Css(
-                                        "100vh",
-                                    ),
+                                declarations: [
+                                    Declaration {
+                                        name: "height",
+                                        values: [
+                                            Css(
+                                                "100vh",
+                                            ),
+                                        ],
+                                    },
                                 ],
                             },
-                        ],
-                    },
-                ),
-            ],
-        },
+                        ),
+                    ],
+                },
+            ),
+            None,
+        ),
     ),
 )

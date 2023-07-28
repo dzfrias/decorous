@@ -20,6 +20,7 @@ pub struct DecorousAst<'a> {
     nodes: Vec<Node<'a, Location>>,
     script: Option<SyntaxNode>,
     css: Option<Css<'a>>,
+    wasm: Option<Code<'a>>,
 }
 
 /// A node of the [AST](DecorousAst).
@@ -137,6 +138,31 @@ pub enum AttributeValue<'a> {
 pub enum CollapsedChildrenType<'a> {
     Text(&'a str),
     Html(String),
+}
+
+#[derive(Debug)]
+pub struct Code<'a> {
+    lang: &'a str,
+    body: &'a str,
+    offset: usize,
+}
+
+impl<'a> Code<'a> {
+    pub fn new(lang: &'a str, body: &'a str, offset: usize) -> Self {
+        Self { lang, body, offset }
+    }
+
+    pub fn lang(&self) -> &'a str {
+        self.lang
+    }
+
+    pub fn body(&self) -> &'a str {
+        self.body
+    }
+
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
 }
 
 impl<'a, T> Element<'a, T> {
@@ -379,8 +405,14 @@ impl<'a> DecorousAst<'a> {
         nodes: Vec<Node<'a, Location>>,
         script: Option<SyntaxNode>,
         css: Option<Css<'a>>,
+        wasm: Option<Code<'a>>,
     ) -> Self {
-        Self { nodes, script, css }
+        Self {
+            nodes,
+            script,
+            css,
+            wasm,
+        }
     }
 
     /// Obtain a shared reference to the template AST.
@@ -405,8 +437,19 @@ impl<'a> DecorousAst<'a> {
         NodeIter::new(self.nodes())
     }
 
-    pub fn into_components(self) -> (Vec<Node<'a, Location>>, Option<SyntaxNode>, Option<Css<'a>>) {
-        (self.nodes, self.script, self.css)
+    pub fn into_components(
+        self,
+    ) -> (
+        Vec<Node<'a, Location>>,
+        Option<SyntaxNode>,
+        Option<Css<'a>>,
+        Option<Code<'a>>,
+    ) {
+        (self.nodes, self.script, self.css, self.wasm)
+    }
+
+    pub fn wasm(&self) -> Option<&Code<'a>> {
+        self.wasm.as_ref()
     }
 }
 

@@ -80,5 +80,6 @@ Ok(
         ],
         script: None,
         css: None,
+        wasm: None,
     },
 )

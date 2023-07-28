@@ -1,0 +1,25 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: parse_code_blocks(input.into())
+---
+Ok(
+    (
+        LocatedSpan {
+            offset: 22,
+            line: 1,
+            fragment: "",
+            extra: (),
+        },
+        (
+            None,
+            None,
+            Some(
+                Code {
+                    lang: "wasm",
+                    body: " let x = 3; ",
+                    offset: 7,
+                },
+            ),
+        ),
+    ),
+)

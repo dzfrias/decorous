@@ -20,8 +20,8 @@ use rslint_parser::{parse_module, SyntaxNode};
 use self::errors::{Help, ParseError, ParseErrorType, Report};
 use crate::{
     ast::{
-        Attribute, AttributeValue, Comment, DecorousAst, Element, EventHandler, ForBlock, IfBlock,
-        Mustache, Node, NodeType, SpecialBlock, Text,
+        Attribute, AttributeValue, Code, Comment, DecorousAst, Element, EventHandler, ForBlock,
+        IfBlock, Mustache, Node, NodeType, SpecialBlock, Text,
     },
     css::{self, ast::Css},
     location::Location,
@@ -67,33 +67,58 @@ pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<Location>> 
 }
 
 fn _parse(input: NomSpan) -> Result<DecorousAst> {
-    let (input, script) = opt(ws(script))(input)?;
-    let (input, css) = opt(ws(style))(input)?;
+    let (input, (mut script, mut css, mut wasm)) = parse_code_blocks(input)?;
     let (input, nodes) = nodes(input)?;
-    Ok((input, DecorousAst::new(nodes, script, css)))
+    let (input, new) = parse_code_blocks(input)?;
+    if css.is_none() {
+        css = new.1;
+    }
+    if wasm.is_none() {
+        wasm = new.2;
+    }
+    if script.is_none() {
+        script = new.0;
+    }
+    Ok((input, DecorousAst::new(nodes, script, css, wasm)))
 }
 
-fn script(input: NomSpan) -> Result<SyntaxNode> {
-    let (input, _) = tag("---js")(input)?;
+fn parse_code_blocks(
+    input: LocatedSpan<&str>,
+) -> Result<(Option<SyntaxNode>, Option<Css>, Option<Code>)> {
+    let (input, code_blocks) = many0(ws(code))(input)?;
+    let mut script = None;
+    let mut css = None;
+    let mut wasm = None;
+    for b in code_blocks {
+        match b.lang() {
+            "js" => {
+                script = match parse_js(b.body(), b.offset()) {
+                    Ok(node) => Some(node),
+                    Err(err) => return nom_err!(input, Failure, err, None),
+                };
+            }
+            "css" => {
+                let p = css::Parser::new(b.body());
+                css = Some(match p.parse() {
+                    Ok(css) => css,
+                    Err(err) => {
+                        return nom_err!(input, Failure, ParseErrorType::CssParsingError(err), None)
+                    }
+                });
+            }
+            _ => wasm = Some(b),
+        }
+    }
+    Ok((input, (script, css, wasm)))
+}
+
+fn code(input: NomSpan) -> Result<Code> {
+    let (input, _) = tag("---")(input)?;
+    let (input, lang) = take_while(|c: char| !c.is_whitespace())(input)?;
     let (input, loc) = position(input)?;
     let (input, body) = take_until("---")(input)?;
     let (input, _) = take(3usize)(input)?;
-    match parse_js(&body, loc.location_offset()) {
-        Ok(node) => Ok((input, node)),
-        Err(err) => nom_err!(input, Failure, err, None),
-    }
-}
-
-fn style(input: NomSpan) -> Result<Css> {
-    let (input, _) = tag("---css")(input)?;
-    let (input, body) = take_until("---")(input)?;
-    let (input, _) = take(3usize)(input)?;
-    let p = css::Parser::new(&body);
-    let css = match p.parse() {
-        Ok(css) => css,
-        Err(err) => return nom_err!(input, Failure, ParseErrorType::CssParsingError(err), None),
-    };
-    Ok((input, css))
+    Ok((input, Code::new(&lang, &body, loc.location_offset())))
 }
 
 fn nodes(input: NomSpan) -> Result<Vec<Node<'_, Location>>> {
@@ -108,6 +133,14 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
             input,
             Error,
             ParseErrorType::Nom(nom::error::ErrorKind::Eof),
+            None
+        );
+    }
+    if peek(tag::<&str, NomSpan, Report<NomSpan>>("---"))(input).is_ok() {
+        return nom_err!(
+            input,
+            Error,
+            ParseErrorType::Nom(nom::error::ErrorKind::Tag),
             None
         );
     }
@@ -538,8 +571,9 @@ mod tests {
 
     #[test]
     fn can_parse_scripts() {
-        nom_test_all_insta!(script, ["---js console.log(\"hello\")---",]);
-        nom_test_all_insta!(style, ["---css body { height: 100vh; } ---"]);
+        nom_test_all_insta!(parse_code_blocks, ["---js console.log(\"hello\")---",]);
+        nom_test_all_insta!(parse_code_blocks, ["---css body { height: 100vh; } ---"]);
+        nom_test_all_insta!(parse_code_blocks, ["---wasm let x = 3; ---"]);
     }
 
     #[test]
@@ -579,5 +613,10 @@ mod tests {
                 "{#if x == 3} #p hello /p {:else} hello {/if}"
             ]
         )
+    }
+
+    #[test]
+    fn css_can_appear_after_template() {
+        nom_test_all_insta!(parse, ["#p Hello /p ---css p { color: red; } ---"])
     }
 }
