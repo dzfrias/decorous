@@ -5,7 +5,7 @@ debug = 1
 members = [
     "crates/decorous-frontend",
     "crates/decorous-backend",
-    "crates/cli",
+    "crates/core",
     "crates/superfmt",
     "crates/harpoon",
 ]
