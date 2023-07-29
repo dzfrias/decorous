@@ -22,17 +22,7 @@ pub struct Cli {
     #[arg(short, long, default_value = "prerender")]
     pub render_method: RenderMethod,
 
-    /// The name of the HTML file to generate
-    #[arg(long,
-          value_name = "PATH",
-          num_args = 0..=1,
-          require_equals = true,
-          default_missing_value = "index.html",
-          default_value = None,
-          default_value_if("render_method", "prerender", Some("out.html")),
-    )]
-    pub html: Option<PathBuf>,
-    /// The name of the css file to generate
-    #[arg(long, value_name = "PATH", default_value = "out.css")]
-    pub css: PathBuf,
+    /// Generate a full index.html file instead of just a fragment (or none at all).
+    #[arg(long)]
+    pub html: bool,
 }

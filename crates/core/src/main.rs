@@ -6,7 +6,6 @@ mod fmt_report;
 use std::{
     fs::{self, File},
     io::{self, BufWriter, Write},
-    path::Path,
 };
 
 use anyhow::{Context, Result};
@@ -69,11 +68,11 @@ fn main() -> Result<()> {
         .transpose()?;
     render_html(&args, &component, &metadata, wasm_ext.as_deref())?;
     if component.css().is_some() {
+        let name = format!("{}.css", args.out);
         render::<CssRenderer, _>(
             &component,
             &mut BufWriter::new(
-                File::create(&args.css)
-                    .with_context(|| format!("problem creating {}", args.css.display()))?,
+                File::create(&name).with_context(|| format!("problem creating {name}"))?,
             ),
             &metadata,
         )?;
@@ -114,19 +113,20 @@ fn render_html(
 ) -> Result<()> {
     let mut handlebars = Handlebars::new();
     handlebars.register_escape_fn(no_escape);
+    handlebars.register_template_string("index", include_str!("./templates/template.html"))?;
     match args.render_method {
         RenderMethod::Dom => {
-            let Some(html) = &args.html else {
+            if !args.html {
                 return Ok(());
-            };
-            let out = File::create(html)
-                .with_context(|| format!("problem creating {}", html.display()))?;
+            }
+            let out = File::create("index.html").context("problem creating index.html")?;
 
             let body = json!({
-                "script": args.out,
-                "css": component.css().is_some().then_some(&args.css),
+                "script": format!("{}.js", args.out),
+                "css": component.css().is_some().then(|| format!("{}.css", args.out)),
                 "name": meta.name,
                 "wasm_ext": wasm_ext,
+                "html": None::<&str>,
             });
 
             handlebars.render_template_to_write(
@@ -138,13 +138,36 @@ fn render_html(
             Ok(())
         }
         RenderMethod::Prerender => {
-            let html = args.html.as_deref().unwrap_or(Path::new("out.html"));
+            if args.html {
+                let mut out = vec![];
+                render::<HtmlPrerenderer, _>(component, &mut out, meta)?;
+
+                let body = json!({
+                    "script": format!("{}.js", args.out),
+                    "css": component.css().is_some().then(|| format!("{}.css", args.out)),
+                    "name": meta.name,
+                    "wasm_ext": wasm_ext,
+                    // SAFETY: HtmlPrerenderer only produces valid UTF-8
+                    "html": Some(unsafe {
+                        std::str::from_utf8_unchecked(&out)
+                    }),
+                });
+
+                handlebars.render_template_to_write(
+                    include_str!("./templates/template.html"),
+                    &body,
+                    File::create("index.html").context("problem creating index.html")?,
+                )?;
+
+                return Ok(());
+            }
+
+            let html = format!("{}.html", args.out);
 
             render::<HtmlPrerenderer, _>(
                 component,
                 &mut BufWriter::new(
-                    File::create(html)
-                        .with_context(|| format!("problem creating {}", html.display()))?,
+                    File::create(&html).with_context(|| format!("problem creating {}", html))?,
                 ),
                 meta,
             )?;
