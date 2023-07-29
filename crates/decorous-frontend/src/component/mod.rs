@@ -12,7 +12,7 @@ use rslint_parser::{
 
 use crate::{
     ast::{
-        traverse_mut, Attribute, AttributeValue, DecorousAst, Node, NodeIter, NodeType,
+        traverse_mut, Attribute, AttributeValue, Code, DecorousAst, Node, NodeIter, NodeType,
         SpecialBlock,
     },
     css::{self, ast::Css},
@@ -33,6 +33,7 @@ pub struct Component<'a> {
     current_id: u32,
 
     css: Option<Css<'a>>,
+    wasm: Option<Code<'a>>,
 }
 
 #[derive(Debug)]
@@ -57,6 +58,7 @@ impl<'a> Component<'a> {
             component_id: 0,
 
             css: None,
+            wasm: None,
         };
         c.compute(ast);
         c
@@ -89,12 +91,16 @@ impl<'a> Component<'a> {
     pub fn css(&self) -> Option<&Css<'_>> {
         self.css.as_ref()
     }
+
+    pub fn wasm(&self) -> Option<&Code<'_>> {
+        self.wasm.as_ref()
+    }
 }
 
 // Private methods of Component
 impl<'a> Component<'a> {
     fn compute(&mut self, ast: DecorousAst<'a>) {
-        let (mut nodes, script, css, _wasm) = ast.into_components();
+        let (mut nodes, script, css, wasm) = ast.into_components();
         let mut declared = vec![];
         if let Some(script) = script {
             let all_declared_vars = self.extract_toplevel_data(script);
@@ -104,6 +110,7 @@ impl<'a> Component<'a> {
             self.isolate_css(&mut css, &mut nodes);
             self.css = Some(css);
         }
+        self.wasm = wasm;
         self.build_fragment_tree(nodes, declared);
     }
 

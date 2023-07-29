@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -e
+
+NAME="${1%%.*}"
+emcc \
+  "$1" \
+  -o "$2/$NAME".js \
+  -s NO_EXIT_RUNTIME=1 \
+  -s EXPORTED_RUNTIME_METHODS="['ccall']"
+
+cat << EOF
+<script async src="$2/$NAME.js"></script>
+<script defer src="$2.js"></script>
+EOF

@@ -17,3 +17,7 @@ decorous-backend = { path = "../decorous-backend" }
 superfmt = { path = "../superfmt" }
 anyhow = "1.0.71"
 dhat = { version = "0.3", optional = true }
+serde = { version = "1.0.177", features = ["derive"] }
+handlebars = "4.3"
+serde_json = "1.0.104"
+scopeguard = "1.2.0"

@@ -1,0 +1,39 @@
+#!/bin/bash
+
+set -e
+
+INPUT="$1"
+OUTDIR="$2"
+CARGO_NAME="decor-out"
+
+if [[ ! -d "$CARGO_NAME" ]]; then
+  cargo new --lib "$CARGO_NAME"
+  cat > "$CARGO_NAME"/Cargo.toml << EOF
+[package]
+name = "$CARGO_NAME"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+EOF
+fi
+
+cat "$INPUT" > "$CARGO_NAME"/src/lib.rs
+
+wasm-pack build "$CARGO_NAME" --target web --out-name decor_out --out-dir ../"$OUTDIR"
+
+cat << EOF
+<script type="module">
+import init, * as wasm from "/$OUTDIR/decor_out.js";
+async function run() {
+  await init();
+  window.wasm = wasm;
+  import("/$OUTDIR.js")
+}
+run();
+</script>
+EOF

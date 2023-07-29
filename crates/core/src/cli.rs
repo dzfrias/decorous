@@ -16,9 +16,9 @@ pub struct Cli {
     #[arg(value_name = "PATH")]
     pub input: PathBuf,
 
-    /// The name of the output file to generate.
-    #[arg(short, long, value_name = "PATH", default_value = "out.js")]
-    pub out: PathBuf,
+    /// The base name of the output file(s) to generate.
+    #[arg(short, long, value_name = "NAME", default_value = "out")]
+    pub out: String,
     #[arg(short, long, default_value = "prerender")]
     pub render_method: RenderMethod,
 
