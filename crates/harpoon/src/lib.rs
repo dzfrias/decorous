@@ -25,7 +25,6 @@ pub struct Harpoon<'a> {
     current: Option<char>,
 
     idx: usize,
-    checkpoints: Vec<usize>,
 }
 
 impl<'a> Harpoon<'a> {
@@ -36,7 +35,6 @@ impl<'a> Harpoon<'a> {
             current: None,
             peek_buf: VecDeque::new(),
             idx: 0,
-            checkpoints: vec![],
         };
         harpoon
     }
@@ -54,25 +52,6 @@ impl<'a> Harpoon<'a> {
         }
         self.current = next;
         self.current
-    }
-
-    pub fn checkpoint(&mut self) {
-        self.checkpoints.push(self.idx);
-    }
-
-    pub fn cancel_checkpoint(&mut self) {
-        if self.checkpoints.pop().is_none() {
-            panic!("attempted to cancel checkpoint when no checkpoints exist");
-        }
-    }
-
-    pub fn end_checkpoint(&mut self) -> Span<'a> {
-        let Some(start) = self.checkpoints.pop() else {
-            panic!("attempted to harpoon when no checkpoints exist");
-        };
-        let t = &self.source[start..self.source.len() - self.source[self.idx..].len()];
-
-        Span::new(t, start)
     }
 
     pub fn current(&self) -> Option<char> {
@@ -156,17 +135,14 @@ impl<'a> Harpoon<'a> {
         self.idx
     }
 
-    pub fn has_checkpoint(&self) -> bool {
-        !self.checkpoints.is_empty()
-    }
-
     pub fn harpoon<F>(&mut self, mut f: F) -> Span<'a>
     where
         F: FnMut(&mut Harpoon),
     {
-        self.checkpoint();
+        let start = self.idx;
         f(self);
-        self.end_checkpoint()
+        let t = &self.source[start..self.source.len() - self.source[self.idx..].len()];
+        Span::new(t, start)
     }
 
     pub fn source(&self) -> &'a str {
@@ -192,10 +168,10 @@ mod tests {
     #[test]
     fn harpoon_is_right_exclusive() {
         let mut harpoon = Harpoon::new("1234");
-        harpoon.checkpoint();
-        assert_eq!(Some('1'), harpoon.consume());
-        assert_eq!(Some('2'), harpoon.consume());
-        let span = harpoon.end_checkpoint();
+        let span = harpoon.harpoon(|h| {
+            assert_eq!(Some('1'), h.consume());
+            assert_eq!(Some('2'), h.consume());
+        });
         assert_eq!(0, span.start());
         assert_eq!(2, span.end());
         assert_eq!("12", span.text());
