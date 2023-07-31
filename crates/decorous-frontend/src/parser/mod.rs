@@ -414,7 +414,11 @@ fn parse_str(i: NomSpan) -> Result<NomSpan> {
 }
 
 fn parse_text(input: NomSpan) -> Result<NomSpan> {
-    escaped(none_of("/#\\{\n"), '\\', one_of(r#"/#{}"#))(input)
+    escaped(
+        take_while(|c| !matches!(c, '/' | '#' | '\\' | '{' | '\n' | '\r')),
+        '\\',
+        one_of(r#"/#{}"#),
+    )(input)
 }
 
 // --General purpose parsers--
