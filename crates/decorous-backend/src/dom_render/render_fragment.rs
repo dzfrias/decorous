@@ -427,7 +427,7 @@ fn collapse_whitespace(s: &str) -> Cow<str> {
             let mut joined = String::with_capacity(s.len());
             // We use .lines() to also account for \r\n
             for line in s.lines() {
-                force_writeln!(joined, "{line}\\n");
+                force_write!(joined, "{line}\\n");
             }
 
             joined.into()
