@@ -1,4 +1,7 @@
 use std::{
+    borrow::Cow,
+    env,
+    ffi::OsStr,
     fs::{self, File},
     io::{self, Write},
     path::PathBuf,
@@ -40,9 +43,12 @@ pub fn compile_wasm<'a>(
         Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
         Err(err) => bail!(err),
     }
+    let shell = env::var_os("SHELL")
+        .map(Cow::Owned)
+        .unwrap_or(Cow::Borrowed(OsStr::new("bash")));
     let (status, stdout, stderr) = match &config.script {
         ScriptOrFile::File(file) => {
-            let out = Command::new("sh")
+            let out = Command::new(shell)
                 .arg(file)
                 .arg(&path)
                 .arg(out_name)
@@ -57,7 +63,7 @@ pub fn compile_wasm<'a>(
             defer! {
                 fs::remove_file("__tmp.sh").expect("error removing \"__tmp.sh\"! Remove it manually!");
             }
-            let out = Command::new("sh")
+            let out = Command::new(shell)
                 .arg("__tmp.sh")
                 .arg(&path)
                 .arg(out_name)
