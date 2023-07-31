@@ -88,8 +88,9 @@ pub fn compile_wasm<'a>(
     };
     if !status.success() {
         bail!(
-            "failed to compile to WebAssembly:\n{}",
-            str::from_utf8(&stderr)?
+            "failed to compile to WebAssembly:\n{}\nwith stdout:\n{}",
+            str::from_utf8(&stderr)?,
+            str::from_utf8(&stdout)?,
         );
     }
 
