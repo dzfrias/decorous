@@ -20,9 +20,6 @@ jobs:
     steps:
       - name: Setup emscripten
         uses: mymindstorm/setup-emsdk@v11
-        with:
-          version: 3.1.43
-          actions-cache-folder: ${{ runner.os }}-emsdk-cache
 
       - uses: actions/checkout@v3
 
