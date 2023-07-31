@@ -18,15 +18,18 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Setup emscripten
+      - name: Install emscripten
         uses: mymindstorm/setup-emsdk@v11
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
 
       - uses: actions/checkout@v3
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Set up cache
+      - name: Set up cargo cache
         uses: actions/cache@v3
         with:
           path: |
