@@ -1,0 +1,61 @@
+---
+source: tests/tests.rs
+expression: all
+---
+
+---out.js---
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+const elems = {};
+__update(null, true);
+function __update(dirty, initial) {
+}
+
+---out.css---
+h1.decor-0 {
+  color: red;
+}
+
+---index.html---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="out.css" rel="stylesheet" />
+  </head>
+  <body>
+    <script async src="out/input.js"></script>
+<script defer src="out.js"></script>
+
+    <h1 class="decor-0">Hello!</h1>
+  </body>
+</html>
+
+---input.wasm---
+COULD NOT BE READ: stream did not contain valid UTF-8
+
+---input.js---
+IGNORED
+
+---input.decor---
+---c
+#include <stdio.h>
+
+int main() {
+    printf("Hello World\n");
+    return 0;
+}
+---
+
+#h1:Hello!
+
+---css
+h1 {
+  color: red;
+}
+---
+

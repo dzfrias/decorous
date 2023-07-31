@@ -1,0 +1,7 @@
+#div CSS! /div
+
+---css
+div {
+  color: red;
+}
+---

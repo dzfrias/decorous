@@ -1,0 +1,56 @@
+---
+source: tests/tests.rs
+expression: all
+---
+
+---out.js---
+const dirty = new Uint8Array(new ArrayBuffer(0));
+function create_main_block(target, anchor) {
+function mount(target, newNode, anchor) {
+target.insertBefore(newNode, anchor || null);
+}
+const e0 = document.createElement("div");
+e0.textContent = "CSS!";
+e0.setAttribute("class", "decor-0")
+mount(target, e0, anchor);
+return {
+u(dirty) {
+},
+d() {
+e0.parentNode.removeChild(e0);
+}
+};
+}
+function __init_ctx() {
+
+return [];
+}
+const ctx = __init_ctx();
+const fragment = create_main_block(document.getElementById("input"));
+let updating = false;
+function __schedule_update(ctx_idx, val) {
+ctx[ctx_idx] = val;
+dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
+if (updating) return;
+updating = true;
+Promise.resolve().then(() => {
+fragment.u(dirty);
+updating = false;
+dirty.fill(0);
+});
+}
+
+---out.css---
+div.decor-0 {
+  color: red;
+}
+
+---input.decor---
+#div CSS! /div
+
+---css
+div {
+  color: red;
+}
+---
+

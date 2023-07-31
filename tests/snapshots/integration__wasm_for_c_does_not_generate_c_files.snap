@@ -1,0 +1,37 @@
+---
+source: tests/tests.rs
+expression: all
+---
+
+---out.html---
+<h1>Hello!</h1>
+
+---out.js---
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+const elems = {};
+__update(null, true);
+function __update(dirty, initial) {
+}
+
+---input.wasm---
+COULD NOT BE READ: stream did not contain valid UTF-8
+
+---input.js---
+IGNORED
+
+---input.decor---
+---c
+#include <stdio.h>
+
+int main() {
+    printf("Hello World\n");
+    return 0;
+}
+---
+
+#h1:Hello!
+

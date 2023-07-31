@@ -1,0 +1,5 @@
+#h1:This is a page
+
+#div[class="green"]
+  #p Hello, my name is #em[class="red"] Diego! /em /p
+/div

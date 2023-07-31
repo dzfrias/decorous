@@ -1,0 +1,40 @@
+---
+source: tests/tests.rs
+expression: all
+---
+
+---out.js---
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+const elems = {};
+__update(null, true);
+function __update(dirty, initial) {
+}
+
+---index.html---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <script defer src="out.js"></script>
+    <h1>This is a page</h1>
+
+<div class="green"><p>Hello, my name is <em class="red">Diego!</em></p>
+</div>
+
+  </body>
+</html>
+
+---input.decor---
+#h1:This is a page
+
+#div[class="green"]
+  #p Hello, my name is #em[class="red"] Diego! /em /p
+/div
+

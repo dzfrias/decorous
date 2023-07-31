@@ -1,0 +1,44 @@
+---
+source: tests/tests.rs
+expression: all
+---
+
+---out.js---
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+const elems = {};
+__update(null, true);
+function __update(dirty, initial) {
+}
+
+---out.css---
+div.decor-0 {
+  color: red;
+}
+
+---index.html---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="out.css" rel="stylesheet" />
+  </head>
+  <body>
+    <script defer src="out.js"></script>
+    <div class="decor-0">CSS!</div>
+  </body>
+</html>
+
+---input.decor---
+#div CSS! /div
+
+---css
+div {
+  color: red;
+}
+---
+

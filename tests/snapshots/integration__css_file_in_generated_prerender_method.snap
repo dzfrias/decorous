@@ -1,0 +1,32 @@
+---
+source: tests/tests.rs
+expression: all
+---
+
+---out.html---
+<div class="decor-0">CSS!</div>
+---out.js---
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+const elems = {};
+__update(null, true);
+function __update(dirty, initial) {
+}
+
+---out.css---
+div.decor-0 {
+  color: red;
+}
+
+---input.decor---
+#div CSS! /div
+
+---css
+div {
+  color: red;
+}
+---
+

@@ -1,5 +1,23 @@
-[profile.release]
-debug = 1
+[package]
+name = "decorous"
+version = "0.1.0"
+authors = ["Diego Frias <styx5242@gmail.com>"]
+license = "MIT"
+exclude = [
+  "/.github/",
+  "/scripts/",
+]
+edition = "2021"
+rust-version = "1.71"
+
+[[test]]
+name = "integration"
+path = "tests/tests.rs"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+insta = { workspace = true }
+tempdir = "0.3"
 
 [workspace]
 members = [
@@ -9,7 +27,11 @@ members = [
     "crates/superfmt",
     "crates/harpoon",
 ]
+default-members = ["crates/core"]
 
 [workspace.dependencies]
 rslint_parser = "0.3.1"
-insta = { version = "1.30.0", features = ["yaml", "redactions"] }
+insta = { version = "1.30", features = ["yaml", "redactions"] }
+
+[profile.release]
+debug = 1
