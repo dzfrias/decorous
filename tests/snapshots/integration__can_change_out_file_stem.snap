@@ -3,6 +3,12 @@ source: tests/tests.rs
 expression: all
 ---
 
+--- new.html---
+<h1>This is a page</h1>
+
+<div class="green"><p>Hello, my name is <em class="red">Diego!</em></p>
+</div>
+
 --- new.js---
 function replace(node) {
   const text = document.createTextNode("");
@@ -13,12 +19,6 @@ const elems = {};
 __update(null, true);
 function __update(dirty, initial) {
 }
-
---- new.html---
-<h1>This is a page</h1>
-
-<div class="green"><p>Hello, my name is <em class="red">Diego!</em></p>
-</div>
 
 ---input.decor---
 #h1:This is a page

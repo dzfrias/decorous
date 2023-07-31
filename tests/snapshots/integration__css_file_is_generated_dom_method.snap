@@ -3,6 +3,20 @@ source: tests/tests.rs
 expression: all
 ---
 
+---input.decor---
+#div CSS! /div
+
+---css
+div {
+  color: red;
+}
+---
+
+---out.css---
+div.decor-0 {
+  color: red;
+}
+
 ---out.js---
 const dirty = new Uint8Array(new ArrayBuffer(0));
 function create_main_block(target, anchor) {
@@ -39,18 +53,4 @@ updating = false;
 dirty.fill(0);
 });
 }
-
----out.css---
-div.decor-0 {
-  color: red;
-}
-
----input.decor---
-#div CSS! /div
-
----css
-div {
-  color: red;
-}
----
 

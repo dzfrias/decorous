@@ -3,22 +3,6 @@ source: tests/tests.rs
 expression: all
 ---
 
----out.js---
-function replace(node) {
-  const text = document.createTextNode("");
-  node.replaceWith(text);
-  return text;
-}
-const elems = {};
-__update(null, true);
-function __update(dirty, initial) {
-}
-
----out.css---
-div.decor-0 {
-  color: red;
-}
-
 ---index.html---
 <!DOCTYPE html>
 <html lang="en">
@@ -41,4 +25,20 @@ div {
   color: red;
 }
 ---
+
+---out.css---
+div.decor-0 {
+  color: red;
+}
+
+---out.js---
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+const elems = {};
+__update(null, true);
+function __update(dirty, initial) {
+}
 

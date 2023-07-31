@@ -3,17 +3,6 @@ source: tests/tests.rs
 expression: all
 ---
 
----out.js---
-function replace(node) {
-  const text = document.createTextNode("");
-  node.replaceWith(text);
-  return text;
-}
-const elems = {};
-__update(null, true);
-function __update(dirty, initial) {
-}
-
 ---index.html---
 <!DOCTYPE html>
 <html lang="en">
@@ -30,12 +19,6 @@ function __update(dirty, initial) {
   </body>
 </html>
 
----input.wasm---
-COULD NOT BE READ: stream did not contain valid UTF-8
-
----input.js---
-IGNORED
-
 ---input.decor---
 ---c
 #include <stdio.h>
@@ -47,4 +30,21 @@ int main() {
 ---
 
 #h1:Hello!
+
+---input.js---
+IGNORED
+
+---input.wasm---
+COULD NOT BE READ: stream did not contain valid UTF-8
+
+---out.js---
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+const elems = {};
+__update(null, true);
+function __update(dirty, initial) {
+}
 

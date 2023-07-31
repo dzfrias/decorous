@@ -3,17 +3,6 @@ source: tests/tests.rs
 expression: all
 ---
 
----out.js---
-function replace(node) {
-  const text = document.createTextNode("");
-  node.replaceWith(text);
-  return text;
-}
-const elems = {};
-__update(null, true);
-function __update(dirty, initial) {
-}
-
 ---index.html---
 <!DOCTYPE html>
 <html lang="en">
@@ -37,4 +26,15 @@ function __update(dirty, initial) {
 #div[class="green"]
   #p Hello, my name is #em[class="red"] Diego! /em /p
 /div
+
+---out.js---
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+const elems = {};
+__update(null, true);
+function __update(dirty, initial) {
+}
 

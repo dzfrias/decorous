@@ -29,12 +29,16 @@ pub(crate) use decor_test;
 macro_rules! assert_all {
     ($dir:expr$(, ignore:$ignore:expr)?) => {
         use ::std::{fmt::Write, fs, io::Read, path::Path};
+        use ::itertools::Itertools;
         fn __write_dir(dir: impl AsRef<Path>, out: &mut String) {
             for path in fs::read_dir(dir)
                 .expect("error reading dir")
-                .filter_map(|p| p.ok())
+                .filter_map(|p| match p {
+                    Ok(entry) => Some(entry.path()),
+                    Err(_) => None,
+                })
+                .sorted()
             {
-                let path = path.path();
                 let name = path.file_name().unwrap().to_string_lossy();
 
                 $(

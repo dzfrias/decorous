@@ -3,22 +3,6 @@ source: tests/tests.rs
 expression: all
 ---
 
----out.js---
-function replace(node) {
-  const text = document.createTextNode("");
-  node.replaceWith(text);
-  return text;
-}
-const elems = {};
-__update(null, true);
-function __update(dirty, initial) {
-}
-
----out.css---
-h1.decor-0 {
-  color: red;
-}
-
 ---index.html---
 <!DOCTYPE html>
 <html lang="en">
@@ -34,12 +18,6 @@ h1.decor-0 {
     <h1 class="decor-0">Hello!</h1>
   </body>
 </html>
-
----input.wasm---
-COULD NOT BE READ: stream did not contain valid UTF-8
-
----input.js---
-IGNORED
 
 ---input.decor---
 ---c
@@ -58,4 +36,26 @@ h1 {
   color: red;
 }
 ---
+
+---input.js---
+IGNORED
+
+---input.wasm---
+COULD NOT BE READ: stream did not contain valid UTF-8
+
+---out.css---
+h1.decor-0 {
+  color: red;
+}
+
+---out.js---
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+const elems = {};
+__update(null, true);
+function __update(dirty, initial) {
+}
 

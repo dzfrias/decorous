@@ -3,6 +3,20 @@ source: tests/tests.rs
 expression: all
 ---
 
+---input.decor---
+#div CSS! /div
+
+---css
+div {
+  color: red;
+}
+---
+
+---out.css---
+div.decor-0 {
+  color: red;
+}
+
 ---out.html---
 <div class="decor-0">CSS!</div>
 ---out.js---
@@ -15,18 +29,4 @@ const elems = {};
 __update(null, true);
 function __update(dirty, initial) {
 }
-
----out.css---
-div.decor-0 {
-  color: red;
-}
-
----input.decor---
-#div CSS! /div
-
----css
-div {
-  color: red;
-}
----
 

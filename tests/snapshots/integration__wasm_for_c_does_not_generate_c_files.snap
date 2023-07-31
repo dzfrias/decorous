@@ -3,6 +3,24 @@ source: tests/tests.rs
 expression: all
 ---
 
+---input.decor---
+---c
+#include <stdio.h>
+
+int main() {
+    printf("Hello World\n");
+    return 0;
+}
+---
+
+#h1:Hello!
+
+---input.js---
+IGNORED
+
+---input.wasm---
+COULD NOT BE READ: stream did not contain valid UTF-8
+
 ---out.html---
 <h1>Hello!</h1>
 
@@ -16,22 +34,4 @@ const elems = {};
 __update(null, true);
 function __update(dirty, initial) {
 }
-
----input.wasm---
-COULD NOT BE READ: stream did not contain valid UTF-8
-
----input.js---
-IGNORED
-
----input.decor---
----c
-#include <stdio.h>
-
-int main() {
-    printf("Hello World\n");
-    return 0;
-}
----
-
-#h1:Hello!
 
