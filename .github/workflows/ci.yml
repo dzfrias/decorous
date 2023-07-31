@@ -18,6 +18,10 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      - name: Install WSL
+        if: matrix.os == "windows-latest"
+        run: wsl --install
+
       - name: Install emscripten
         uses: mymindstorm/setup-emsdk@v11
 
