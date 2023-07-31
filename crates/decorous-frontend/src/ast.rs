@@ -526,10 +526,10 @@ impl<'a, T> fmt::Display for Element<'a, T> {
             f,
             "<{}{}{}>{}</{0}>",
             self.tag(),
-            self.attrs().iter().join(" "),
             (!self.children().is_empty())
                 .then_some(" ")
                 .unwrap_or_default(),
+            self.attrs().iter().join(" "),
             self.children()
                 .iter()
                 .map(|elem| format!("  {elem}"))

@@ -69,7 +69,7 @@ pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<Location>> 
 fn _parse(input: NomSpan) -> Result<DecorousAst> {
     let (input, (mut script, mut css, mut wasm)) = parse_code_blocks(input)?;
     let (input, nodes) = nodes(input)?;
-    let (input, new) = parse_code_blocks(input)?;
+    let (input, new) = ws(parse_code_blocks)(input)?;
     if css.is_none() {
         css = new.1;
     }
@@ -136,7 +136,7 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
             None
         );
     }
-    if peek(tag::<&str, NomSpan, Report<NomSpan>>("---"))(input).is_ok() {
+    if peek(ws(tag::<&str, NomSpan, Report<NomSpan>>("---")))(input).is_ok() {
         return nom_err!(
             input,
             Error,
@@ -414,7 +414,7 @@ fn parse_str(i: NomSpan) -> Result<NomSpan> {
 }
 
 fn parse_text(input: NomSpan) -> Result<NomSpan> {
-    escaped(none_of("/#\\{"), '\\', one_of(r#"/#{}"#))(input)
+    escaped(none_of("/#\\{\n"), '\\', one_of(r#"/#{}"#))(input)
 }
 
 // --General purpose parsers--
@@ -617,6 +617,10 @@ mod tests {
 
     #[test]
     fn css_can_appear_after_template() {
-        nom_test_all_insta!(parse, ["#p Hello /p ---css p { color: red; } ---"])
+        nom_test_all_insta!(
+            parse,
+            ["#p Hello /p 
+            ---css p { color: blue; } ---"]
+        )
     }
 }
