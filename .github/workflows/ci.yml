@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Install WSL
         if: matrix.os == 'windows-latest'
-        run: wsl --install
+        run: wsl --install -d Ubuntu
 
       - name: Install emscripten
         uses: mymindstorm/setup-emsdk@v11
