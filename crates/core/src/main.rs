@@ -64,7 +64,16 @@ fn main() -> Result<()> {
     )?;
     let wasm_ext = component
         .wasm()
-        .map(|w| compile_wasm(w.lang(), w.body(), metadata.name, &args.out, &config))
+        .map(|w| {
+            compile_wasm(
+                w.lang(),
+                w.body(),
+                metadata.name,
+                &args.out,
+                &args.build_args,
+                &config,
+            )
+        })
         .transpose()?;
     render_html(&args, &component, &metadata, wasm_ext.as_deref())?;
     if component.css().is_some() {

@@ -20,6 +20,7 @@ pub fn compile_wasm<'a>(
     body: &'a str,
     name: &'a str,
     out_name: &str,
+    build_args: &[(String, String)],
     config: &Config,
 ) -> Result<String> {
     let config = config
@@ -63,10 +64,24 @@ pub fn compile_wasm<'a>(
             defer! {
                 fs::remove_file("__tmp.sh").expect("error removing \"__tmp.sh\"! Remove it manually!");
             }
+            let build_args = {
+                let args =
+                    build_args
+                        .iter()
+                        .find_map(|(l, args)| if l == lang { Some(args.as_str()) } else { None });
+                if let Some(args) = args {
+                    shlex::split(args).with_context(|| {
+                        format!("error parsing build args for language: {}", lang)
+                    })?
+                } else {
+                    vec![]
+                }
+            };
             let out = Command::new(shell)
                 .arg("__tmp.sh")
                 .arg(&path)
                 .arg(out_name)
+                .args(&build_args)
                 .output()?;
             (out.status, out.stdout, out.stderr)
         }

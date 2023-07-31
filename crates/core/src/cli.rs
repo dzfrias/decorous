@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::Context;
 use clap::{Parser as ArgParser, ValueEnum};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -25,4 +26,22 @@ pub struct Cli {
     /// Generate a full index.html file instead of just a fragment (or none at all).
     #[arg(long)]
     pub html: bool,
+
+    /// Pass a build argument(s) to a given WASM compiler.
+    #[arg(
+        short = 'B',
+        long,
+        value_name = "LANG>=<ARGS", // HACK
+        value_parser = parse_key_val,
+        number_of_values = 1,
+    )]
+    pub build_args: Vec<(String, String)>,
+}
+
+/// Parse a single key-value pair
+fn parse_key_val(s: &str) -> Result<(String, String), anyhow::Error> {
+    let pos = s
+        .find('=')
+        .with_context(|| format!("invalid LANG=ARGS: no `=` found in `{s}`"))?;
+    Ok((s[..pos].to_owned(), s[pos + 1..].to_owned()))
 }
