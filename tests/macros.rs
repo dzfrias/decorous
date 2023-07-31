@@ -10,7 +10,8 @@ macro_rules! decor_test {
             let mut dir = TempDir::new(stringify!($name)).expect("could not create temp dir");
             let mut f =
                 File::create(dir.path().join("input.decor")).expect("could not create temp file");
-            f.write_all($input).expect("could not write to temp file");
+            f.write_all($input.as_bytes())
+                .expect("could not write to temp file");
             drop(f);
             let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
             cmd.current_dir(dir.path());

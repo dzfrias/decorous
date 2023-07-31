@@ -60,7 +60,7 @@ decor_test!(
     can_change_out_file_stem,
     NO_JS,
     |dir: &mut TempDir, mut cmd: Command| {
-        cmd.arg("-o new");
+        cmd.arg("-o").arg("new");
         cmd.assert().success();
         assert_all!(dir.path());
     }
