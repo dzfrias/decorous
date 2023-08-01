@@ -1,6 +1,7 @@
 use std::io::{self, Write};
 
 use decorous_frontend::{errors::Report, location::Location};
+use itertools::Itertools;
 use superfmt::{
     style::{Color, Modifiers, Style},
     Formatter,
@@ -22,7 +23,7 @@ pub fn fmt_report<T: io::Write>(
         if let Some(help_line) = err
             .help()
             .and_then(|help| help.corresponding_line())
-            .filter(|ln| ln < &line_no)
+            .filter(|ln| ln < &(line_no + 1))
         {
             let (_, line) = lines
                 .clone()
@@ -30,14 +31,14 @@ pub fn fmt_report<T: io::Write>(
                 .expect("should be in lines");
             write!(formatter, "{help_line}| {} ", line)?;
             formatter.writeln_with_context("<--- this line", Color::Yellow)?;
-            if help_line + 1 != line_no {
+            if help_line + 1 != line_no + 1 {
                 formatter.writeln("...")?;
             }
         }
         let (i, line) = lines
             .clone()
-            .find(|(n, _)| (*n as u32) + 1 == line_no)
-            .expect("line should be in input");
+            .find_or_last(|(n, _)| (*n as u32) == line_no)
+            .unwrap();
 
         writeln!(formatter, "{}| {line}", i + 1)?;
         // Plus one because line_no is 0 indexed, so we need to get the actual line number

@@ -81,7 +81,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn can_retrive_location_from_just_offset() {
+    fn can_retrieve_location_from_just_offset() {
         let offset = 14;
         let source = "hello world\nhi";
         assert_eq!(

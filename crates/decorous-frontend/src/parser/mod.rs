@@ -12,7 +12,7 @@ use nom::{
     error::ParseError as NomParseError,
     multi::{many0, many0_count, separated_list0},
     sequence::{delimited, pair, preceded, terminated},
-    IResult, InputIter, InputTake,
+    IResult, InputIter, InputTake, Slice,
 };
 use nom_locate::{position, LocatedSpan};
 use rslint_parser::{parse_module, SyntaxNode};
@@ -67,9 +67,10 @@ pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<Location>> 
 }
 
 fn _parse(input: NomSpan) -> Result<DecorousAst> {
-    let (input, (mut script, mut css, mut wasm)) = parse_code_blocks(input)?;
+    let src = input;
+    let (input, (mut script, mut css, mut wasm)) = parse_code_blocks(input, input)?;
     let (input, nodes) = nodes(input)?;
-    let (input, new) = ws(parse_code_blocks)(input)?;
+    let (input, new) = parse_code_blocks(input, src)?;
     if css.is_none() {
         css = new.1;
     }
@@ -82,9 +83,10 @@ fn _parse(input: NomSpan) -> Result<DecorousAst> {
     Ok((input, DecorousAst::new(nodes, script, css, wasm)))
 }
 
-fn parse_code_blocks(
-    input: LocatedSpan<&str>,
-) -> Result<(Option<SyntaxNode>, Option<Css>, Option<Code>)> {
+fn parse_code_blocks<'a>(
+    input: LocatedSpan<&'a str>,
+    src: LocatedSpan<&'a str>,
+) -> Result<'a, (Option<SyntaxNode>, Option<Css<'a>>, Option<Code<'a>>)> {
     let (input, code_blocks) = many0(ws(code))(input)?;
     let mut script = None;
     let mut css = None;
@@ -102,7 +104,14 @@ fn parse_code_blocks(
                 css = Some(match p.parse() {
                     Ok(css) => css,
                     Err(err) => {
-                        return nom_err!(input, Failure, ParseErrorType::CssParsingError(err), None)
+                        let pos = src.slice(b.offset() + err.fragment().offset() + 1..);
+                        let help = err.help().cloned();
+                        return nom_err!(
+                            pos,
+                            Failure,
+                            ParseErrorType::CssParsingError(err, b.offset()),
+                            help
+                        );
                     }
                 });
             }
@@ -600,9 +609,9 @@ mod tests {
 
     #[test]
     fn can_parse_scripts() {
-        nom_test_all_insta!(parse_code_blocks, ["---js console.log(\"hello\")---",]);
-        nom_test_all_insta!(parse_code_blocks, ["---css body { height: 100vh; } ---"]);
-        nom_test_all_insta!(parse_code_blocks, ["---wasm let x = 3; ---"]);
+        nom_test_all_insta!(parse, ["---js console.log(\"hello\")---",]);
+        nom_test_all_insta!(parse, ["---css body { height: 100vh; } ---"]);
+        nom_test_all_insta!(parse, ["---wasm let x = 3; ---"]);
     }
 
     #[test]
@@ -657,5 +666,10 @@ mod tests {
     fn can_parse_bindings() {
         nom_test_all_insta!(attribute, [":hello:", ":invalid"]);
         nom_test_all_insta!(parse, ["#input[:bind: attr=\"value\"]/input"])
+    }
+
+    #[test]
+    fn css_parse_errors_are_given_offset() {
+        nom_test_all_insta!(parse, ["#p hi /p ---css p { color: red } ---"])
     }
 }

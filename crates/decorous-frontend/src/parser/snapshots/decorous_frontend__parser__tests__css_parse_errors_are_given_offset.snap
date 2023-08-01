@@ -1,0 +1,33 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: parse(input.into())
+---
+Err(
+    Report {
+        errors: [
+            ParseError {
+                fragment: Location {
+                    offset: 31,
+                    length: 1,
+                    line: 1,
+                    column: 32,
+                },
+                help: None,
+                err_type: CssParsingError(
+                    ParseError {
+                        fragment: Location {
+                            offset: 16,
+                            length: 1,
+                            line: 1,
+                            column: 16,
+                        },
+                        err_type: ExpectedCharacter(
+                            ';',
+                        ),
+                    },
+                    15,
+                ),
+            },
+        ],
+    },
+)

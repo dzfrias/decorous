@@ -7,7 +7,7 @@ use super::{
     ast::{AtRule, Css, Declaration, Pseudo, RegularRule, Rule, Selector, SelectorPart, Value},
     error::{ParseError, ParseErrorType},
 };
-use crate::location::Location;
+use crate::{errors::Help, location::Location};
 
 pub type Result<T> = std::result::Result<T, ParseError<Location>>;
 
@@ -62,7 +62,8 @@ impl<'a> Parser<'a> {
         if name.is_empty() {
             return Err(ParseError::new(
                 ParseErrorType::ExpectedMediaQueryName,
-                Location::from_source(self.harpoon.offset(), self.harpoon.source()),
+                Location::from_source(self.harpoon.offset() - 1, self.harpoon.source()),
+                None,
             ));
         }
         self.skip_whitespace();
@@ -98,6 +99,18 @@ impl<'a> Parser<'a> {
             self.skip_whitespace();
             parts.push(self.parse_selector_part()?);
             self.skip_whitespace();
+        }
+
+        if parts.len() == 1
+            && parts
+                .first()
+                .is_some_and(|p| p.text().is_some_and(|t| t.is_empty()) && p.pseudoes().is_empty())
+        {
+            return Err(ParseError::new(
+                ParseErrorType::ExpectedSelector,
+                Location::from_source(self.harpoon.offset(), self.harpoon.source()),
+                None,
+            ));
         }
 
         Ok(Selector::new(parts))
@@ -159,6 +172,7 @@ impl<'a> Parser<'a> {
             .harpoon
             .harpoon(|harpoon| harpoon.consume_until(':'))
             .text();
+        let line = self.harpoon.line();
         self.expect_consume(':')?;
         self.skip_whitespace();
         let mut values = vec![];
@@ -168,11 +182,21 @@ impl<'a> Parser<'a> {
             values.push(self.parse_value()?);
             self.skip_whitespace();
         }
-        self.expect_consume(';')?;
+        self.expect_consume_with_help(
+            ';',
+            Some(Help::with_line(
+                line as u32,
+                "declaration needs a closing semicolon",
+            )),
+        )?;
         Ok(Declaration::new(name, values))
     }
 
     fn expect_consume(&mut self, expected: char) -> Result<()> {
+        self.expect_consume_with_help(expected, None)
+    }
+
+    fn expect_consume_with_help(&mut self, expected: char, help: Option<Help>) -> Result<()> {
         if self.harpoon.peek_is(expected) {
             self.harpoon.consume();
             Ok(())
@@ -180,6 +204,7 @@ impl<'a> Parser<'a> {
             Err(ParseError::new(
                 ParseErrorType::ExpectedCharacter(expected),
                 Location::from_source(self.harpoon.offset(), self.harpoon.source()),
+                help,
             ))
         }
     }
@@ -194,6 +219,7 @@ impl<'a> Parser<'a> {
                 ParseError::new(
                     ParseErrorType::JavaScriptParseError(err),
                     Location::from_source(offset, self.harpoon.source()),
+                    None,
                 )
             })?;
             Ok(Value::Mustache(res.syntax().clone()))

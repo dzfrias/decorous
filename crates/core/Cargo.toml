@@ -23,3 +23,4 @@ serde_json = "1.0.104"
 scopeguard = "1.2.0"
 shlex = "1.1.0"
 which = "4.4.0"
+itertools = { workspace = true }

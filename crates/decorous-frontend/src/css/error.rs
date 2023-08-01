@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::errors::Help;
+
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum ParseErrorType {
     #[error("expected: {0}")]
@@ -16,13 +18,18 @@ pub enum ParseErrorType {
 #[error("parse error: {err_type}")]
 pub struct ParseError<T> {
     fragment: T,
+    help: Option<Help>,
     #[source]
     err_type: ParseErrorType,
 }
 
 impl<T> ParseError<T> {
-    pub fn new(err_type: ParseErrorType, fragment: T) -> Self {
-        Self { fragment, err_type }
+    pub fn new(err_type: ParseErrorType, fragment: T, help: Option<Help>) -> Self {
+        Self {
+            fragment,
+            err_type,
+            help,
+        }
     }
 
     pub fn fragment(&self) -> &T {
@@ -31,5 +38,9 @@ impl<T> ParseError<T> {
 
     pub fn err_type(&self) -> &ParseErrorType {
         &self.err_type
+    }
+
+    pub fn help(&self) -> Option<&Help> {
+        self.help.as_ref()
     }
 }

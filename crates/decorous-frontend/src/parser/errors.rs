@@ -31,7 +31,7 @@ pub enum ParseErrorType {
     #[error("invalid special block type: {0}. Only `for` and `if` are accepted.")]
     InvalidSpecialBlockType(String),
     #[error("css parsing error: {0}")]
-    CssParsingError(css::error::ParseError<Location>),
+    CssParsingError(css::error::ParseError<Location>, usize),
     #[error("byte processing error: {}", 0.to_string())]
     Nom(nom::error::ErrorKind),
 }

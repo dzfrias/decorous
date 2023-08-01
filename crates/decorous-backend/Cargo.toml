@@ -8,7 +8,7 @@ rslint_parser = { workspace = true }
 decorous-frontend = { path = "../decorous-frontend" }
 superfmt = { path = "../superfmt" }
 rslint_text_edit = "0.1.0"
-itertools = "0.11.0"
+itertools = { workspace = true }
 lazy_format = "2.0.0"
 
 [dev-dependencies]

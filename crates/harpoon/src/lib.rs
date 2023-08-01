@@ -25,6 +25,7 @@ pub struct Harpoon<'a> {
     current: Option<char>,
 
     idx: usize,
+    line: usize,
 }
 
 impl<'a> Harpoon<'a> {
@@ -35,11 +36,16 @@ impl<'a> Harpoon<'a> {
             current: None,
             peek_buf: VecDeque::new(),
             idx: 0,
+            line: 1,
         };
         harpoon
     }
 
     pub fn consume(&mut self) -> Option<char> {
+        if self.current().is_some_and(|c| c == '\n') {
+            self.line += 1;
+        }
+
         if let Some(next) = self.peek_buf.pop_front() {
             self.idx += next.len_utf8();
             self.current = Some(next);
@@ -148,6 +154,10 @@ impl<'a> Harpoon<'a> {
     pub fn source(&self) -> &'a str {
         self.source
     }
+
+    pub fn line(&self) -> usize {
+        self.line
+    }
 }
 
 #[cfg(test)]
@@ -189,5 +199,16 @@ mod tests {
         let mut harpoon = Harpoon::new("1234");
         assert!(!harpoon.try_consume("33"));
         assert_eq!(Some('1'), harpoon.consume());
+    }
+
+    #[test]
+    fn gets_line_no() {
+        let mut harpoon = Harpoon::new("1\n2");
+        harpoon.consume();
+        assert_eq!(1, harpoon.line());
+        harpoon.consume();
+        assert_eq!(1, harpoon.line());
+        harpoon.consume();
+        assert_eq!(2, harpoon.line());
     }
 }
