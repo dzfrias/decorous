@@ -7,6 +7,7 @@ mod html_render;
 mod node_analyzer;
 
 use decorous_frontend::{ast::SpecialBlock, utils, Component};
+use itertools::Itertools;
 use lazy_format::lazy_format;
 use rslint_parser::AstNode;
 use superfmt::{ContextBuilder, Formatter};
@@ -168,6 +169,7 @@ fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result
                         .iter()
                         .map(|(meta, _)| meta),
                 )
+                .unique_by(|meta| meta.id())
                 .map(|meta| {
                     let id = analysis.id_overwrites().try_get(meta.id());
                     lazy_format!("\"{id}\":document.getElementById(\"{id}\")")
@@ -531,5 +533,12 @@ mod tests {
     #[test]
     fn can_render_bindings() {
         test_render!("---js let x = 0; --- #input[:x:]/input");
+    }
+
+    #[test]
+    fn does_not_get_duplicate_elems() {
+        test_render!(
+            "---js let x = 0; --- #input[:x: @click={() => console.log(\"hello\")}]/input"
+        );
     }
 }
