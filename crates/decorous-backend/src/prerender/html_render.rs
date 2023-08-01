@@ -114,7 +114,7 @@ impl<'a, T: io::Write> HtmlFmt<T> for Element<'a, FragmentMetadata> {
                 Attribute::KeyValue(key, None) => {
                     write!(f, " {key}=\"\"")?;
                 }
-                Attribute::Binding(_) => todo!(),
+                Attribute::Binding(_) => has_dynamic = true,
             }
         }
         if metadata.parent_id().is_none() && !declared.css_mustaches().is_empty() {

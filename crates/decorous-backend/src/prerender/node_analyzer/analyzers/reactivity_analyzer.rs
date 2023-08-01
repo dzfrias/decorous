@@ -17,6 +17,7 @@ pub struct ReactiveData<'ast> {
     key_values: IdVec<'ast, Rc<[(SmolStr, SyntaxNode)]>>,
     event_listeners: IdVec<'ast, Rc<[(SmolStr, SyntaxNode)]>>,
     special_blocks: IdVec<'ast, &'ast SpecialBlock<'ast, FragmentMetadata>>,
+    bindings: IdVec<'ast, SmolStr>,
 }
 
 #[derive(Debug)]
@@ -33,6 +34,7 @@ impl<'ast> ReactivityAnalyzer<'ast> {
                 special_blocks: vec![],
                 key_values: vec![],
                 event_listeners: vec![],
+                bindings: vec![],
             },
             style_cache: None,
         }
@@ -72,6 +74,7 @@ impl<'a> NodeAnalyzer<'a> for ReactivityAnalyzer<'a> {
                 // PERF: small vec?
                 let mut kvs = vec![];
                 let mut listeners = vec![];
+                let mut binding = None;
                 let mut has_style = false;
                 for attr in elem.attrs() {
                     match attr {
@@ -107,6 +110,8 @@ impl<'a> NodeAnalyzer<'a> for ReactivityAnalyzer<'a> {
                             event_handler.expr().clone(),
                         )),
 
+                        Attribute::Binding(b) => binding = Some(SmolStr::new(b)),
+
                         _ => {}
                     };
                 }
@@ -119,6 +124,9 @@ impl<'a> NodeAnalyzer<'a> for ReactivityAnalyzer<'a> {
                     ));
                 }
 
+                if let Some(binding) = binding {
+                    self.reactive_data.bindings.push((node.metadata(), binding))
+                }
                 if !kvs.is_empty() {
                     self.reactive_data
                         .key_values
@@ -179,5 +187,9 @@ impl<'ast> ReactiveData<'ast> {
         self.key_values()
             .iter()
             .flat_map(|(meta, kvs)| kvs.iter().map(move |(k, expr)| (*meta, k, expr)))
+    }
+
+    pub fn bindings(&self) -> &[(&FragmentMetadata, SmolStr)] {
+        self.bindings.as_ref()
     }
 }

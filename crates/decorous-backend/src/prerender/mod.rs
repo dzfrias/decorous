@@ -160,7 +160,15 @@ fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result
                 .key_values()
                 .iter()
                 .chain(analysis.reactive_data().event_listeners())
-                .map(|(meta, _)| {
+                .map(|(meta, _)| meta)
+                .chain(
+                    analysis
+                        .reactive_data()
+                        .bindings()
+                        .iter()
+                        .map(|(meta, _)| meta),
+                )
+                .map(|meta| {
                     let id = analysis.id_overwrites().try_get(meta.id());
                     lazy_format!("\"{id}\":document.getElementById(\"{id}\")")
                 }),
@@ -271,12 +279,35 @@ fn render_ctx_init<T: io::Write>(
         )?;
     }
 
+    for (meta, binding) in analysis.reactive_data().bindings() {
+        let elem_id = analysis.id_overwrites().try_get(meta.id());
+        let id = component
+            .declared_vars()
+            .get_binding(binding)
+            .expect("BUG: every binding should have an id in declared vars");
+        let Some(var_id) = component.declared_vars().get_var(binding, None) else {
+            todo!("unbound var lint")
+        };
+        writeln!(formatter, "elems[\"{elem_id}\"].value = {binding};")?;
+        writeln!(
+            formatter,
+            "let __binding{id} = (ev) => __schedule_update({var_id}, {binding} = ev.target.value);"
+        )?;
+        writeln!(
+            formatter,
+            "elems[\"{elem_id}\"].addEventListener(\"input\", __binding{id});"
+        )?;
+    }
+
     let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
     for (name, idx) in component.declared_vars().all_vars() {
         ctx[*idx as usize] = Cow::Borrowed(name);
     }
     for (idx, _) in component.declared_vars().all_arrow_exprs().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
+    }
+    for (_, idx) in component.declared_vars().all_bindings() {
+        ctx[*idx as usize] = Cow::Owned(format!("__binding{idx}"))
     }
     writeln!(formatter, "return [{}];", ctx.join(","))?;
 
@@ -318,6 +349,19 @@ fn render_update_body<T: io::Write>(
                 "if ({dirty_indices}) elems[{id}].data = {replaced};"
             )?;
         }
+    }
+
+    for (meta, binding) in analysis.reactive_data().bindings() {
+        let Some(var_id) = component.declared_vars().get_var(binding, None) else {
+            todo!("unbound var lint");
+        };
+        let dirty_idx = ((var_id + 7) / 8).saturating_sub(1) as usize;
+        let bitmask = 1 << (var_id % 8);
+        writeln!(
+            formatter,
+            "if (dirty[{dirty_idx}] & {bitmask}) elems[\"{}\"].value = ctx[{var_id}];",
+            meta.id()
+        )?;
     }
 
     for (meta, special_block) in analysis.reactive_data().special_blocks() {
@@ -482,5 +526,10 @@ mod tests {
     #[test]
     fn reactive_css_is_merged_with_existing_inline_styles() {
         test_render!("---js let color = \"blue\" --- ---css p { color: {color}; } --- #p[style=\"background: green;\"] {color} /p", "---js let color = \"blue\" --- ---css p { color: {color}; } --- #p[style={`background: green;`}] {color} /p");
+    }
+
+    #[test]
+    fn can_render_bindings() {
+        test_render!("---js let x = 0; --- #input[:x:]/input");
     }
 }
