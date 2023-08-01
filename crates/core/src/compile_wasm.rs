@@ -11,6 +11,7 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use scopeguard::defer;
+use which::which;
 
 use crate::config::{Config, ScriptOrFile};
 
@@ -58,11 +59,11 @@ pub fn compile_wasm<'a>(
         }
         ScriptOrFile::Script(script) => {
             {
-                let mut f = File::create("__tmp.sh")?;
+                let mut f = File::create("__tmp.py")?;
                 f.write_all(script.as_bytes())?;
             }
             defer! {
-                fs::remove_file("__tmp.sh").expect("error removing \"__tmp.sh\"! Remove it manually!");
+                fs::remove_file("__tmp.py").expect("error removing \"__tmp.py\"! Remove it manually!");
             }
             let build_args = {
                 let args =
@@ -77,8 +78,18 @@ pub fn compile_wasm<'a>(
                     vec![]
                 }
             };
-            let out = Command::new(shell)
-                .arg("__tmp.sh")
+            let python = {
+                match which("python") {
+                    Ok(bin) => bin,
+                    Err(which::Error::CannotFindBinaryPath) => match which("python3") {
+                        Ok(bin) => bin,
+                        Err(_) => bail!("python not found in PATH! Make sure to install it!"),
+                    },
+                    Err(_) => bail!("python not found in PATH! Make sure to install it!"),
+                }
+            };
+            let out = Command::new(python)
+                .arg("__tmp.py")
                 .arg(&path)
                 .arg(out_name)
                 .args(&build_args)

@@ -16,7 +16,7 @@ impl Default for Config<'_> {
                     "rust",
                     CompilerConfig {
                         ext_override: Some("rs"),
-                        script: ScriptOrFile::Script(include_str!("./compilers/rust")),
+                        script: ScriptOrFile::Script(include_str!("./compilers/rust.py")),
                         group: true,
                     },
                 ),
@@ -24,7 +24,7 @@ impl Default for Config<'_> {
                     "c++",
                     CompilerConfig {
                         ext_override: Some("cpp"),
-                        script: ScriptOrFile::Script(include_str!("./compilers/emscripten")),
+                        script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
                         group: false,
                     },
                 ),
@@ -32,7 +32,7 @@ impl Default for Config<'_> {
                     "c",
                     CompilerConfig {
                         ext_override: None,
-                        script: ScriptOrFile::Script(include_str!("./compilers/emscripten")),
+                        script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
                         group: false,
                     },
                 ),
