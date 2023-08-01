@@ -6,7 +6,7 @@ import os
 def main():
     input = Path(sys.argv[1])
     outdir = Path(sys.argv[2])
-    name = os.path.basename(input)
+    name = input.stem
 
     out_name = (outdir / name).with_suffix(".js")
     os.system(
@@ -14,7 +14,7 @@ def main():
     )
 
     print(
-        f"""<script async src="{out_name}"></script>
+        f"""<script async src="{outdir}/{name}.js"></script>
 <script defer src="{outdir}.js"></script>"""
     )
 
