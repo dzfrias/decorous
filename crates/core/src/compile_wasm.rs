@@ -1,7 +1,4 @@
 use std::{
-    borrow::Cow,
-    env,
-    ffi::OsStr,
     fs::{self, File},
     io::{self, Write},
     path::PathBuf,
@@ -45,15 +42,17 @@ pub fn compile_wasm<'a>(
         Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
         Err(err) => bail!(err),
     }
-    let shell = env::var_os("SHELL")
-        .map(Cow::Owned)
-        .unwrap_or(Cow::Borrowed(OsStr::new("bash")));
+
+    let python = get_python()?;
+    let build_args = get_build_args(build_args, lang)?;
+
     let (status, stdout, stderr) = match &config.script {
         ScriptOrFile::File(file) => {
-            let out = Command::new(shell)
+            let out = Command::new(python)
                 .arg(file)
                 .arg(&path)
                 .arg(out_name)
+                .args(&build_args)
                 .output()?;
             (out.status, out.stdout, out.stderr)
         }
@@ -65,29 +64,6 @@ pub fn compile_wasm<'a>(
             defer! {
                 fs::remove_file("__tmp.py").expect("error removing \"__tmp.py\"! Remove it manually!");
             }
-            let build_args = {
-                let args =
-                    build_args
-                        .iter()
-                        .find_map(|(l, args)| if l == lang { Some(args.as_str()) } else { None });
-                if let Some(args) = args {
-                    shlex::split(args).with_context(|| {
-                        format!("error parsing build args for language: {}", lang)
-                    })?
-                } else {
-                    vec![]
-                }
-            };
-            let python = {
-                match which("python") {
-                    Ok(bin) => bin,
-                    Err(which::Error::CannotFindBinaryPath) => match which("python3") {
-                        Ok(bin) => bin,
-                        Err(_) => bail!("python not found in PATH! Make sure to install it!"),
-                    },
-                    Err(_) => bail!("python not found in PATH! Make sure to install it!"),
-                }
-            };
             let out = Command::new(python)
                 .arg("__tmp.py")
                 .arg(&path)
@@ -97,6 +73,7 @@ pub fn compile_wasm<'a>(
             (out.status, out.stdout, out.stderr)
         }
     };
+
     if !status.success() {
         bail!(
             "failed to compile to WebAssembly:\n{}\nwith stdout:\n{}",
@@ -106,4 +83,27 @@ pub fn compile_wasm<'a>(
     }
 
     Ok(String::from_utf8(stdout)?)
+}
+
+fn get_build_args(build_args: &[(String, String)], lang: &str) -> Result<Vec<String>> {
+    let args = build_args
+        .iter()
+        .find_map(|(l, args)| if l == lang { Some(args.as_str()) } else { None });
+    Ok(if let Some(args) = args {
+        shlex::split(args)
+            .with_context(|| format!("error parsing build args for language: {}", lang))?
+    } else {
+        vec![]
+    })
+}
+
+fn get_python() -> Result<PathBuf> {
+    match which("python") {
+        Ok(bin) => Ok(bin),
+        Err(which::Error::CannotFindBinaryPath) => match which("python3") {
+            Ok(bin) => Ok(bin),
+            Err(_) => bail!("python not found in PATH! Make sure to install it!"),
+        },
+        Err(_) => bail!("python not found in PATH! Make sure to install it!"),
+    }
 }

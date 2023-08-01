@@ -16,7 +16,6 @@ command = [
     "--all-targets",
     "--color", "always",
     "--",
-    "-F", "unsafe_code",
     "-W", "clippy::all",
     "-W", "clippy::char_lit_as_u8",
     "-W", "clippy::perf",
