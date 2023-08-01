@@ -5,11 +5,12 @@ expression: parser.parse()
 Err(
     ParseError {
         fragment: Location {
-            offset: 1,
+            offset: 0,
             length: 1,
             line: 1,
-            column: 1,
+            column: 0,
         },
+        help: None,
         err_type: ExpectedMediaQueryName,
     },
 )

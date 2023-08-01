@@ -10,6 +10,7 @@ Err(
             line: 1,
             column: 34,
         },
+        help: None,
         err_type: ExpectedCharacter(
             '{',
         ),
