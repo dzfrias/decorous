@@ -8,6 +8,7 @@ use rslint_parser::{ast::ArrowExpr, SmolStr, SyntaxNode};
 pub struct DeclaredVariables {
     vars: HashMap<SmolStr, u32>,
     arrow_exprs: HashMap<ArrowExpr, (u32, Option<u32>)>,
+    bindings: HashMap<SmolStr, u32>,
     scopes: HashMap<u32, Scope>,
     css_mustaches: HashMap<SyntaxNode, u32>,
     current_id: u32,
@@ -38,6 +39,11 @@ impl DeclaredVariables {
         self.scopes.insert(scope_id, scope);
     }
 
+    pub fn insert_binding(&mut self, name: SmolStr) {
+        let id = self.generate_id();
+        self.bindings.insert(name, id);
+    }
+
     pub fn get_var<K>(&self, var: &K, scope_id: Option<u32>) -> Option<u32>
     where
         SmolStr: Borrow<K>,
@@ -53,6 +59,14 @@ impl DeclaredVariables {
         self.arrow_exprs.get(arrow_expr).copied()
     }
 
+    pub fn get_binding<K>(&self, var: &K) -> Option<u32>
+    where
+        SmolStr: Borrow<K>,
+        K: Hash + Eq + ?Sized,
+    {
+        self.bindings.get(var).cloned()
+    }
+
     pub fn all_vars(&self) -> &HashMap<SmolStr, u32> {
         &self.vars
     }
@@ -63,6 +77,10 @@ impl DeclaredVariables {
 
     pub fn all_scopes(&self) -> &HashMap<u32, Scope> {
         &self.scopes
+    }
+
+    pub fn all_bindings(&self) -> &HashMap<SmolStr, u32> {
+        &self.bindings
     }
 
     pub fn is_scope_var<K>(&self, var: &K, scope_id: u32) -> bool
@@ -80,6 +98,7 @@ impl DeclaredVariables {
         self.vars.len()
             + self.arrow_exprs.len()
             + self.scopes.values().map(|s| s.env.len()).sum::<usize>()
+            + self.bindings.len()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -100,7 +119,7 @@ impl DeclaredVariables {
         old
     }
 
-    pub(crate) fn generate_css_id(&mut self) -> u32 {
+    fn generate_css_id(&mut self) -> u32 {
         let old = self.css_current;
         self.css_current += 1;
         old

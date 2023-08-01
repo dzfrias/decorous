@@ -167,19 +167,30 @@ fn render_decl(f: &mut Vec<u8>, node: &Node<'_, FragmentMetadata>, declared: &De
                         //    and always passes the scoped variable in for the first argument.
                         //    Then, we pass in the arguments that the user actually expected when
                         //    they created the closure.
-                        let mut added_args = String::new();
+                        const ARG_LEN: usize = "arg0".len();
+                        let mut added_args = String::with_capacity(scope_args.len() * ARG_LEN);
                         for (i, arg_idx) in scope_args.iter().enumerate() {
                             force_writeln!(f, "const arg{i} = ctx[{arg_idx}];");
                             force_write!(added_args, "arg{i},");
                         }
                         force_writeln!(
                             f,
-                            "e{id}.addEventListener(\"{}\", (...args) => {}({added_args} ...args))",
+                            "e{id}.addEventListener(\"{}\", (...args) => {}({added_args} ...args));",
                             event_handler.event(),
                             replaced
                         );
                     }
-                    Attribute::Binding(_) => todo!(),
+                    Attribute::Binding(binding) => {
+                        match declared.get_var(*binding, node.metadata().scope()) {
+                            Some(var_id) => force_writeln!(f, "e{id}.value = ctx[{var_id}];"),
+                            None => force_writeln!(f, "e{id}.value = {binding};"),
+                        }
+                        force_writeln!(
+                            f,
+                            "e{id}.addEventListener(\"input\", ctx[{}]);",
+                            declared.get_binding(*binding).expect("BUG: every binding should have a corresponding event listener in declared vars")
+                        )
+                    }
                 }
             }
         }
@@ -285,24 +296,33 @@ fn render_update(f: &mut Vec<u8>, node: &Node<'_, FragmentMetadata>, declared: &
 
         NodeType::Element(elem) => {
             for attr in elem.attrs() {
-                let Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) = attr else {
-                    continue;
-                };
-
-                let unbound = utils::get_unbound_refs(js);
-                let dirty_indices =
-                    codegen_utils::calc_dirty(&unbound, declared, node.metadata().scope());
-                let replacement = codegen_utils::replace_namerefs(
-                    js,
-                    &unbound,
-                    declared,
-                    node.metadata().scope(),
-                );
-                if !dirty_indices.is_empty() {
-                    force_writeln!(
-                        f,
-                        "if ({dirty_indices}) e{id}.setAttribute(\"{key}\", {replacement});"
-                    );
+                match attr {
+                    Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) => {
+                        let unbound = utils::get_unbound_refs(js);
+                        let dirty_indices =
+                            codegen_utils::calc_dirty(&unbound, declared, node.metadata().scope());
+                        let replacement = codegen_utils::replace_namerefs(
+                            js,
+                            &unbound,
+                            declared,
+                            node.metadata().scope(),
+                        );
+                        if !dirty_indices.is_empty() {
+                            force_writeln!(f, "if ({dirty_indices}) e{id}.setAttribute(\"{key}\", {replacement});");
+                        }
+                    }
+                    Attribute::Binding(binding) => {
+                        let Some(var_id) = declared.get_var(*binding, None) else {
+                            todo!("unbound var lint");
+                        };
+                        let dirty_idx = ((var_id + 7) / 8).saturating_sub(1) as usize;
+                        let bitmask = 1 << (var_id % 8);
+                        force_writeln!(
+                            f,
+                            "if (dirty[{dirty_idx}] & {bitmask}) e{id}.value = ctx[{var_id}];"
+                        )
+                    }
+                    _ => continue,
                 }
             }
         }

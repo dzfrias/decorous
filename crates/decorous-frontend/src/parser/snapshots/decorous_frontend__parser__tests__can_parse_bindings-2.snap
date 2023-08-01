@@ -1,0 +1,29 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: attribute(input.into())
+---
+Err(
+    Failure(
+        Report {
+            errors: [
+                ParseError {
+                    fragment: LocatedSpan {
+                        offset: 8,
+                        line: 1,
+                        fragment: "",
+                        extra: (),
+                    },
+                    help: Some(
+                        Help {
+                            corresponding_line: None,
+                            message: "expected because binding was started with \":\"",
+                        },
+                    ),
+                    err_type: ExpectedCharacter(
+                        ':',
+                    ),
+                },
+            ],
+        },
+    ),
+)

@@ -1,0 +1,40 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: parse(input.into())
+---
+Ok(
+    DecorousAst {
+        nodes: [
+            Node {
+                metadata: Location {
+                    offset: 0,
+                    length: 33,
+                    line: 1,
+                    column: 1,
+                },
+                node_type: Element(
+                    Element {
+                        tag: "input",
+                        attrs: [
+                            Binding(
+                                "bind",
+                            ),
+                            KeyValue(
+                                "attr",
+                                Some(
+                                    Literal(
+                                        "value",
+                                    ),
+                                ),
+                            ),
+                        ],
+                        children: [],
+                    },
+                ),
+            },
+        ],
+        script: None,
+        css: None,
+        wasm: None,
+    },
+)

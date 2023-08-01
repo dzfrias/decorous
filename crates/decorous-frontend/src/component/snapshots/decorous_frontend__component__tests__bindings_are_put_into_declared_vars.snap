@@ -1,0 +1,17 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component.declared_vars()
+---
+DeclaredVariables {
+    vars: {
+        "x": 1,
+    },
+    arrow_exprs: {},
+    bindings: {
+        "x": 0,
+    },
+    scopes: {},
+    css_mustaches: {},
+    current_id: 2,
+    css_current: 0,
+}

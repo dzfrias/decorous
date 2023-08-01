@@ -31,6 +31,7 @@ DeclaredVariables {
             None,
         ),
     },
+    bindings: {},
     scopes: {},
     css_mustaches: {},
     current_id: 1,

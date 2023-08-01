@@ -243,35 +243,11 @@ fn element(input: NomSpan) -> Result<Element<'_, Location>> {
 }
 
 fn attribute(input: NomSpan) -> Result<Attribute<'_>> {
-    let (input, event_handler) = map(opt(char('@')), |evt| evt.is_some())(input)?;
-    let (input, attr) = identifier(input)?;
-    if event_handler {
-        let (input, _) = alt((
-            ws(char('=')),
-            failure_case(bad_char, |_| {
-                (
-                    ParseErrorType::ExpectedCharacter('='),
-                    Some(Help::with_message(
-                        "value-less event handlers are not allowed",
-                    )),
-                )
-            }),
-        ))(input)?;
-        if peek(char::<NomSpan, Report<NomSpan>>('{'))(input).is_err() {
-            return nom_err!(
-                input,
-                Failure,
-                ParseErrorType::ExpectedCharacter('{'),
-                Some(Help::with_message(
-                    "expected because event handlers must always have curly braces as their values"
-                ))
-            );
-        }
-        return map(mustache, |node| {
-            Attribute::EventHandler(EventHandler::new(&attr, node))
-        })(input);
-    }
+    alt((parse_evt_handler, parse_binding, parse_attr))(input)
+}
 
+fn parse_attr(input: LocatedSpan<&str>) -> Result<Attribute> {
+    let (input, attr) = identifier(input)?;
     let (input, eq_char) = opt(ws(char('=')))(input)?;
     if eq_char.is_none() {
         return Ok((input, Attribute::KeyValue(&attr, None)));
@@ -304,8 +280,57 @@ fn attribute(input: NomSpan) -> Result<Attribute<'_>> {
             |t| Attribute::KeyValue(&attr, Some(AttributeValue::Literal(Cow::Borrowed(&t)))),
         ),
     ))(input)?;
-
     Ok((input, attribute))
+}
+
+fn parse_binding(input: LocatedSpan<&str>) -> Result<Attribute> {
+    map(
+        delimited(
+            char(':'),
+            identifier,
+            alt((
+                char(':'),
+                failure_case(bad_char, |_| {
+                    (
+                        ParseErrorType::ExpectedCharacter(':'),
+                        Some(Help::with_message(
+                            "expected because binding was started with \":\"",
+                        )),
+                    )
+                }),
+            )),
+        ),
+        |ident| Attribute::Binding(&ident),
+    )(input)
+}
+
+fn parse_evt_handler(input: LocatedSpan<&str>) -> Result<Attribute> {
+    let (input, _) = char('@')(input)?;
+    let (input, attr) = identifier(input)?;
+    let (input, _) = alt((
+        ws(char('=')),
+        failure_case(bad_char, |_| {
+            (
+                ParseErrorType::ExpectedCharacter('='),
+                Some(Help::with_message(
+                    "value-less event handlers are not allowed",
+                )),
+            )
+        }),
+    ))(input)?;
+    if peek(char::<NomSpan, Report<NomSpan>>('{'))(input).is_err() {
+        return nom_err!(
+            input,
+            Failure,
+            ParseErrorType::ExpectedCharacter('{'),
+            Some(Help::with_message(
+                "expected because event handlers must always have curly braces as their values"
+            ))
+        );
+    }
+    return map(mustache, |node| {
+        Attribute::EventHandler(EventHandler::new(&attr, node))
+    })(input);
 }
 
 fn comment(input: NomSpan) -> Result<NomSpan> {
@@ -626,5 +651,11 @@ mod tests {
             ["#p Hello /p 
             ---css p { color: blue; } ---"]
         )
+    }
+
+    #[test]
+    fn can_parse_bindings() {
+        nom_test_all_insta!(attribute, [":hello:", ":invalid"]);
+        nom_test_all_insta!(parse, ["#input[:bind: attr=\"value\"]/input"])
     }
 }

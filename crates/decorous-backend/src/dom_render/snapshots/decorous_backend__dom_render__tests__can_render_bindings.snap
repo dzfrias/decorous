@@ -1,0 +1,42 @@
+---
+source: crates/decorous-backend/src/dom_render/mod.rs
+expression: "String::from_utf8(out).unwrap()"
+---
+const dirty = new Uint8Array(new ArrayBuffer(1));
+function create_main_block(target, anchor) {
+function mount(target, newNode, anchor) {
+target.insertBefore(newNode, anchor || null);
+}
+const e0 = document.createElement("input");
+e0.value = ctx[1];
+e0.addEventListener("input", ctx[0]);
+mount(target, e0, anchor);
+return {
+u(dirty) {
+if (dirty[0] & 2) e0.value = ctx[1];
+},
+d() {
+e0.parentNode.removeChild(e0);
+}
+};
+}
+function __init_ctx() {
+let x = 0;
+let __binding0 = (ev) => __schedule_update(1, x = ev.target.value);
+return [__binding0,x];
+}
+const ctx = __init_ctx();
+const fragment = create_main_block(document.getElementById("test"));
+let updating = false;
+function __schedule_update(ctx_idx, val) {
+ctx[ctx_idx] = val;
+dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
+if (updating) return;
+updating = true;
+Promise.resolve().then(() => {
+fragment.u(dirty);
+updating = false;
+dirty.fill(0);
+});
+}
+

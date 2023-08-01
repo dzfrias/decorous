@@ -334,6 +334,11 @@ impl<'a> Component<'a> {
                                 self.declared_vars.insert_arrow_expr(arrow_expr, scope);
                             }
                         }
+                        Attribute::Binding(binding) => {
+                            let name = SmolStr::new(binding);
+                            self.referenced.push(name.clone());
+                            self.declared_vars.insert_binding(name);
+                        }
                         Attribute::KeyValue(_, Some(AttributeValue::JavaScript(js))) => {
                             self.apply_refs(js);
                         }
@@ -541,5 +546,17 @@ mod tests {
     fn assigns_ids_to_mustaches_in_css() {
         let component = make_component("---css p { color: {color}; } ---");
         insta::assert_debug_snapshot!(component.declared_vars().css_mustaches());
+    }
+
+    #[test]
+    fn does_not_hoist_with_binding() {
+        let component = make_component("---js let x = 0; --- #input[:x:]/input");
+        assert!(component.hoist().is_empty())
+    }
+
+    #[test]
+    fn bindings_are_put_into_declared_vars() {
+        let component = make_component("---js let x = 0; --- #input[:x:]/input");
+        insta::assert_debug_snapshot!(component.declared_vars())
     }
 }

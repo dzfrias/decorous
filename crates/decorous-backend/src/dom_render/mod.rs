@@ -79,12 +79,26 @@ fn render<T: io::Write>(
         )?;
     }
 
+    for (name, id) in component.declared_vars().all_bindings() {
+        if let Some(var_id) = component.declared_vars().get_var(name, None) {
+            writeln!(
+                render_to,
+                "let __binding{id} = (ev) => __schedule_update({var_id}, {name} = ev.target.value);"
+            )?;
+        } else {
+            todo!("unbound var lint");
+        }
+    }
+
     let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
     for (name, idx) in component.declared_vars().all_vars() {
         ctx[*idx as usize] = Cow::Borrowed(name);
     }
     for (idx, _) in component.declared_vars().all_arrow_exprs().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
+    }
+    for (_, idx) in component.declared_vars().all_bindings() {
+        ctx[*idx as usize] = Cow::Owned(format!("__binding{idx}"))
     }
     writeln!(render_to, "return [{}];", ctx.join(","))?;
     writeln!(render_to, "}}")?;
@@ -216,5 +230,10 @@ mod tests {
         test_render!(
             "---js let color = \"red\"; let bg = \"green\" --- ---css p { color: {color}; background: {bg}; } --- #button[@click={() => { color = 1; bg = 3; }}]:Click"
         );
+    }
+
+    #[test]
+    fn can_render_bindings() {
+        test_render!("---js let x = 0; --- #input[:x:]/input");
     }
 }
