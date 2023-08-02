@@ -1,6 +1,6 @@
 pub mod errors;
 
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::Range, slice};
 
 use nom::{
     branch::alt,
@@ -94,9 +94,17 @@ fn parse_code_blocks<'a>(
     for b in code_blocks {
         match b.lang() {
             "js" => {
-                script = match parse_js(b.body(), b.offset()) {
+                script = match parse_js(b.body()) {
                     Ok(node) => Some(node),
-                    Err(err) => return nom_err!(input, Failure, err, None),
+                    Err((title, span)) => {
+                        let pos = src.slice(b.offset() + span.start..);
+                        return nom_err!(
+                            pos,
+                            Failure,
+                            ParseErrorType::JavaScriptDiagnostics { title },
+                            None
+                        );
+                    }
                 };
             }
             "css" => {
@@ -428,20 +436,58 @@ fn mustache_inner(input: NomSpan) -> Result<SyntaxNode> {
         char('}'),
     )(input)?;
 
-    match parse_js(&js_text, loc.location_offset()) {
+    match parse_js(&js_text) {
         Ok(s) => Ok((input, s.first_child().map_or(s, |child| child))),
-        Err(err) => nom_err!(input, Failure, err, None),
+        Err((title, span)) => {
+            let src = get_unoffsetted_str(input);
+            let src_loc = LocatedSpan::new(src);
+            nom_err!(
+                src_loc.slice(loc.location_offset() + span.start..loc.location_offset() + span.end),
+                Failure,
+                ParseErrorType::JavaScriptDiagnostics { title },
+                None
+            )
+        }
     }
 }
 
-fn parse_js(text: &str, offset: usize) -> std::result::Result<SyntaxNode, ParseErrorType> {
+fn parse_js(text: &str) -> std::result::Result<SyntaxNode, (String, Range<usize>)> {
     let res = parse_module(text, 0);
     if res.errors().is_empty() {
         Ok(res.syntax())
     } else {
         // A bit of a weird way to get owned diagnostics...
-        let errors = res.ok().expect_err("should have errors");
-        Err(ParseErrorType::JavaScriptDiagnostics { errors, offset })
+        // We also get the first element error because this parser has a fail-fast strategy
+        let error = res.ok().expect_err("should have errors").swap_remove(0);
+        let range = error
+            .primary
+            .map(|diag| diag.span.range)
+            .unwrap_or_default();
+        Err((error.title, range))
+    }
+}
+
+// Thanks to https://docs.rs/nom_locate/latest/src/nom_locate/lib.rs.html#326 for
+// most of the code of this function. This function retrieves the source a NomSpan
+// is derived from, up to the end of the NomSpan.
+//
+// With an input and span (denoted by ^) of:
+// Hello, world!
+//   ^^^
+// This function returns: "Hello"
+fn get_unoffsetted_str(span: NomSpan) -> &str {
+    let self_bytes = span.fragment().as_bytes();
+    let self_ptr = self_bytes.as_ptr();
+    unsafe {
+        // Part of safety condition at https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html
+        assert!(
+            span.location_offset() <= isize::max_value() as usize,
+            "offset is too big"
+        );
+        let orig_ptr = self_ptr.offset(-(span.location_offset() as isize));
+        let bytes = slice::from_raw_parts(orig_ptr, span.location_offset() + self_bytes.len());
+        // SAFETY: we got it from an &str originally, so we know it's valid utf8
+        std::str::from_utf8_unchecked(bytes)
     }
 }
 
@@ -673,5 +719,10 @@ mod tests {
     #[test]
     fn css_parse_errors_are_given_offset() {
         nom_test_all_insta!(parse, ["#p hi /p ---css p { color: red } ---"])
+    }
+
+    #[test]
+    fn javascript_parse_errors_have_proper_location_offsets() {
+        nom_test_all_insta!(parse, ["---js let x = ; ---"])
     }
 }

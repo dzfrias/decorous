@@ -1,0 +1,22 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: parse(input.into())
+---
+Err(
+    Report {
+        errors: [
+            ParseError {
+                fragment: Location {
+                    offset: 14,
+                    length: 1,
+                    line: 1,
+                    column: 15,
+                },
+                help: None,
+                err_type: JavaScriptDiagnostics {
+                    title: "expected an expression, but found `;` instead",
+                },
+            },
+        ],
+    },
+)

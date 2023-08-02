@@ -23,11 +23,8 @@ pub enum ParseErrorType {
     CannotHaveTwoScripts,
     #[error("cannot have two style tags")]
     CannotHaveTwoStyleTags,
-    #[error("parse error in JavaScript: {}", 0.to_string())]
-    JavaScriptDiagnostics {
-        errors: Vec<rslint_errors::Diagnostic>,
-        offset: usize,
-    },
+    #[error("parse error in JavaScript: {title}")]
+    JavaScriptDiagnostics { title: String },
     #[error("invalid special block type: {0}. Only `for` and `if` are accepted.")]
     InvalidSpecialBlockType(String),
     // Boxed because this enum variant would otherwise be very large.
