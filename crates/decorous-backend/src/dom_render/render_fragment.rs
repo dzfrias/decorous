@@ -189,7 +189,7 @@ fn render_decl(f: &mut Vec<u8>, node: &Node<'_, FragmentMetadata>, declared: &De
                             f,
                             "e{id}.addEventListener(\"input\", ctx[{}]);",
                             declared.get_binding(*binding).expect("BUG: every binding should have a corresponding event listener in declared vars")
-                        )
+                        );
                     }
                 }
             }
@@ -320,7 +320,7 @@ fn render_update(f: &mut Vec<u8>, node: &Node<'_, FragmentMetadata>, declared: &
                         force_writeln!(
                             f,
                             "if (dirty[{dirty_idx}] & {bitmask}) e{id}.value = ctx[{var_id}];"
-                        )
+                        );
                     }
                     _ => continue,
                 }

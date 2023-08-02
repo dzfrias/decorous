@@ -110,11 +110,11 @@ impl<'a, T: io::Write> HtmlFmt<T> for Element<'a, FragmentMetadata> {
                 }
                 // Do nothing. Dynamic attributes can't be baked statically into the HTML
                 Attribute::KeyValue(_, Some(AttributeValue::JavaScript(_)))
-                | Attribute::EventHandler(_) => has_dynamic = true,
+                | Attribute::EventHandler(_)
+                | Attribute::Binding(_) => has_dynamic = true,
                 Attribute::KeyValue(key, None) => {
                     write!(f, " {key}=\"\"")?;
                 }
-                Attribute::Binding(_) => has_dynamic = true,
             }
         }
         if metadata.parent_id().is_none() && !declared.css_mustaches().is_empty() {

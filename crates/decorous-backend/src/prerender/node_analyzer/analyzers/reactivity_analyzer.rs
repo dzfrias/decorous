@@ -112,7 +112,7 @@ impl<'a> NodeAnalyzer<'a> for ReactivityAnalyzer<'a> {
 
                         Attribute::Binding(b) => binding = Some(SmolStr::new(b)),
 
-                        _ => {}
+                        Attribute::KeyValue(_, _) => {}
                     };
                 }
 
@@ -125,7 +125,7 @@ impl<'a> NodeAnalyzer<'a> for ReactivityAnalyzer<'a> {
                 }
 
                 if let Some(binding) = binding {
-                    self.reactive_data.bindings.push((node.metadata(), binding))
+                    self.reactive_data.bindings.push((node.metadata(), binding));
                 }
                 if !kvs.is_empty() {
                     self.reactive_data

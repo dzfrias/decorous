@@ -97,8 +97,8 @@ fn render<T: io::Write>(
     for (idx, _) in component.declared_vars().all_arrow_exprs().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
     }
-    for (_, idx) in component.declared_vars().all_bindings() {
-        ctx[*idx as usize] = Cow::Owned(format!("__binding{idx}"))
+    for idx in component.declared_vars().all_bindings().values() {
+        ctx[*idx as usize] = Cow::Owned(format!("__binding{idx}"));
     }
     writeln!(render_to, "return [{}];", ctx.join(","))?;
     writeln!(render_to, "}}")?;

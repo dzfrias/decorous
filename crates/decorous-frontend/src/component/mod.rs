@@ -311,7 +311,7 @@ impl<'a> Component<'a> {
                             let name = SmolStr::new(binding);
                             self.declared_vars.insert_binding(name);
                         }
-                        _ => continue,
+                        Attribute::KeyValue(_, _) => continue,
                     }
                 }
 
@@ -374,7 +374,7 @@ impl<'a> Component<'a> {
                 let var_decl: VarDecl = toplevel.node.to();
                 let mut all_declared = vec![];
                 for decl in var_decl.declared() {
-                    all_declared.extend(utils::get_idents_from_pattern(decl.pattern().unwrap()))
+                    all_declared.extend(utils::get_idents_from_pattern(decl.pattern().unwrap()));
                 }
                 // If the variable assignment has a mutation, that means the variable
                 // itself is not a valid candidate for being hoisted
@@ -400,7 +400,7 @@ impl<'a> Component<'a> {
                             Attribute::KeyValue(_, Some(AttributeValue::JavaScript(js))) => {
                                 remove_mutated(js, &mut unmutated);
                             }
-                            _ => {}
+                            Attribute::KeyValue(_, _) => {}
                         }
                     }
                 }
