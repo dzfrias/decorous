@@ -66,8 +66,8 @@ pub fn compile_wasm<'a>(
             }
             let out = Command::new(python)
                 .arg("__tmp.py")
-                .arg(&path)
-                .arg(out_name)
+                .env("DECOR_INPUT", &path)
+                .env("DECOR_OUT", out_name)
                 .args(&build_args)
                 .output()?;
             (out.status, out.stdout, out.stderr)

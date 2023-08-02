@@ -1,11 +1,10 @@
 from pathlib import Path
-import sys
 import os
 
 
 def main():
-    input = Path(sys.argv[1])
-    outdir = Path(sys.argv[2])
+    input = Path(os.environ["DECOR_INPUT"])
+    outdir = Path(os.environ["DECOR_OUT"])
     name = input.stem
 
     out_name = (outdir / name).with_suffix(".js")

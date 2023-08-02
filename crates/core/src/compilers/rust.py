@@ -1,11 +1,10 @@
-import sys
 import os
 from pathlib import Path
 
 
 def main():
-    input = sys.argv[1]
-    outdir = sys.argv[2]
+    input = os.environ["DECOR_INPUT"]
+    outdir = os.environ["DECOR_OUT"]
 
     PROJECT_NAME = "decor-out"
 
