@@ -30,8 +30,9 @@ pub enum ParseErrorType {
     },
     #[error("invalid special block type: {0}. Only `for` and `if` are accepted.")]
     InvalidSpecialBlockType(String),
+    // Boxed because this enum variant would otherwise be very large.
     #[error("css parsing error: {0}")]
-    CssParsingError(css::error::ParseError<Location>, usize),
+    CssParsingError(Box<css::error::ParseError<Location>>),
     #[error("byte processing error: {}", 0.to_string())]
     Nom(nom::error::ErrorKind),
 }
@@ -64,7 +65,7 @@ pub struct Help {
 /// This is usually produced along the [`parse`](crate::parse) function.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Report<T> {
-    errors: SmallVec<[ParseError<T>; 3]>,
+    errors: SmallVec<[ParseError<T>; 1]>,
 }
 
 impl<T> Report<T> {

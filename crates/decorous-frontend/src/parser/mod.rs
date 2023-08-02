@@ -109,7 +109,7 @@ fn parse_code_blocks<'a>(
                         return nom_err!(
                             pos,
                             Failure,
-                            ParseErrorType::CssParsingError(err, b.offset()),
+                            ParseErrorType::CssParsingError(err.into()),
                             help
                         );
                     }
@@ -337,6 +337,8 @@ fn parse_evt_handler(input: LocatedSpan<&str>) -> Result<Attribute> {
             ))
         );
     }
+    // clippy is wrong here...
+    #[allow(clippy::needless_return)]
     return map(mustache, |node| {
         Attribute::EventHandler(EventHandler::new(&attr, node))
     })(input);
