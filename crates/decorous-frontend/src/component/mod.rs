@@ -1,6 +1,5 @@
 mod declared_vars;
 mod fragment;
-mod warning;
 
 use std::{borrow::Cow, collections::HashSet};
 
@@ -22,7 +21,6 @@ use crate::{
 };
 pub use declared_vars::{DeclaredVariables, Scope};
 pub use fragment::FragmentMetadata;
-pub use warning::*;
 
 #[derive(Debug)]
 pub struct Component<'a> {
