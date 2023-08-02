@@ -8,11 +8,11 @@ function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
 const e0 = document.createElement("div");
-e0.setAttribute("class", ctx[1]);
+e0.setAttribute("class", ctx[0]);
 mount(target, e0, anchor);
 return {
 u(dirty) {
-if (dirty[0] & 2) e0.setAttribute("class", ctx[1]);
+if (dirty[0] & 1) e0.setAttribute("class", ctx[0]);
 },
 d() {
 e0.parentNode.removeChild(e0);
@@ -21,8 +21,8 @@ e0.parentNode.removeChild(e0);
 }
 function __init_ctx() {
 let x = 3;
-function remake_x() { __schedule_update(1, x = 44); }
-return [remake_x,x];
+function remake_x() { __schedule_update(0, x = 44); }
+return [x,remake_x];
 }
 const ctx = __init_ctx();
 const fragment = create_main_block(document.getElementById("test"));

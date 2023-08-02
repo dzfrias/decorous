@@ -2,8 +2,7 @@
 source: crates/decorous-backend/src/dom_render/mod.rs
 expression: "String::from_utf8(out).unwrap()"
 ---
-let hello = 0;
-const dirty = new Uint8Array(new ArrayBuffer(0));
+const dirty = new Uint8Array(new ArrayBuffer(1));
 function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
@@ -40,10 +39,10 @@ e2.parentNode.removeChild(e2);
 mount(target, e0_anchor, anchor);
 let e0;
 let e0_on = false;
-if (hello == 0) { e0 = create_0_block(e0_anchor.parentNode, e0_anchor); e0_on = true; } else { e0 = create_0_else_block(e0_anchor.parentNode, e0_anchor); }
+if (ctx[0] == 0) { e0 = create_0_block(e0_anchor.parentNode, e0_anchor); e0_on = true; } else { e0 = create_0_else_block(e0_anchor.parentNode, e0_anchor); }
 return {
 u(dirty) {
-if (hello == 0) { if (e0 && e0_on) { e0.u(dirty); } else { e0_on = true; e0.d(); e0 = create_0_block(e0_anchor.parentNode, e0_anchor); } } else if (e0_on) { e0_on = false; e0.d(); e0 = create_0_else_block(e0_anchor.parentNode, e0_anchor); }
+if (ctx[0] == 0) { if (e0 && e0_on) { e0.u(dirty); } else { e0_on = true; e0.d(); e0 = create_0_block(e0_anchor.parentNode, e0_anchor); } } else if (e0_on) { e0_on = false; e0.d(); e0 = create_0_else_block(e0_anchor.parentNode, e0_anchor); }
 },
 d() {
 if (e0) e0.d();
@@ -52,8 +51,8 @@ e0_anchor.parentNode.removeChild(e0_anchor);
 };
 }
 function __init_ctx() {
-
-return [];
+let hello = 0;
+return [hello];
 }
 const ctx = __init_ctx();
 const fragment = create_main_block(document.getElementById("test"));

@@ -3,18 +3,18 @@ source: crates/decorous-backend/src/dom_render/mod.rs
 expression: "String::from_utf8(out).unwrap()"
 ---
 import data from "data";
-let x = 3;
-const dirty = new Uint8Array(new ArrayBuffer(0));
+const dirty = new Uint8Array(new ArrayBuffer(1));
 function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
 const e0 = document.createElement("p");
-const e1 = document.createTextNode(x);
+const e1 = document.createTextNode(ctx[0]);
 mount(target, e0, anchor);
 e0.appendChild(e1);
 return {
 u(dirty) {
+if (dirty[0] & 1) e1.data = ctx[0];
 },
 d() {
 e0.parentNode.removeChild(e0);
@@ -22,8 +22,8 @@ e0.parentNode.removeChild(e0);
 };
 }
 function __init_ctx() {
-
-return [];
+let x = 3;
+return [x];
 }
 const ctx = __init_ctx();
 const fragment = create_main_block(document.getElementById("test"));

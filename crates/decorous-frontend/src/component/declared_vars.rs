@@ -110,7 +110,20 @@ impl DeclaredVariables {
         SmolStr: Borrow<K>,
         K: Hash + Eq + ?Sized,
     {
-        self.vars.remove(var).is_some()
+        if let Some(removed_id) = self.vars.remove(var) {
+            for id in self
+                .vars
+                .values_mut()
+                .chain(self.arrow_exprs.values_mut().map(|(id, _)| id))
+                .chain(self.bindings.values_mut())
+                .filter(|id| **id > removed_id)
+            {
+                *id -= 1;
+            }
+            true
+        } else {
+            false
+        }
     }
 
     pub(crate) fn generate_id(&mut self) -> u32 {

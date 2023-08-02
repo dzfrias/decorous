@@ -4,11 +4,11 @@ expression: component.declared_vars()
 ---
 DeclaredVariables {
     vars: {
-        "x": 1,
+        "x": 0,
     },
     arrow_exprs: {},
     bindings: {
-        "x": 0,
+        "x": 1,
     },
     scopes: {},
     css_mustaches: {},

@@ -10,13 +10,13 @@ function replace(node) {
 }
 const elems = {"0":document.getElementById("0"),};
 function __init_ctx() {
-  let __closure1 = () => console.log("hello");
+  let __closure2 = () => console.log("hello");
   let x = 0;
   elems["0"].addEventListener("click", () => console.log("hello"));
   elems["0"].value = x;
-  let __binding0 = (ev) => __schedule_update(2, x = ev.target.value);
-  elems["0"].addEventListener("input", __binding0);
-  return [__binding0,__closure1,x];
+  let __binding1 = (ev) => __schedule_update(0, x = ev.target.value);
+  elems["0"].addEventListener("input", __binding1);
+  return [x,__binding1,__closure2];
 }
 const ctx = __init_ctx();
 let updating = false;
@@ -24,7 +24,7 @@ dirty.fill(255);
 __update(dirty, true);
 dirty.fill(0);
 function __update(dirty, initial) {
-  if (dirty[0] & 4) elems["0"].value = ctx[2];
+  if (dirty[0] & 1) elems["0"].value = ctx[0];
 }
 function __schedule_update(ctx_idx, val) {
   ctx[ctx_idx] = val;
