@@ -32,13 +32,4 @@ div.decor-0 {
 }
 
 ---out.js---
-function replace(node) {
-  const text = document.createTextNode("");
-  node.replaceWith(text);
-  return text;
-}
-const elems = {};
-__update(null, true);
-function __update(dirty, initial) {
-}
 

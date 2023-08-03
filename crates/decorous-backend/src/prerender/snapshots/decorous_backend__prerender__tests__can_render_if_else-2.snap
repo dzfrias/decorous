@@ -3,11 +3,6 @@ source: crates/decorous-backend/src/prerender/mod.rs
 expression: output
 ---
 const dirty = new Uint8Array(new ArrayBuffer(1));
-function replace(node) {
-  const text = document.createTextNode("");
-  node.replaceWith(text);
-  return text;
-}
 function create_0_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
@@ -37,6 +32,11 @@ e2.parentNode.removeChild(e2);
 };
 }
 const elems = {"0":replace(document.getElementById("0")),"0_block":null,"0_on":true,};
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
 function __init_ctx() {
   let x = 0;
   return [x];
@@ -62,6 +62,7 @@ function __update(dirty, initial) {
 }
 
 }
+__update(null, true);
 function __schedule_update(ctx_idx, val) {
   ctx[ctx_idx] = val;
   dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);

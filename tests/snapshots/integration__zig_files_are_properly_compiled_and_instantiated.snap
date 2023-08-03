@@ -32,18 +32,9 @@ COULD NOT BE READ: stream did not contain valid UTF-8
 
 ---out.js---
 let wasm = (await WebAssembly.instantiateStreaming(fetch("./out/__tmp.wasm"))).instance.exports;
-function replace(node) {
-  const text = document.createTextNode("");
-  node.replaceWith(text);
-  return text;
-}
-const elems = {};
 function __init_ctx() {
   console.log(wasm.add(1, 2));
   return [];
 }
 const ctx = __init_ctx();
-__update(null, true);
-function __update(dirty, initial) {
-}
 

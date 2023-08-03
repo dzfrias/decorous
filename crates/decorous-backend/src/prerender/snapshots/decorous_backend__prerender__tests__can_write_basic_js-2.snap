@@ -3,12 +3,12 @@ source: crates/decorous-backend/src/prerender/mod.rs
 expression: output
 ---
 const dirty = new Uint8Array(new ArrayBuffer(1));
+const elems = {"2":replace(document.getElementById("2")),"7":replace(document.getElementById("7")),"4":document.getElementById("4"),};
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);
   return text;
 }
-const elems = {"2":replace(document.getElementById("2")),"7":replace(document.getElementById("7")),"4":document.getElementById("4"),};
 function __init_ctx() {
   let __closure1 = () => __schedule_update(0, x = 444);
   let x = 3;
@@ -24,6 +24,7 @@ function __update(dirty, initial) {
   if (dirty[0] & 1) elems[2].data = ctx[0];
   if (dirty[0] & 1) elems[7].data = ctx[0];
 }
+__update(null, true);
 function __schedule_update(ctx_idx, val) {
   ctx[ctx_idx] = val;
   dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);

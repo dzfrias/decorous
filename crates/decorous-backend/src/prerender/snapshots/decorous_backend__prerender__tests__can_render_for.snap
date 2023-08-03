@@ -2,11 +2,6 @@
 source: crates/decorous-backend/src/prerender/mod.rs
 expression: output
 ---
-function replace(node) {
-  const text = document.createTextNode("");
-  node.replaceWith(text);
-  return text;
-}
 function create_0_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
@@ -25,14 +20,19 @@ e2.parentNode.removeChild(e2);
 };
 }
 const elems = {"0":replace(document.getElementById("0")),"0_block":[],};
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
 function __init_ctx() {
   return [undefined];
 }
 const ctx = __init_ctx();
-__update(null, true);
 function __update(dirty, initial) {
   let i = 0; for (const v of ([1, 2, 3])) { ctx[0] = v; if (i >= elems["0_block"].length) { elems["0_block"][i] = create_0_block(elems["0"].parentNode, elems["0"]); } elems["0_block"][i].u(dirty); i += 1; } elems["0_block"].slice(i).forEach((b) => b.d()); elems["0_block"].length = i;
 }
+__update(null, true);
 
 ---
 <span id="0"></span>

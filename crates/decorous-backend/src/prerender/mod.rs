@@ -49,9 +49,9 @@ where
 {
     let analysis = Analysis::analyze(component);
 
-    let has_reactive_variables = component.declared_vars().all_vars().is_empty();
+    let has_reactive_variables = !component.declared_vars().all_vars().is_empty();
 
-    if !has_reactive_variables {
+    if has_reactive_variables {
         let vars = (component.declared_vars().all_vars().len() + 7) / 8;
         writeln!(
             js_out,
@@ -59,11 +59,13 @@ where
         )?;
     }
 
-    write!(js_out, include_str!("./templates/replace.js"))?;
     render_hoists(component, &analysis, js_out)?;
-    render_elements(&analysis, js_out)?;
+    let status = render_elements(&analysis, js_out)?;
+    if status.wrote_something() {
+        write!(js_out, include_str!("./templates/replace.js"))?;
+    }
     let status = render_ctx_init(component, &analysis, js_out)?;
-    if !has_reactive_variables && status.wrote_something() {
+    if has_reactive_variables && status.wrote_something() {
         writeln!(
             js_out,
             "const ctx = __init_ctx();
@@ -76,11 +78,13 @@ dirty.fill(0);"
         if status.wrote_something() {
             writeln!(js_out, "const ctx = __init_ctx();")?;
         }
+    }
+    let status = render_update_body(component, &analysis, js_out)?;
+    if status.wrote_something() {
         writeln!(js_out, "__update(null, true);")?;
     }
-    render_update_body(component, &analysis, js_out)?;
     // If there are no reactive variables, nothing can be updated, so remove this.
-    if !has_reactive_variables {
+    if has_reactive_variables {
         write!(js_out, include_str!("./templates/schedule_update.js"))?;
     }
 
@@ -131,8 +135,17 @@ fn render_hoists<'a, T: io::Write>(
     Ok(())
 }
 
-fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result<()> {
+fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result<WriteStatus> {
     let mut formatter = Formatter::new(out);
+
+    if analysis.reactive_data().mustaches().is_empty()
+        && analysis.reactive_data().key_values().is_empty()
+        && analysis.reactive_data().event_listeners().is_empty()
+        && analysis.reactive_data().bindings().is_empty()
+        && analysis.reactive_data().special_blocks().is_empty()
+    {
+        return Ok(WriteStatus::Nothing);
+    }
 
     formatter
         .write("const elems = ")?
@@ -154,7 +167,7 @@ fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result
                 }),
             ",",
         )?
-        // For reactive key-value attributes, just get element by it's generated id
+        // For reactive key-value attributes, just get element by its generated id
         .write_all_trailing(
             analysis
                 .reactive_data()
@@ -207,7 +220,7 @@ fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result
 
     formatter.pop_ctx()?;
 
-    Ok(())
+    Ok(WriteStatus::Something)
 }
 
 fn render_ctx_init<T: io::Write>(
@@ -322,8 +335,16 @@ fn render_update_body<T: io::Write>(
     component: &Component,
     analysis: &Analysis,
     out: &mut T,
-) -> io::Result<()> {
+) -> io::Result<WriteStatus> {
     let mut formatter = Formatter::new(out);
+
+    if analysis.reactive_data().mustaches().is_empty()
+        && analysis.reactive_data().bindings().is_empty()
+        && analysis.reactive_data().special_blocks().is_empty()
+        && analysis.reactive_data().key_values().is_empty()
+    {
+        return Ok(WriteStatus::Nothing);
+    }
 
     formatter
         .write("function __update(dirty, initial) ")?
@@ -435,7 +456,7 @@ fn render_update_body<T: io::Write>(
 
     formatter.pop_ctx()?;
 
-    Ok(())
+    Ok(WriteStatus::Something)
 }
 
 #[cfg(test)]

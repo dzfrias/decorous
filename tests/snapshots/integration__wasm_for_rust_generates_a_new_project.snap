@@ -220,19 +220,16 @@ export function add(a: number, b: number): number;
 ---out.js---
 import init, * as wasm from "/out/decor_out.js";
 await init();
+const elems = {"0":document.getElementById("0"),};
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);
   return text;
 }
-const elems = {"0":document.getElementById("0"),};
 function __init_ctx() {
   let __closure0 = () => console.log(wasm.add(1, 2));
   elems["0"].addEventListener("click", () => console.log(wasm.add(1, 2)));
   return [__closure0];
 }
 const ctx = __init_ctx();
-__update(null, true);
-function __update(dirty, initial) {
-}
 
