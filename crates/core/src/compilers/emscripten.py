@@ -11,14 +11,18 @@ def main():
     pre = outdir / "__pre.js"
 
     # The contents of this file will run before the JavaScript glue
-    with open(pre, "w") as f:
-        f.write(
-            f"""var Module = {{
-  locateFile: function(s) {{
-    return '{outdir}/' + s;
-  }}
-}};"""
-        )
+    try:
+        with open(pre, "w") as f:
+            f.write(
+                f"""var Module = {{
+      locateFile: function(s) {{
+        return '{outdir}/' + s;
+      }}
+    }};"""
+            )
+    except:
+        raise Exception("problem writing __pre.js")
+
     out_name = (outdir / name).with_suffix(".js")
     args = [
         "emcc",
@@ -41,7 +45,10 @@ def main():
         'EXPORTED_RUNTIME_METHODS=["ccall"]',
         *sys.argv[1:],
     ]
-    subprocess.run(args, check=True)
+    try:
+        subprocess.run(args, check=True)
+    except:
+        raise Exception("emscripten had a problem while compiling")
     try:
         # Clean up __pre.js file
         os.remove(pre)
