@@ -1,6 +1,14 @@
 use std::io;
 
 use crate::RenderBackend;
+use rslint_parser::SmolStr;
+
+#[derive(Debug, Clone, Hash)]
+pub struct CodeInfo<'a> {
+    pub lang: &'a str,
+    pub body: &'a str,
+    pub exports: &'a [SmolStr],
+}
 
 /// The trait for anything that takes WebAssembly input and compiles it to JavaScript.
 ///
@@ -15,7 +23,7 @@ where
 {
     type Err;
 
-    fn compile<W>(&mut self, lang: &str, body: &str, out: &mut W) -> Result<(), Self::Err>
+    fn compile<W>(&mut self, info: CodeInfo, out: &mut W) -> Result<(), Self::Err>
     where
         W: io::Write;
 }

@@ -7,7 +7,8 @@ use std::{
 };
 
 use anyhow::{bail, Context, Error, Result};
-use decorous_backend::{dom_render::DomRenderer, prerender::Prerenderer, WasmCompiler};
+use decorous_backend::{dom_render::DomRenderer, prerender::Prerenderer, CodeInfo, WasmCompiler};
+use itertools::Itertools;
 use scopeguard::defer;
 use which::which;
 
@@ -39,7 +40,7 @@ macro_rules! compile_for {
         impl WasmCompiler<$backend> for MainCompiler<'_> {
             type Err = Error;
 
-            fn compile<W>(&mut self, lang: &str, body: &str, out: &mut W) -> Result<(), Error>
+            fn compile<W>(&mut self, CodeInfo { lang, body, exports }: CodeInfo, out: &mut W) -> Result<(), Error>
             where
                 W: io::Write,
             {
@@ -74,8 +75,9 @@ macro_rules! compile_for {
                     ScriptOrFile::File(file) => {
                         let out = Command::new(python)
                             .arg(file)
-                            .arg(&path)
-                            .arg(self.out_name)
+                            .env("DECOR_INPUT", &path)
+                            .env("DECOR_OUT", self.out_name)
+                            .env("DECOR_EXPORTS", exports.iter().join(" "))
                             .args(&build_args)
                             .output()?;
                         (out.status, out.stdout, out.stderr)
@@ -92,6 +94,7 @@ macro_rules! compile_for {
                             .arg("__tmp.py")
                             .env("DECOR_INPUT", &path)
                             .env("DECOR_OUT", self.out_name)
+                            .env("DECOR_EXPORTS", exports.iter().join(" "))
                             .args(&build_args)
                             .output()?;
                         (out.status, out.stdout, out.stderr)

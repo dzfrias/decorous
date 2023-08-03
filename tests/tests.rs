@@ -142,3 +142,13 @@ decor_test!(
         assert_all!(dir.path());
     }
 );
+
+decor_test!(
+    zig_has_imports_exported_objects,
+    ZIG_EXPORTS,
+    |dir: &mut TempDir, mut cmd: Command| {
+        cmd.arg("--html");
+        cmd.assert().success();
+        assert_all!(dir.path());
+    }
+);

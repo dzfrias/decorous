@@ -10,6 +10,8 @@ use std::io;
 use thiserror::Error;
 pub use wasm_compiler::WasmCompiler;
 
+pub use crate::wasm_compiler::CodeInfo;
+
 #[derive(Debug)]
 pub struct Metadata<'name> {
     pub name: &'name str,
@@ -52,7 +54,14 @@ where
 {
     if let Some(wasm) = component.wasm() {
         compiler
-            .compile(wasm.lang(), wasm.body(), out)
+            .compile(
+                CodeInfo {
+                    lang: wasm.lang(),
+                    body: wasm.body(),
+                    exports: component.exports(),
+                },
+                out,
+            )
             .map_err(|err| WasmRenderError::Wasm(err))?;
     }
     <B as RenderBackend>::render(out, component, metadata)?;

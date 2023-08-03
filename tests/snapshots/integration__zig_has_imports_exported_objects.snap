@@ -1,0 +1,52 @@
+---
+source: tests/tests.rs
+expression: all
+---
+
+---index.html---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <script type="module" src="out.js"></script>
+    <p>Hi</p>
+
+  </body>
+</html>
+
+---input.decor---
+---zig
+extern fn print(i32) void;
+
+export fn add(a: i32, b: i32) void {
+    print(a + b);
+}
+---
+
+---js
+export function print(x) {
+  console.log(x);
+}
+
+wasm.add(1, 2);
+---
+
+#p:Hi
+
+---__tmp.wasm---
+COULD NOT BE READ: stream did not contain valid UTF-8
+
+---out.js---
+let wasm = (await WebAssembly.instantiateStreaming(fetch("./out/__tmp.wasm"), { env: { print } })).instance.exports;
+export function print(x) {
+  console.log(x);
+}
+function __init_ctx() {
+  wasm.add(1, 2);
+  return [];
+}
+const ctx = __init_ctx();
+

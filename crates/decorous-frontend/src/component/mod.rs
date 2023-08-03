@@ -6,7 +6,7 @@ use std::{borrow::Cow, collections::HashSet};
 #[cfg(not(debug_assertions))]
 use rand::Rng;
 use rslint_parser::{
-    ast::{ArrowExpr, ExportDecl, FnDecl, ImportDecl, VarDecl},
+    ast::{ArrowExpr, Decl, ExportDecl, FnDecl, ImportDecl, VarDecl},
     AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
 };
 
@@ -28,6 +28,7 @@ pub struct Component<'a> {
     declared_vars: DeclaredVariables,
     toplevel_nodes: Vec<ToplevelNodeData>,
     hoist: Vec<SyntaxNode>,
+    exports: Vec<SmolStr>,
     component_id: u8,
     current_id: u32,
 
@@ -49,6 +50,7 @@ impl<'a> Component<'a> {
             declared_vars: DeclaredVariables::new(),
             toplevel_nodes: vec![],
             hoist: vec![],
+            exports: vec![],
             current_id: 0,
             #[cfg(not(debug_assertions))]
             component_id: rand::thread_rng().gen(),
@@ -93,6 +95,10 @@ impl<'a> Component<'a> {
 
     pub fn wasm(&self) -> Option<&Code<'_>> {
         self.wasm.as_ref()
+    }
+
+    pub fn exports(&self) -> &[SmolStr] {
+        self.exports.as_ref()
     }
 }
 
@@ -245,6 +251,26 @@ impl<'a> Component<'a> {
                     substitute_assign_refs: true,
                 });
             } else if child.is::<ImportDecl>() || child.is::<ExportDecl>() {
+                if let Some(decl) = child.try_to::<ExportDecl>().and_then(|exp| exp.decl()) {
+                    match decl {
+                        Decl::FnDecl(decl) => {
+                            let tok = decl.name().unwrap().ident_token().unwrap();
+                            let name = tok.text();
+                            self.exports.push(name.clone());
+                        }
+                        Decl::ClassDecl(decl) => {
+                            let tok = decl.name().unwrap().ident_token().unwrap();
+                            let name = tok.text();
+                            self.exports.push(name.clone());
+                        }
+                        Decl::VarDecl(decl) => {
+                            for pat in decl.declared().filter_map(|d| d.pattern()) {
+                                self.exports.extend(utils::get_idents_from_pattern(pat));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
                 self.hoist.push(child);
             } else {
                 self.toplevel_nodes.push(ToplevelNodeData {
@@ -577,5 +603,13 @@ mod tests {
         let component = make_component("---js export function x() { console.log(\"hi\") } ---");
         assert!(component.toplevel_nodes().is_empty());
         insta::assert_debug_snapshot!(component.hoist())
+    }
+
+    #[test]
+    fn can_get_exports_from_script() {
+        let component = make_component(
+            "---js export function x() { console.log(\"hi\"); }; export let l = 1 ---",
+        );
+        insta::assert_debug_snapshot!(component.exports())
     }
 }

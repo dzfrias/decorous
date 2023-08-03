@@ -1,0 +1,8 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component.exports()
+---
+[
+    "x",
+    "l",
+]
