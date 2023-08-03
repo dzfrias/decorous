@@ -17,7 +17,6 @@ impl Default for Config<'_> {
                     CompilerConfig {
                         ext_override: Some("rs"),
                         script: ScriptOrFile::Script(include_str!("./compilers/rust.py")),
-                        group: true,
                     },
                 ),
                 (
@@ -25,7 +24,6 @@ impl Default for Config<'_> {
                     CompilerConfig {
                         ext_override: Some("cpp"),
                         script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
-                        group: false,
                     },
                 ),
                 (
@@ -33,7 +31,13 @@ impl Default for Config<'_> {
                     CompilerConfig {
                         ext_override: None,
                         script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
-                        group: false,
+                    },
+                ),
+                (
+                    "zig",
+                    CompilerConfig {
+                        ext_override: None,
+                        script: ScriptOrFile::Script(include_str!("./compilers/zig.py")),
                     },
                 ),
             ]),
@@ -46,7 +50,6 @@ pub struct CompilerConfig<'a> {
     pub ext_override: Option<&'a str>,
     #[serde(deserialize_with = "deserialize_script")]
     pub script: ScriptOrFile<'a>,
-    pub group: bool,
 }
 
 #[derive(Debug)]

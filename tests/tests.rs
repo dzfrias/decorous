@@ -132,3 +132,13 @@ decor_test!(
         assert_all!(dir.path(), ignore: ["__tmp.js"]);
     }
 );
+
+decor_test!(
+    zig_files_are_properly_compiled_and_instantiated,
+    ZIG,
+    |dir: &mut TempDir, mut cmd: Command| {
+        cmd.arg("--html");
+        cmd.assert().success();
+        assert_all!(dir.path());
+    }
+);

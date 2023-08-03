@@ -1,0 +1,9 @@
+---zig
+export fn add(a: i32, b: i32) i32 {
+    return a + b;
+}
+---
+
+---js
+console.log(wasm.add(1, 2));
+---
