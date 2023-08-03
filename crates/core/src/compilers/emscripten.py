@@ -42,8 +42,11 @@ def main():
         *sys.argv[1:],
     ]
     subprocess.run(args, check=True)
-    # Clean up __pre.js file
-    os.remove(pre)
+    try:
+        # Clean up __pre.js file
+        os.remove(pre)
+    except:
+        raise Exception("problem removing __pre.js")
 
     print(
         f"""import init from "./{outdir}/{name}.js";
