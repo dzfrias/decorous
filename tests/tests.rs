@@ -109,7 +109,7 @@ decor_test!(
     WASM_C,
     |dir: &mut TempDir, mut cmd: Command| {
         cmd.assert().success();
-        assert_all!(dir.path(), ignore: ["input.js"]);
+        assert_all!(dir.path(), ignore: ["__tmp.js"]);
     }
 );
 
@@ -119,7 +119,7 @@ decor_test!(
     |dir: &mut TempDir, mut cmd: Command| {
         cmd.arg("--html");
         cmd.assert().success();
-        assert_all!(dir.path(), ignore: ["input.js"]);
+        assert_all!(dir.path(), ignore: ["__tmp.js"]);
     }
 );
 
@@ -129,6 +129,6 @@ decor_test!(
     |dir: &mut TempDir, mut cmd: Command| {
         cmd.arg("--html");
         cmd.assert().success();
-        assert_all!(dir.path(), ignore: ["input.js"]);
+        assert_all!(dir.path(), ignore: ["__tmp.js"]);
     }
 );

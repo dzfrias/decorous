@@ -218,6 +218,8 @@ export function add(a: number, b: number): number;
 <button id="0">Hello!</button>
 
 ---out.js---
+import init, * as wasm from "/out/decor_out.js";
+await init();
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);

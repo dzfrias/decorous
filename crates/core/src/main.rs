@@ -11,13 +11,12 @@ use std::{
 use anyhow::{Context, Result};
 use clap::Parser;
 use cli::{Cli, RenderMethod};
-use compile_wasm::compile_wasm;
 use config::Config;
 use decorous_backend::{
     css_render::CssRenderer,
     dom_render::DomRenderer,
     prerender::{HtmlPrerenderer, Prerenderer},
-    render, Metadata,
+    render, render_with_wasm, Metadata,
 };
 use decorous_frontend::{parse, Component};
 use fmt_report::fmt_report;
@@ -27,6 +26,8 @@ use superfmt::{
     style::{Color, Modifiers},
     Formatter,
 };
+
+use crate::compile_wasm::MainCompiler;
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -56,26 +57,31 @@ fn main() -> Result<()> {
 
     formatter.writeln_with_context("rendering...", Modifiers::BOLD)?;
 
-    render_js(
-        BufWriter::new(File::create(format!("{}.js", args.out))?),
-        &component,
-        args.render_method,
-        &metadata,
-    )?;
-    let wasm_ext = component
-        .wasm()
-        .map(|w| {
-            compile_wasm(
-                w.lang(),
-                w.body(),
-                metadata.name,
-                &args.out,
-                &args.build_args,
-                &config,
-            )
-        })
-        .transpose()?;
-    render_html(&args, &component, &metadata, wasm_ext.as_deref())?;
+    let mut out = BufWriter::new(File::create(format!("{}.js", args.out))?);
+    let mut wasm_compiler = MainCompiler::new(&config, &args.out, &args.build_args);
+    match args.render_method {
+        RenderMethod::Dom => {
+            render_with_wasm::<DomRenderer, _, _>(
+                &component,
+                &mut out,
+                &metadata,
+                &mut wasm_compiler,
+            )?;
+        }
+        RenderMethod::Prerender => {
+            render_with_wasm::<Prerenderer, _, _>(
+                &component,
+                &mut out,
+                &metadata,
+                &mut wasm_compiler,
+            )?;
+        }
+    }
+    out.flush()
+        .context("problem flushing buffered writer while rendering")?;
+    drop(out);
+
+    render_html(&args, &component, &metadata)?;
     if component.css().is_some() {
         let name = format!("{}.css", args.out);
         render::<CssRenderer, _>(
@@ -95,31 +101,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn render_js<T: io::Write>(
-    mut out: BufWriter<T>,
-    component: &Component,
-    render_method: RenderMethod,
-    meta: &Metadata,
-) -> Result<()> {
-    match render_method {
-        RenderMethod::Dom => {
-            render::<DomRenderer, _>(component, &mut out, meta).context("problem dom rendering")?;
-        }
-        RenderMethod::Prerender => {
-            render::<Prerenderer, _>(component, &mut out, meta).context("problem prerendering")?;
-        }
-    }
-
-    out.flush()
-        .context("problem flushing buffered writer while rendering")
-}
-
-fn render_html(
-    args: &Cli,
-    component: &Component,
-    meta: &Metadata,
-    wasm_ext: Option<&str>,
-) -> Result<()> {
+fn render_html(args: &Cli, component: &Component, meta: &Metadata) -> Result<()> {
     let mut handlebars = Handlebars::new();
     handlebars.register_escape_fn(no_escape);
     handlebars.register_template_string("index", include_str!("./templates/template.html"))?;
@@ -134,7 +116,6 @@ fn render_html(
                 "script": format!("{}.js", args.out),
                 "css": component.css().is_some().then(|| format!("{}.css", args.out)),
                 "name": meta.name,
-                "wasm_ext": wasm_ext,
                 "html": None::<&str>,
             });
 
@@ -155,7 +136,6 @@ fn render_html(
                     "script": format!("{}.js", args.out),
                     "css": component.css().is_some().then(|| format!("{}.css", args.out)),
                     "name": meta.name,
-                    "wasm_ext": wasm_ext,
                     // SAFETY: HtmlPrerenderer only produces valid UTF-8
                     "html": Some(unsafe {
                         std::str::from_utf8_unchecked(&out)

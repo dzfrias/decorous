@@ -12,9 +12,7 @@ expression: all
     <link href="out.css" rel="stylesheet" />
   </head>
   <body>
-    <script async src="out/input.js"></script>
-<script defer src="out.js"></script>
-
+    <script type="module" src="out.js"></script>
     <h1 class="decor-0">Hello!</h1>
   </body>
 </html>
@@ -37,10 +35,10 @@ h1 {
 }
 ---
 
----input.js---
+---__tmp.js---
 IGNORED
 
----input.wasm---
+---__tmp.wasm---
 COULD NOT BE READ: stream did not contain valid UTF-8
 
 ---out.css---
@@ -49,6 +47,8 @@ h1.decor-0 {
 }
 
 ---out.js---
+import init from "./out/__tmp.js";
+let wasm = await init();
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);

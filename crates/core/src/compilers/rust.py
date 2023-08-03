@@ -22,16 +22,8 @@ def main():
     )
 
     print(
-        f"""<script type="module">
-import init, * as wasm from "/{outdir}/decor_out.js";
-async function run() {{
-  await init();
-  window.wasm = wasm;
-  import("/{outdir}.js")
-}}
-run();
-</script>
-"""
+        f"""import init, * as wasm from "/{outdir}/decor_out.js";
+await init();"""
     )
 
 

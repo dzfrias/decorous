@@ -11,7 +11,7 @@ expression: all
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
   <body>
-    <script defer src="new.js"></script>
+    <script type="module" src="new.js"></script>
     <h1>This is a page</h1>
 
 <div class="green"><p>Hello, my name is <em class="red">Diego!</em></p>

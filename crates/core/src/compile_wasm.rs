@@ -6,84 +6,116 @@ use std::{
     str,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Context, Error, Result};
+use decorous_backend::{dom_render::DomRenderer, prerender::Prerenderer, WasmCompiler};
 use scopeguard::defer;
 use which::which;
 
 use crate::config::{Config, ScriptOrFile};
 
-/// The core of WASM compiling. Beware! This function has a lot of side effects...
-pub fn compile_wasm<'a>(
-    lang: &'a str,
-    body: &'a str,
-    name: &'a str,
-    out_name: &str,
-    build_args: &[(String, String)],
-    config: &Config,
-) -> Result<String> {
-    let config = config
-        .compilers
-        .get(lang)
-        .with_context(|| format!("unsupported language: {lang}"))?;
-    let path: PathBuf = format!("{name}.{}", config.ext_override.unwrap_or(lang)).into();
+#[derive(Debug)]
+pub struct MainCompiler<'a> {
+    config: &'a Config<'a>,
+    build_args: &'a [(String, String)],
+    out_name: &'a str,
+}
 
-    {
-        let mut f = File::create(&path)?;
-        f.write_all(body.as_bytes())?;
-    }
-
-    let _guard = scopeguard::guard(&path, |p| {
-        fs::remove_file(p)
-            .unwrap_or_else(|_| panic!("error removing \"{}\"! Remove it manually!", p.display()));
-    });
-
-    match fs::create_dir("out") {
-        Ok(()) => {}
-        Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
-        Err(err) => bail!(err),
-    }
-
-    let python = get_python()?;
-    let build_args = get_build_args(build_args, lang)?;
-
-    let (status, stdout, stderr) = match &config.script {
-        ScriptOrFile::File(file) => {
-            let out = Command::new(python)
-                .arg(file)
-                .arg(&path)
-                .arg(out_name)
-                .args(&build_args)
-                .output()?;
-            (out.status, out.stdout, out.stderr)
+impl<'a> MainCompiler<'a> {
+    pub fn new(
+        config: &'a Config<'a>,
+        out_name: &'a str,
+        build_args: &'a [(String, String)],
+    ) -> Self {
+        Self {
+            config,
+            build_args,
+            out_name,
         }
-        ScriptOrFile::Script(script) => {
+    }
+}
+
+macro_rules! compile_for {
+    ($backend:ty) => {
+        impl WasmCompiler<$backend> for MainCompiler<'_> {
+            type Err = Error;
+
+            fn compile<W>(&mut self, lang: &str, body: &str, out: &mut W) -> Result<(), Error>
+            where
+                W: io::Write,
             {
-                let mut f = File::create("__tmp.py")?;
-                f.write_all(script.as_bytes())?;
+                let config = self
+                    .config
+                    .compilers
+                    .get(lang)
+                    .with_context(|| format!("unsupported language: {lang}"))?;
+                let path: PathBuf = format!("__tmp.{}", config.ext_override.unwrap_or(lang)).into();
+
+                {
+                    let mut f = File::create(&path)?;
+                    f.write_all(body.as_bytes())?;
+                }
+
+                let _guard = scopeguard::guard(&path, |p| {
+                    fs::remove_file(p).unwrap_or_else(|_| {
+                        panic!("error removing \"{}\"! Remove it manually!", p.display())
+                    });
+                });
+
+                match fs::create_dir("out") {
+                    Ok(()) => {}
+                    Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
+                    Err(err) => bail!(err),
+                }
+
+                let python = get_python()?;
+                let build_args = get_build_args(self.build_args, lang)?;
+
+                let (status, stdout, stderr) = match &config.script {
+                    ScriptOrFile::File(file) => {
+                        let out = Command::new(python)
+                            .arg(file)
+                            .arg(&path)
+                            .arg(self.out_name)
+                            .args(&build_args)
+                            .output()?;
+                        (out.status, out.stdout, out.stderr)
+                    }
+                    ScriptOrFile::Script(script) => {
+                        {
+                            let mut f = File::create("__tmp.py")?;
+                            f.write_all(script.as_bytes())?;
+                        }
+                        defer! {
+                            fs::remove_file("__tmp.py").expect("error removing \"__tmp.py\"! Remove it manually!");
+                        }
+                        let out = Command::new(python)
+                            .arg("__tmp.py")
+                            .env("DECOR_INPUT", &path)
+                            .env("DECOR_OUT", self.out_name)
+                            .args(&build_args)
+                            .output()?;
+                        (out.status, out.stdout, out.stderr)
+                    }
+                };
+
+                if !status.success() {
+                    bail!(
+                        "failed to compile to WebAssembly:\n{}\nwith stdout:\n{}",
+                        str::from_utf8(&stderr)?,
+                        str::from_utf8(&stdout)?,
+                    );
+                }
+
+                out.write_all(&stdout)?;
+
+                Ok(())
             }
-            defer! {
-                fs::remove_file("__tmp.py").expect("error removing \"__tmp.py\"! Remove it manually!");
-            }
-            let out = Command::new(python)
-                .arg("__tmp.py")
-                .env("DECOR_INPUT", &path)
-                .env("DECOR_OUT", out_name)
-                .args(&build_args)
-                .output()?;
-            (out.status, out.stdout, out.stderr)
         }
     };
-
-    if !status.success() {
-        bail!(
-            "failed to compile to WebAssembly:\n{}\nwith stdout:\n{}",
-            str::from_utf8(&stderr)?,
-            str::from_utf8(&stdout)?,
-        );
-    }
-
-    Ok(String::from_utf8(stdout)?)
 }
+
+compile_for!(DomRenderer);
+compile_for!(Prerenderer);
 
 fn get_build_args(build_args: &[(String, String)], lang: &str) -> Result<Vec<String>> {
     let args = build_args

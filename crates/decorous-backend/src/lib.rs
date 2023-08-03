@@ -2,9 +2,13 @@ pub(crate) mod codegen_utils;
 pub mod css_render;
 pub mod dom_render;
 pub mod prerender;
+mod wasm_compiler;
 
 use decorous_frontend::Component;
+use std::fmt::Debug;
 use std::io;
+use thiserror::Error;
+pub use wasm_compiler::WasmCompiler;
 
 #[derive(Debug)]
 pub struct Metadata<'name> {
@@ -25,4 +29,33 @@ where
     B: RenderBackend,
 {
     <B as RenderBackend>::render(out, component, metadata)
+}
+
+#[derive(Debug, Error)]
+pub enum WasmRenderError<T> {
+    #[error("io error: {0}")]
+    Io(#[from] io::Error),
+    #[error("wasm error: {0}")]
+    Wasm(T),
+}
+
+pub fn render_with_wasm<B, W, T>(
+    component: &Component,
+    out: &mut W,
+    metadata: &Metadata,
+    compiler: &mut T,
+) -> Result<(), WasmRenderError<T::Err>>
+where
+    T: WasmCompiler<B>,
+    B: RenderBackend,
+    W: io::Write,
+{
+    if let Some(wasm) = component.wasm() {
+        compiler
+            .compile(wasm.lang(), wasm.body(), out)
+            .map_err(|err| WasmRenderError::Wasm(err))?;
+    }
+    <B as RenderBackend>::render(out, component, metadata)?;
+
+    Ok(())
 }

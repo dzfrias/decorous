@@ -433,6 +433,7 @@ dependencies = [
  "rslint_parser",
  "rslint_text_edit",
  "superfmt",
+ "thiserror",
 ]
 
 [[package]]

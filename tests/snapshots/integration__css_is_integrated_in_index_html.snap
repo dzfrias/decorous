@@ -12,7 +12,7 @@ expression: all
     <link href="out.css" rel="stylesheet" />
   </head>
   <body>
-    <script defer src="out.js"></script>
+    <script type="module" src="out.js"></script>
     <div class="decor-0">CSS!</div>
   </body>
 </html>

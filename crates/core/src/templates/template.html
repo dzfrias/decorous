@@ -8,11 +8,7 @@
     {{/if}}
   </head>
   <body>
-    {{#if wasm_ext}}
-    {{wasm_ext}}
-    {{else}}
-    <script defer src="{{script}}"></script>
-    {{/if}}
+    <script type="module" src="{{script}}"></script>
     {{#if html}}
     {{html}}
     {{else}}
