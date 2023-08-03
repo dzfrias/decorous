@@ -28,31 +28,19 @@ def main():
         raise Exception("problem writing __pre.js")
 
     out_name = (outdir / name).with_suffix(".js")
-    args = [
-        "emcc",
-        "--pre-js",
-        pre,
-        input,
-        "-o",
-        out_name,
-        "-s",
-        "NO_EXIT_RUNTIME=1",
-        "-s",
-        "MODULARIZE=1",
-        "-s",
-        "EXPORT_ES6=1",
-        "-s",
-        "EXPORT_NAME='initModule'",
-        "-s",
-        "ASYNCIFY=1",
-        "-s",
-        'EXPORTED_RUNTIME_METHODS=["ccall"]',
-        *sys.argv[1:],
-    ]
-    try:
-        subprocess.run(args, check=True)
-    except:
-        raise Exception("emscripten had a problem while compiling")
+    status = os.system(
+        f'emcc \
+            --pre-js "{pre}" \
+            {input} -o {out_name} \
+            -s NO_EXIT_RUNTIME=1 \
+            -s MODULARIZE=1 \
+            -s EXPORT_ES6=1 \
+            -s EXPORT_NAME="initModule" \
+            -s ASYNCIFY \
+            -s EXPORTED_RUNTIME_METHODS=\'["ccall"]\''
+    )
+    if status != 0:
+        raise Exception("error compiling emscripten")
     try:
         # Clean up __pre.js file
         os.remove(pre)
