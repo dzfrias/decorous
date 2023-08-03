@@ -1,6 +1,8 @@
 from pathlib import Path
 import os
 import shutil
+import subprocess
+import sys
 
 
 def main():
@@ -9,7 +11,20 @@ def main():
     exports = os.environ["DECOR_EXPORTS"]
     name = input.stem
 
-    os.system(f"zig build-lib {input} -target wasm32-freestanding -dynamic")
+    subprocess.run(
+        [
+            "zig",
+            "build-lib",
+            input,
+            "-target",
+            "wasm32-freestanding",
+            "-dynamic",
+            "--color",
+            "on",
+            *sys.argv[1:],
+        ],
+        check=True,
+    )
     shutil.move(f"{name}.wasm", outdir)
     os.remove(f"{name}.wasm.o")
 
@@ -25,4 +40,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"\nerror occurred: {e}", file=sys.stderr)
+        sys.exit(1)

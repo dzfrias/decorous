@@ -67,8 +67,9 @@ where
         context: impl Into<Context>,
     ) -> io::Result<&mut Self> {
         self.begin_context(context)?;
-        self.writeln(display)?;
-        self.pop_ctx()
+        self.write(display)?;
+        self.pop_ctx()?;
+        self.write("\n")
     }
 
     pub fn pop_ctx(&mut self) -> io::Result<&mut Self> {

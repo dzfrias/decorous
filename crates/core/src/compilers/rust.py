@@ -1,4 +1,6 @@
 import os
+import sys
+import subprocess
 from pathlib import Path
 
 
@@ -17,8 +19,22 @@ def main():
     with open(lib_path, "w") as f:
         f.write(contents)
 
-    os.system(
-        f"wasm-pack build {PROJECT_NAME} --target web --out-name decor_out --out-dir {Path('..') / outdir}"
+    subprocess.run(
+        [
+            "wasm-pack",
+            "build",
+            PROJECT_NAME,
+            "--target",
+            "web",
+            "--out-name",
+            "decor_out",
+            "--out-dir",
+            Path("..") / outdir,
+            "--color",
+            "always",
+            *sys.argv[1:],
+        ],
+        check=True,
     )
 
     print(
@@ -28,7 +44,7 @@ await init();"""
 
 
 def create_wasm_bindgen_project(name: str):
-    os.system(f"cargo new --lib {name}")
+    subprocess.run(["cargo", "new", "--lib", name], check=True)
     with open(f"{name}/Cargo.toml", "w") as f:
         contents = f"""[package]
 name = "{name}"
@@ -45,4 +61,8 @@ wasm-bindgen = "0.2"
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"\nerror occurred: {e}", file=sys.stderr)
+        sys.exit(1)

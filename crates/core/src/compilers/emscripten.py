@@ -1,5 +1,7 @@
 from pathlib import Path
 import os
+import sys
+import subprocess
 
 
 def main():
@@ -18,17 +20,28 @@ def main():
 }};"""
         )
     out_name = (outdir / name).with_suffix(".js")
-    os.system(
-        f'emcc \
-            --pre-js "{pre}" \
-            {input} -o {out_name} \
-            -s NO_EXIT_RUNTIME=1 \
-            -s MODULARIZE=1 \
-            -s EXPORT_ES6=1 \
-            -s EXPORT_NAME="initModule" \
-            -s ASYNCIFY \
-            -s EXPORTED_RUNTIME_METHODS=\'["ccall"]\''
-    )
+    args = [
+        "emcc",
+        "--pre-js",
+        pre,
+        input,
+        "-o",
+        out_name,
+        "-s",
+        "NO_EXIT_RUNTIME=1",
+        "-s",
+        "MODULARIZE=1",
+        "-s",
+        "EXPORT_ES6=1",
+        "-s",
+        "EXPORT_NAME='initModule'",
+        "-s",
+        "ASYNCIFY=1",
+        "-s",
+        'EXPORTED_RUNTIME_METHODS=["ccall"]',
+        *sys.argv[1:],
+    ]
+    subprocess.run(args, check=True)
     # Clean up __pre.js file
     os.remove(pre)
 
@@ -39,4 +52,8 @@ let wasm = await init();"""
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"\nerror occurred: {e}", file=sys.stderr)
+        sys.exit(1)
