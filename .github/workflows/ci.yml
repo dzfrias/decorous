@@ -26,6 +26,9 @@ jobs:
       - name: Install emscripten
         uses: mymindstorm/setup-emsdk@v11
 
+      - name: Install zig
+        uses: goto-bus-stop/setup-zig@v2
+
       - name: Install wasm-pack
         uses: jetli/wasm-pack-action@v0.4.0
 
