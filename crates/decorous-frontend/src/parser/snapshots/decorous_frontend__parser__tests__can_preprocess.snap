@@ -1,0 +1,32 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: ast
+---
+Ok(
+    DecorousAst {
+        nodes: [],
+        script: Some(
+            MODULE@0..28
+              EXPR_STMT@0..28
+                CALL_EXPR@0..28
+                  DOT_EXPR@0..11
+                    NAME_REF@0..7
+                      IDENT@0..7 "console"
+                    DOT@7..8 "."
+                    NAME@8..11
+                      IDENT@8..11 "log"
+                  ARG_LIST@11..28
+                    L_PAREN@11..12 "("
+                    LITERAL@12..27
+                      STRING@12..27 "\" typescript? \""
+                    R_PAREN@27..28 ")"
+            ,
+        ),
+        css: Some(
+            Preproc(
+                "CSS sass:  hello ",
+            ),
+        ),
+        wasm: None,
+    },
+)

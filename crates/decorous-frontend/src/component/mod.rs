@@ -13,7 +13,7 @@ use rslint_parser::{
 use crate::{
     ast::{
         traverse_mut, Attribute, AttributeValue, Code, DecorousAst, Node, NodeIter, NodeType,
-        SpecialBlock,
+        PreprocCss, SpecialBlock,
     },
     css::{self, ast::Css},
     location::Location,
@@ -32,7 +32,7 @@ pub struct Component<'a> {
     component_id: u8,
     current_id: u32,
 
-    css: Option<Css<'a>>,
+    css: Option<PreprocCss<'a>>,
     wasm: Option<Code<'a>>,
 }
 
@@ -89,7 +89,7 @@ impl<'a> Component<'a> {
         self.component_id
     }
 
-    pub fn css(&self) -> Option<&Css<'_>> {
+    pub fn css(&self) -> Option<&PreprocCss<'_>> {
         self.css.as_ref()
     }
 
@@ -109,9 +109,12 @@ impl<'a> Component<'a> {
         if let Some(script) = script {
             self.extract_toplevel_data(script);
         }
-        if let Some(mut css) = css {
-            self.isolate_css(&mut css, &mut nodes);
-            self.css = Some(css);
+        match css {
+            Some(PreprocCss::NoPreproc(mut css)) => {
+                self.isolate_css(&mut css, &mut nodes);
+                self.css = Some(PreprocCss::NoPreproc(css));
+            }
+            _ => self.css = css,
         }
         self.wasm = wasm;
         self.build_fragment_tree(nodes);

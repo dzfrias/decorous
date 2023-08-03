@@ -37,34 +37,36 @@ Ok(
         ],
         script: None,
         css: Some(
-            Css {
-                rules: [
-                    Regular(
-                        RegularRule {
-                            selector: Selector {
-                                parts: [
-                                    SelectorPart {
-                                        text: Some(
-                                            "p",
-                                        ),
-                                        pseudoes: [],
+            NoPreproc(
+                Css {
+                    rules: [
+                        Regular(
+                            RegularRule {
+                                selector: Selector {
+                                    parts: [
+                                        SelectorPart {
+                                            text: Some(
+                                                "p",
+                                            ),
+                                            pseudoes: [],
+                                        },
+                                    ],
+                                },
+                                declarations: [
+                                    Declaration {
+                                        name: "color",
+                                        values: [
+                                            Css(
+                                                "blue",
+                                            ),
+                                        ],
                                     },
                                 ],
                             },
-                            declarations: [
-                                Declaration {
-                                    name: "color",
-                                    values: [
-                                        Css(
-                                            "blue",
-                                        ),
-                                    ],
-                                },
-                            ],
-                        },
-                    ),
-                ],
-            },
+                        ),
+                    ],
+                },
+            ),
         ),
         wasm: None,
     },

@@ -1,4 +1,5 @@
 pub mod errors;
+mod preprocessor;
 
 use std::{borrow::Cow, ops::Range, slice};
 
@@ -21,11 +22,16 @@ use self::errors::{Help, ParseError, ParseErrorType, Report};
 use crate::{
     ast::{
         Attribute, AttributeValue, Code, Comment, DecorousAst, Element, EventHandler, ForBlock,
-        IfBlock, Mustache, Node, NodeType, SpecialBlock, Text,
+        IfBlock, Mustache, Node, NodeType, PreprocCss, SpecialBlock, Text,
     },
-    css::{self, ast::Css},
+    css,
     location::Location,
 };
+pub use preprocessor::*;
+
+struct NullPreproc;
+
+impl Preprocessor for NullPreproc {}
 
 type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report<NomSpan<'a>>>;
 type NomSpan<'a> = LocatedSpan<&'a str>;
@@ -39,12 +45,16 @@ macro_rules! nom_err {
     };
 }
 
-/// Parses a string decorous syntax into an AST.
-///
-/// A successful parse will yield a [`DecorousAst`]. An unsuccessful one will yield a [`Report`].
-pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<Location>> {
+pub fn parse_with_preprocessor<'i, P>(
+    input: &'i str,
+    preproc: &P,
+) -> std::result::Result<DecorousAst<'i>, Report<Location>>
+where
+    P: Preprocessor,
+{
+    let parse = |input| _parse(input, preproc);
     let result = cut(alt((
-        all_consuming(_parse),
+        all_consuming(parse),
         failure_case(char('/'), |_| {
             (
                 ParseErrorType::ExpectedClosingTag,
@@ -66,11 +76,18 @@ pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<Location>> 
     }
 }
 
-fn _parse(input: NomSpan) -> Result<DecorousAst> {
+/// Parses a string decorous syntax into an AST.
+///
+/// A successful parse will yield a [`DecorousAst`]. An unsuccessful one will yield a [`Report`].
+pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<Location>> {
+    parse_with_preprocessor(input, &NullPreproc)
+}
+
+fn _parse<'i, P: Preprocessor>(input: NomSpan<'i>, preproc: &P) -> Result<'i, DecorousAst<'i>> {
     let src = input;
-    let (input, (mut script, mut css, mut wasm)) = parse_code_blocks(input, input)?;
+    let (input, (mut script, mut css, mut wasm)) = parse_code_blocks(input, input, preproc)?;
     let (input, nodes) = nodes(input)?;
-    let (input, new) = parse_code_blocks(input, src)?;
+    let (input, new) = parse_code_blocks(input, src, preproc)?;
     if css.is_none() {
         css = new.1;
     }
@@ -83,10 +100,11 @@ fn _parse(input: NomSpan) -> Result<DecorousAst> {
     Ok((input, DecorousAst::new(nodes, script, css, wasm)))
 }
 
-fn parse_code_blocks<'a>(
+fn parse_code_blocks<'a, P: Preprocessor>(
     input: LocatedSpan<&'a str>,
     src: LocatedSpan<&'a str>,
-) -> Result<'a, (Option<SyntaxNode>, Option<Css<'a>>, Option<Code<'a>>)> {
+    preproc: P,
+) -> Result<'a, (Option<SyntaxNode>, Option<PreprocCss<'a>>, Option<Code<'a>>)> {
     let (input, code_blocks) = many0(ws(code))(input)?;
     let mut script = None;
     let mut css = None;
@@ -109,7 +127,7 @@ fn parse_code_blocks<'a>(
             }
             "css" => {
                 let p = css::Parser::new(b.body());
-                css = Some(match p.parse() {
+                let ast = match p.parse() {
                     Ok(css) => css,
                     Err(err) => {
                         let pos = src.slice(b.offset() + err.fragment().offset() + 1..);
@@ -121,9 +139,33 @@ fn parse_code_blocks<'a>(
                             help
                         );
                     }
-                });
+                };
+                css = Some(PreprocCss::NoPreproc(ast));
             }
-            _ => wasm = Some(b),
+            _ => {
+                if let Some(js) = preproc.preprocess_js(b.lang(), b.body()) {
+                    script = match parse_js(&js) {
+                        Ok(node) => Some(node),
+                        Err((title, span)) => {
+                            let pos = src.slice(b.offset() + span.start..);
+                            return nom_err!(
+                                pos,
+                                Failure,
+                                ParseErrorType::JavaScriptDiagnostics { title },
+                                None
+                            );
+                        }
+                    };
+                    continue;
+                }
+
+                if let Some(new_css) = preproc.preprocess_css(b.lang(), b.body()) {
+                    css = Some(PreprocCss::Preproc(new_css));
+                    continue;
+                }
+
+                wasm = Some(b);
+            }
         }
     }
     Ok((input, (script, css, wasm)))
@@ -724,5 +766,31 @@ mod tests {
     #[test]
     fn javascript_parse_errors_have_proper_location_offsets() {
         nom_test_all_insta!(parse, ["---js let x = ; ---"])
+    }
+
+    #[test]
+    fn can_preprocess() {
+        struct Preproc;
+
+        impl Preprocessor for Preproc {
+            fn preprocess_js(&self, lang: &str, body: &str) -> Option<String> {
+                if lang == "ts" {
+                    Some(format!("console.log(\"{body}\")"))
+                } else {
+                    None
+                }
+            }
+            fn preprocess_css(&self, lang: &str, body: &str) -> Option<String> {
+                if lang == "sass" {
+                    Some(format!("CSS {lang}: {body}"))
+                } else {
+                    None
+                }
+            }
+        }
+
+        let input = "---sass hello --- ---ts typescript? ---";
+        let ast = parse_with_preprocessor(input, &Preproc);
+        insta::assert_debug_snapshot!(ast);
     }
 }

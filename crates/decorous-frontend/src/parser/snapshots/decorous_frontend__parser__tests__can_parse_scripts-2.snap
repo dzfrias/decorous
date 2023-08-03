@@ -7,34 +7,36 @@ Ok(
         nodes: [],
         script: None,
         css: Some(
-            Css {
-                rules: [
-                    Regular(
-                        RegularRule {
-                            selector: Selector {
-                                parts: [
-                                    SelectorPart {
-                                        text: Some(
-                                            "body",
-                                        ),
-                                        pseudoes: [],
+            NoPreproc(
+                Css {
+                    rules: [
+                        Regular(
+                            RegularRule {
+                                selector: Selector {
+                                    parts: [
+                                        SelectorPart {
+                                            text: Some(
+                                                "body",
+                                            ),
+                                            pseudoes: [],
+                                        },
+                                    ],
+                                },
+                                declarations: [
+                                    Declaration {
+                                        name: "height",
+                                        values: [
+                                            Css(
+                                                "100vh",
+                                            ),
+                                        ],
                                     },
                                 ],
                             },
-                            declarations: [
-                                Declaration {
-                                    name: "height",
-                                    values: [
-                                        Css(
-                                            "100vh",
-                                        ),
-                                    ],
-                                },
-                            ],
-                        },
-                    ),
-                ],
-            },
+                        ),
+                    ],
+                },
+            ),
         ),
         wasm: None,
     },

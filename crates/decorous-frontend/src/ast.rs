@@ -19,7 +19,7 @@ use crate::{css::ast::Css, location::Location};
 pub struct DecorousAst<'a> {
     nodes: Vec<Node<'a, Location>>,
     script: Option<SyntaxNode>,
-    css: Option<Css<'a>>,
+    css: Option<PreprocCss<'a>>,
     wasm: Option<Code<'a>>,
 }
 
@@ -145,6 +145,12 @@ pub struct Code<'a> {
     lang: &'a str,
     body: &'a str,
     offset: usize,
+}
+
+#[derive(Debug)]
+pub enum PreprocCss<'a> {
+    NoPreproc(Css<'a>),
+    Preproc(String),
 }
 
 impl<'a> Code<'a> {
@@ -404,7 +410,7 @@ impl<'a> DecorousAst<'a> {
     pub fn new(
         nodes: Vec<Node<'a, Location>>,
         script: Option<SyntaxNode>,
-        css: Option<Css<'a>>,
+        css: Option<PreprocCss<'a>>,
         wasm: Option<Code<'a>>,
     ) -> Self {
         Self {
@@ -428,7 +434,7 @@ impl<'a> DecorousAst<'a> {
 
     /// Gives a a shared reference to the CSS AST, if it exists. The `DecorousAst` will have
     /// no CSS AST if no `<style>` tag is specified in the template.
-    pub fn css(&self) -> Option<&Css<'a>> {
+    pub fn css(&self) -> Option<&PreprocCss<'a>> {
         self.css.as_ref()
     }
 
@@ -442,7 +448,7 @@ impl<'a> DecorousAst<'a> {
     ) -> (
         Vec<Node<'a, Location>>,
         Option<SyntaxNode>,
-        Option<Css<'a>>,
+        Option<PreprocCss<'a>>,
         Option<Code<'a>>,
     ) {
         (self.nodes, self.script, self.css, self.wasm)

@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use decorous_frontend::{css::ast::*, Component};
+use decorous_frontend::{ast::PreprocCss, css::ast::*, Component};
 use superfmt::{ContextBuilder, Formatter};
 
 use crate::{Metadata, RenderBackend};
@@ -13,9 +13,11 @@ impl RenderBackend for CssRenderer {
         component: &Component,
         _metadata: &Metadata,
     ) -> io::Result<()> {
-        component
-            .css()
-            .map_or(Ok(()), |css| render(css, out, component))
+        match component.css() {
+            Some(PreprocCss::Preproc(css)) => write!(out, "{css}"),
+            Some(PreprocCss::NoPreproc(css)) => render(css, out, component),
+            None => Ok(()),
+        }
     }
 }
 
