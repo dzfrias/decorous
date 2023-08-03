@@ -6,7 +6,7 @@ use std::{borrow::Cow, collections::HashSet};
 #[cfg(not(debug_assertions))]
 use rand::Rng;
 use rslint_parser::{
-    ast::{ArrowExpr, FnDecl, ImportDecl, VarDecl},
+    ast::{ArrowExpr, ExportDecl, FnDecl, ImportDecl, VarDecl},
     AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
 };
 
@@ -223,8 +223,7 @@ impl<'a> Component<'a> {
     fn extract_toplevel_data(&mut self, script: SyntaxNode) {
         // Only go to top level assignments
         for child in script.children() {
-            if child.is::<VarDecl>() {
-                let var_decl = child.to::<VarDecl>();
+            if let Some(var_decl) = child.try_to::<VarDecl>() {
                 for decl in var_decl.declared() {
                     let idents = utils::get_idents_from_pattern(decl.pattern().unwrap());
                     for ident in idents {
@@ -235,8 +234,7 @@ impl<'a> Component<'a> {
                     node: child,
                     substitute_assign_refs: true,
                 });
-            } else if child.is::<FnDecl>() {
-                let fn_decl = child.to::<FnDecl>();
+            } else if let Some(fn_decl) = child.try_to::<FnDecl>() {
                 let Some(ident) = fn_decl.name().and_then(|name| name.ident_token()) else {
                     continue;
                 };
@@ -246,7 +244,7 @@ impl<'a> Component<'a> {
                     node: child,
                     substitute_assign_refs: true,
                 });
-            } else if child.is::<ImportDecl>() {
+            } else if child.is::<ImportDecl>() || child.is::<ExportDecl>() {
                 self.hoist.push(child);
             } else {
                 self.toplevel_nodes.push(ToplevelNodeData {
@@ -572,5 +570,12 @@ mod tests {
     fn bindings_are_put_into_declared_vars() {
         let component = make_component("---js let x = 0; --- #input[:x:]/input");
         insta::assert_debug_snapshot!(component.declared_vars())
+    }
+
+    #[test]
+    fn hoists_exports() {
+        let component = make_component("---js export function x() { console.log(\"hi\") } ---");
+        assert!(component.toplevel_nodes().is_empty());
+        insta::assert_debug_snapshot!(component.hoist())
     }
 }
