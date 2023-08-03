@@ -4,6 +4,8 @@ use serde::{Deserialize, Deserializer};
 
 #[derive(Debug, Deserialize)]
 pub struct Config<'a> {
+    pub python: Option<&'a Path>,
+
     #[serde(borrow)]
     pub compilers: HashMap<&'a str, CompilerConfig<'a>>,
 }
@@ -11,6 +13,7 @@ pub struct Config<'a> {
 impl Default for Config<'_> {
     fn default() -> Self {
         Self {
+            python: None,
             compilers: HashMap::from_iter([
                 (
                     "rust",

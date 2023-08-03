@@ -1,7 +1,8 @@
 use std::{
+    borrow::Cow,
     fs::{self, File},
     io::{self, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
     str,
 };
@@ -10,6 +11,7 @@ use anyhow::{bail, Context, Error, Result};
 use decorous_backend::{dom_render::DomRenderer, prerender::Prerenderer, CodeInfo, WasmCompiler};
 use itertools::Itertools;
 use scopeguard::defer;
+use shlex::Shlex;
 use which::which;
 
 use crate::config::{Config, ScriptOrFile};
@@ -31,6 +33,33 @@ impl<'a> MainCompiler<'a> {
             config,
             build_args,
             out_name,
+        }
+    }
+
+    fn build_args_for_lang(&self, lang: &str) -> Shlex {
+        let args =
+            self.build_args
+                .iter()
+                .find_map(|(l, args)| if l == lang { Some(args.as_str()) } else { None });
+        if let Some(args) = args {
+            Shlex::new(args)
+        } else {
+            Shlex::new("")
+        }
+    }
+
+    fn get_python(&self) -> Option<Cow<'_, Path>> {
+        if let Some(py) = self.config.python {
+            return Some(Cow::Borrowed(py));
+        }
+
+        match which("python") {
+            Ok(bin) => Some(bin.into()),
+            Err(which::Error::CannotFindBinaryPath) => match which("python3") {
+                Ok(bin) => Some(bin.into()),
+                Err(_) => None,
+            },
+            Err(_) => None,
         }
     }
 }
@@ -68,17 +97,17 @@ macro_rules! compile_for {
                     Err(err) => bail!(err),
                 }
 
-                let python = get_python()?;
-                let build_args = get_build_args(self.build_args, lang)?;
+                let python = self.get_python().context("python not found in PATH! Make sure to install it!")?;
+                let mut build_args = self.build_args_for_lang(lang);
 
                 let (status, stdout, stderr) = match &config.script {
                     ScriptOrFile::File(file) => {
-                        let out = Command::new(python)
+                        let out = Command::new(python.as_ref())
                             .arg(file)
                             .env("DECOR_INPUT", &path)
                             .env("DECOR_OUT", self.out_name)
                             .env("DECOR_EXPORTS", exports.iter().join(" "))
-                            .args(&build_args)
+                            .args(&mut build_args)
                             .output()?;
                         (out.status, out.stdout, out.stderr)
                     }
@@ -90,16 +119,20 @@ macro_rules! compile_for {
                         defer! {
                             fs::remove_file("__tmp.py").expect("error removing \"__tmp.py\"! Remove it manually!");
                         }
-                        let out = Command::new(python)
+                        let out = Command::new(python.as_ref())
                             .arg("__tmp.py")
                             .env("DECOR_INPUT", &path)
                             .env("DECOR_OUT", self.out_name)
                             .env("DECOR_EXPORTS", exports.iter().join(" "))
-                            .args(&build_args)
+                            .args(&mut build_args)
                             .output()?;
                         (out.status, out.stdout, out.stderr)
                     }
                 };
+
+                if build_args.had_error {
+                    bail!("error parsing build args for language: {lang}");
+                }
 
                 if !status.success() {
                     bail!(
@@ -119,26 +152,3 @@ macro_rules! compile_for {
 
 compile_for!(DomRenderer);
 compile_for!(Prerenderer);
-
-fn get_build_args(build_args: &[(String, String)], lang: &str) -> Result<Vec<String>> {
-    let args = build_args
-        .iter()
-        .find_map(|(l, args)| if l == lang { Some(args.as_str()) } else { None });
-    Ok(if let Some(args) = args {
-        shlex::split(args)
-            .with_context(|| format!("error parsing build args for language: {}", lang))?
-    } else {
-        vec![]
-    })
-}
-
-fn get_python() -> Result<PathBuf> {
-    match which("python") {
-        Ok(bin) => Ok(bin),
-        Err(which::Error::CannotFindBinaryPath) => match which("python3") {
-            Ok(bin) => Ok(bin),
-            Err(_) => bail!("python not found in PATH! Make sure to install it!"),
-        },
-        Err(_) => bail!("python not found in PATH! Make sure to install it!"),
-    }
-}
