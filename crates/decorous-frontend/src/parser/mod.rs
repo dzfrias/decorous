@@ -1,3 +1,4 @@
+mod code_blocks;
 pub mod errors;
 mod preprocessor;
 
@@ -26,6 +27,7 @@ use crate::{
     },
     css::{self, ast::Css},
     location::Location,
+    parser::code_blocks::CodeBlocks,
 };
 pub use preprocessor::*;
 
@@ -36,7 +38,6 @@ impl Preprocessor for NullPreproc {
         &self,
         _lang: &str,
         _body: &str,
-        _target: PreprocessTarget,
     ) -> std::result::Result<Override, PreprocessError> {
         Ok(Override::None)
     }
@@ -46,11 +47,15 @@ type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report<NomSpan<'a>>>;
 type NomSpan<'a> = LocatedSpan<&'a str>;
 
 /// Helper macro for creating an `IResult` error by hand.
+macro_rules! nom_err_res {
+    ($input:expr, $severity:ident, $err_type:expr, $help:expr) => {
+        Err(nom_err!($input, $severity, $err_type, $help))
+    };
+}
+
 macro_rules! nom_err {
     ($input:expr, $severity:ident, $err_type:expr, $help:expr) => {
-        Err(nom::Err::$severity(Report::from(ParseError::new(
-            $input, $err_type, $help,
-        ))))
+        nom::Err::$severity(Report::from(ParseError::new($input, $err_type, $help)))
     };
 }
 
@@ -94,128 +99,129 @@ pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<Location>> 
 
 fn _parse<'i, P: Preprocessor>(input: NomSpan<'i>, preproc: &P) -> Result<'i, DecorousAst<'i>> {
     let src = input;
-    let (input, (mut script, mut css, mut wasm)) = parse_code_blocks(input, input, preproc)?;
+    let mut blocks = CodeBlocks::new();
+    let (input, _) = parse_code_blocks(input, input, &mut blocks, preproc)?;
     let (input, nodes) = nodes(input)?;
-    let (input, new) = parse_code_blocks(input, src, preproc)?;
-    if css.is_none() {
-        css = new.1;
-    }
-    if wasm.is_none() {
-        wasm = new.2;
-    }
-    if script.is_none() {
-        script = new.0;
-    }
+    let (input, _) = parse_code_blocks(input, src, &mut blocks, preproc)?;
+    let (script, css, wasm) = blocks.into_parts();
     Ok((input, DecorousAst::new(nodes, script, css, wasm)))
 }
 
 fn parse_code_blocks<'a, P: Preprocessor>(
     input: LocatedSpan<&'a str>,
     src: LocatedSpan<&'a str>,
+    blocks: &mut CodeBlocks<'a>,
     preproc: P,
-) -> Result<'a, (Option<SyntaxNode>, Option<Css>, Option<Code<'a>>)> {
+) -> Result<'a, ()> {
     let (input, code_blocks) = many0(ws(code))(input)?;
-    let mut script = None;
-    let mut css = None;
-    let mut wasm = None;
     for b in code_blocks {
         match b.lang() {
             "js" => {
-                script = match parse_js(b.body()) {
-                    Ok(node) => Some(node),
-                    Err((title, span)) => {
-                        let pos = src.slice(b.offset() + span.start..);
-                        return nom_err!(
-                            pos,
-                            Failure,
-                            ParseErrorType::JavaScriptDiagnostics { title },
-                            None
-                        );
-                    }
-                };
+                let syntax_node = parse_js_block(b.body(), b.offset(), src)?;
+                blocks.set_script(syntax_node).map_err(|_| {
+                    nom_err!(
+                        src.slice(b.offset()..),
+                        Failure,
+                        ParseErrorType::CannotHaveTwoScripts,
+                        None
+                    )
+                })?;
             }
             "css" => {
-                let p = css::Parser::new(b.body());
-                let ast = match p.parse() {
-                    Ok(css) => css,
-                    Err(err) => {
-                        let pos = src.slice(b.offset() + err.fragment().offset() + 1..);
-                        let help = err.help().cloned();
-                        return nom_err!(
-                            pos,
-                            Failure,
-                            ParseErrorType::CssParsingError(err.into()),
-                            help
-                        );
-                    }
-                };
-                css = Some(ast);
+                let ast = parse_css_block(b.body(), b.offset(), src)?;
+                blocks.set_css(ast).map_err(|_| {
+                    nom_err!(
+                        src.slice(b.offset()..),
+                        Failure,
+                        ParseErrorType::CannotHaveTwoStyles,
+                        None
+                    )
+                })?;
             }
             _ => {
-                if let Override::Js(js) = preproc
-                    .preprocess(b.lang(), b.body(), PreprocessTarget::Js)
-                    .map_err(|err| {
-                        nom::Err::Failure(
-                            ParseError::new(
-                                input,
-                                ParseErrorType::PreprocError(Box::new(err)),
-                                None,
-                            )
-                            .into(),
+                match preproc.preprocess(b.lang(), b.body()).map_err(|err| {
+                    nom::Err::Failure(
+                        ParseError::new(
+                            src.slice(b.offset() + err.loc.offset()..),
+                            ParseErrorType::PreprocError(Box::new(err)),
+                            None,
                         )
-                    })?
-                {
-                    script = match parse_js(&js) {
-                        Ok(node) => Some(node),
-                        Err((title, span)) => {
-                            let pos = src.slice(b.offset() + span.start..);
-                            return nom_err!(
-                                pos,
+                        .into(),
+                    )
+                })? {
+                    Override::Css(new_css) => {
+                        let ast = parse_css_block(&new_css, b.offset(), src)?;
+                        blocks.set_css(ast).map_err(|_| {
+                            nom_err!(
+                                src.slice(b.offset()..),
                                 Failure,
-                                ParseErrorType::JavaScriptDiagnostics { title },
+                                ParseErrorType::CannotHaveTwoStyles,
                                 None
-                            );
-                        }
-                    };
-                    continue;
-                }
-
-                if let Override::Css(new_css) = preproc
-                    .preprocess(b.lang(), b.body(), PreprocessTarget::Css)
-                    .map_err(|err| {
-                        nom::Err::Failure(
-                            ParseError::new(
-                                src.slice(b.offset() + err.loc.offset()..),
-                                ParseErrorType::PreprocError(Box::new(err)),
-                                None,
                             )
-                            .into(),
-                        )
-                    })?
-                {
-                    let p = css::Parser::new(&new_css);
-                    let ast = match p.parse() {
-                        Ok(css) => css,
-                        Err(err) => {
-                            let pos = src.slice(b.offset() + err.fragment().offset() + 1..);
-                            let help = err.help().cloned();
-                            return nom_err!(
-                                pos,
+                        })?;
+                    }
+                    Override::Js(js) => {
+                        let script = parse_js_block(&js, b.offset(), src)?;
+                        blocks.set_script(script).map_err(|_| {
+                            nom_err!(
+                                src.slice(b.offset()..),
                                 Failure,
-                                ParseErrorType::CssParsingError(err.into()),
-                                help
-                            );
-                        }
-                    };
-                    css = Some(ast);
-                    continue;
+                                ParseErrorType::CannotHaveTwoScripts,
+                                None
+                            )
+                        })?;
+                    }
+                    Override::None => {
+                        let offset = b.offset();
+                        blocks.set_wasm(b).map_err(|_| {
+                            nom_err!(
+                                src.slice(offset..),
+                                Failure,
+                                ParseErrorType::CannotHaveTwoWasmBlocks,
+                                None
+                            )
+                        })?;
+                    }
                 }
-
-                wasm = Some(b);
             }
         }
     }
-    Ok((input, (script, css, wasm)))
+    Ok((input, ()))
+}
+
+fn parse_css_block<'a>(
+    code: &str,
+    offset: usize,
+    src: LocatedSpan<&'a str>,
+) -> std::result::Result<Css, nom::Err<Report<LocatedSpan<&'a str>>>> {
+    let p = css::Parser::new(code);
+    let ast = p.parse().map_err(|err| {
+        let pos = src.slice(offset + err.fragment().offset() + 1..);
+        let help = err.help().cloned();
+        nom_err!(
+            pos,
+            Failure,
+            ParseErrorType::CssParsingError(err.into()),
+            help
+        )
+    })?;
+    Ok(ast)
+}
+
+fn parse_js_block<'a>(
+    code: &str,
+    offset: usize,
+    src: LocatedSpan<&'a str>,
+) -> std::result::Result<SyntaxNode, nom::Err<Report<LocatedSpan<&'a str>>>> {
+    parse_js(code).map_err(|(title, span)| {
+        let pos = src.slice(offset + span.start..);
+        nom_err!(
+            pos,
+            Failure,
+            ParseErrorType::JavaScriptDiagnostics { title },
+            None
+        )
+    })
 }
 
 fn code(input: NomSpan) -> Result<Code> {
@@ -235,7 +241,7 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
     let (input, pos) = position(input)?;
     // Do not succeed if empty
     if input.is_empty() {
-        return nom_err!(
+        return nom_err_res!(
             input,
             Error,
             ParseErrorType::Nom(nom::error::ErrorKind::Eof),
@@ -243,7 +249,7 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
         );
     }
     if peek(ws(tag::<&str, NomSpan, Report<NomSpan>>("---")))(input).is_ok() {
-        return nom_err!(
+        return nom_err_res!(
             input,
             Error,
             ParseErrorType::Nom(nom::error::ErrorKind::Tag),
@@ -425,7 +431,7 @@ fn parse_evt_handler(input: LocatedSpan<&str>) -> Result<Attribute> {
         }),
     ))(input)?;
     if peek(char::<NomSpan, Report<NomSpan>>('{'))(input).is_err() {
-        return nom_err!(
+        return nom_err_res!(
             input,
             Failure,
             ParseErrorType::ExpectedCharacter('{'),
@@ -493,7 +499,7 @@ fn special_block(input: NomSpan) -> Result<SpecialBlock<'_, Location>> {
                 SpecialBlock::If(IfBlock::new(expr, inner, else_block)),
             ))
         }
-        "each" => nom_err!(
+        "each" => nom_err_res!(
             input,
             Failure,
             ParseErrorType::InvalidSpecialBlockType(String::from("each")),
@@ -501,7 +507,7 @@ fn special_block(input: NomSpan) -> Result<SpecialBlock<'_, Location>> {
                 "you might've meant `for`. each loops do not exist in decorous"
             ))
         ),
-        block => nom_err!(
+        block => nom_err_res!(
             input,
             Failure,
             ParseErrorType::InvalidSpecialBlockType(block.to_owned()),
@@ -530,7 +536,7 @@ fn mustache_inner(input: NomSpan) -> Result<SyntaxNode> {
         Err((title, span)) => {
             let src = get_unoffsetted_str(input);
             let src_loc = LocatedSpan::new(src);
-            nom_err!(
+            nom_err_res!(
                 src_loc.slice(loc.location_offset() + span.start..loc.location_offset() + span.end),
                 Failure,
                 ParseErrorType::JavaScriptDiagnostics { title },
@@ -824,7 +830,6 @@ mod tests {
                 &self,
                 lang: &str,
                 body: &str,
-                _target: PreprocessTarget,
             ) -> std::result::Result<Override, PreprocessError> {
                 let body = match lang {
                     "ts" => Override::Js(format!("console.log(\"{body}\");")),
@@ -837,6 +842,40 @@ mod tests {
         }
 
         let input = "---sass hello --- ---ts typescript? ---";
+        let ast = parse_with_preprocessor(input, &Preproc);
+        insta::assert_debug_snapshot!(ast);
+    }
+
+    #[test]
+    fn cannot_have_two_code_blocks_of_same_type() {
+        nom_test_all_insta!(
+            parse,
+            [
+                "---js let x = 0; --- ---js let x = 0; ---",
+                "---css p { color: red; } --- ---css p { color: red; } ---",
+                "---rust let x = 0; --- ---rust let x = 0; ---"
+            ]
+        )
+    }
+
+    #[test]
+    fn cannot_have_two_preprocessed_scripts() {
+        struct Preproc;
+        impl Preprocessor for Preproc {
+            fn preprocess(
+                &self,
+                lang: &str,
+                _body: &str,
+            ) -> std::result::Result<Override, PreprocessError> {
+                let body = match lang {
+                    "sass" => Override::Css(format!("p {{ color: red; }}")),
+                    _ => Override::None,
+                };
+
+                Ok(body)
+            }
+        }
+        let input = "---sass hello --- ---sass sass ---";
         let ast = parse_with_preprocessor(input, &Preproc);
         insta::assert_debug_snapshot!(ast);
     }

@@ -1,0 +1,20 @@
+---
+source: crates/decorous-frontend/src/parser/mod.rs
+expression: parse(input.into())
+---
+Err(
+    Report {
+        errors: [
+            ParseError {
+                fragment: Location {
+                    offset: 26,
+                    length: 1,
+                    line: 1,
+                    column: 27,
+                },
+                help: None,
+                err_type: CannotHaveTwoScripts,
+            },
+        ],
+    },
+)

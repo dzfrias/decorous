@@ -19,10 +19,12 @@ pub enum ParseErrorType {
     ExpectedCharacterAny(Vec<char>, char),
     #[error("expected closing tag. If you meant to escape the slash, use '\\/'")]
     ExpectedClosingTag,
-    #[error("cannot have non-toplevel script")]
+    #[error("cannot have more than one script block")]
     CannotHaveTwoScripts,
-    #[error("cannot have two style tags")]
-    CannotHaveTwoStyleTags,
+    #[error("cannot have more than one style block")]
+    CannotHaveTwoStyles,
+    #[error("cannot have more than one WebAssembly block")]
+    CannotHaveTwoWasmBlocks,
     #[error("parse error in JavaScript: {title}")]
     JavaScriptDiagnostics { title: String },
     #[error("invalid special block type: {0}. Only `for` and `if` are accepted.")]

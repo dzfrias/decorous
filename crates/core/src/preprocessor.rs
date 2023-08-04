@@ -17,22 +17,10 @@ impl<'a> Preproc<'a> {
 }
 
 impl Preprocessor for Preproc<'_> {
-    fn preprocess(
-        &self,
-        lang: &str,
-        body: &str,
-        target: decorous_frontend::PreprocessTarget,
-    ) -> Result<Override, PreprocessError> {
+    fn preprocess(&self, lang: &str, body: &str) -> Result<Override, PreprocessError> {
         let Some(cfg) = &self.config.preprocessors.get(lang) else {
             return Ok(Override::None);
         };
-        let target = match target {
-            decorous_frontend::PreprocessTarget::Js => PreprocTarget::Js,
-            decorous_frontend::PreprocessTarget::Css => PreprocTarget::Css,
-        };
-        if target != cfg.target {
-            return Ok(Override::None);
-        }
 
         let mut to_pipe = Cow::Borrowed(body);
         for comp in &cfg.pipeline {
