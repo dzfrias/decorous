@@ -23,10 +23,13 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install dart-sass
-        uses: jaxxstorm/action-install-gh-release@v1.10.0
+      - name: Install node
+        uses: actions/setup-node@v3
         with:
-          repo: sass/dart-sass
+          node-version: 18
+
+      - name: Install dart-sass
+        run: npm install --global sass
 
       - name: Install emscripten
         uses: mymindstorm/setup-emsdk@v11
