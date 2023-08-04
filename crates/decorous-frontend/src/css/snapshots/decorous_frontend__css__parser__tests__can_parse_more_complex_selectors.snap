@@ -7,16 +7,18 @@ Ok(
         rules: [
             Regular(
                 RegularRule {
-                    selector: Selector {
-                        parts: [
-                            SelectorPart {
-                                text: Some(
-                                    "p.green",
-                                ),
-                                pseudoes: [],
-                            },
-                        ],
-                    },
+                    selector: [
+                        Selector {
+                            parts: [
+                                SelectorPart {
+                                    text: Some(
+                                        "p.green",
+                                    ),
+                                    pseudoes: [],
+                                },
+                            ],
+                        },
+                    ],
                     declarations: [
                         Declaration {
                             name: "color",

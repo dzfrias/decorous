@@ -4,7 +4,7 @@ use nom_locate::LocatedSpan;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 
-use crate::{css, location::Location};
+use crate::{css, location::Location, PreprocessError};
 
 /// Describes possible parsing errors of the [`parse`](crate::parse) function.
 #[derive(Debug, Error, PartialEq, Clone)]
@@ -30,6 +30,8 @@ pub enum ParseErrorType {
     // Boxed because this enum variant would otherwise be very large.
     #[error("css parsing error: {0}")]
     CssParsingError(Box<css::error::ParseError<Location>>),
+    #[error("{0}")]
+    PreprocError(PreprocessError),
     #[error("byte processing error: {}", 0.to_string())]
     Nom(nom::error::ErrorKind),
 }

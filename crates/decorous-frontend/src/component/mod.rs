@@ -13,7 +13,7 @@ use rslint_parser::{
 use crate::{
     ast::{
         traverse_mut, Attribute, AttributeValue, Code, DecorousAst, Node, NodeIter, NodeType,
-        PreprocCss, SpecialBlock,
+        SpecialBlock,
     },
     css::{self, ast::Css},
     location::Location,
@@ -32,7 +32,7 @@ pub struct Component<'a> {
     component_id: u8,
     current_id: u32,
 
-    css: Option<PreprocCss<'a>>,
+    css: Option<Css>,
     wasm: Option<Code<'a>>,
 }
 
@@ -89,7 +89,7 @@ impl<'a> Component<'a> {
         self.component_id
     }
 
-    pub fn css(&self) -> Option<&PreprocCss<'_>> {
+    pub fn css(&self) -> Option<&Css> {
         self.css.as_ref()
     }
 
@@ -109,24 +109,21 @@ impl<'a> Component<'a> {
         if let Some(script) = script {
             self.extract_toplevel_data(script);
         }
-        match css {
-            Some(PreprocCss::NoPreproc(mut css)) => {
-                self.isolate_css(&mut css, &mut nodes);
-                self.css = Some(PreprocCss::NoPreproc(css));
-            }
-            _ => self.css = css,
+        if let Some(mut css) = css {
+            self.isolate_css(&mut css, &mut nodes);
+            self.css = Some(css);
         }
         self.wasm = wasm;
         self.build_fragment_tree(nodes);
     }
 
-    fn isolate_css(&mut self, css: &mut Css<'a>, nodes: &mut [Node<'a, Location>]) {
+    fn isolate_css(&mut self, css: &mut Css, nodes: &mut [Node<'a, Location>]) {
         self.modify_selectors(css.rules_mut());
         self.assign_css_mustaches(css.rules_mut());
         self.assign_node_classes(nodes);
     }
 
-    fn assign_css_mustaches(&mut self, rules: &[css::ast::Rule<'a>]) {
+    fn assign_css_mustaches(&mut self, rules: &[css::ast::Rule]) {
         use css::ast::*;
         for rule in rules {
             let rule = match rule {
@@ -204,7 +201,7 @@ impl<'a> Component<'a> {
         });
     }
 
-    fn modify_selectors(&mut self, rules: &mut [css::ast::Rule<'a>]) {
+    fn modify_selectors(&mut self, rules: &mut [css::ast::Rule]) {
         use css::ast::*;
         for rule in rules {
             let rule = match rule {
@@ -218,13 +215,15 @@ impl<'a> Component<'a> {
             };
 
             let selector = rule.selector_mut();
-            for part in selector.parts_mut() {
-                let new_text = if let Some(t) = part.text() {
-                    format!("{t}.decor-{}", self.component_id)
-                } else {
-                    format!(".decor-{}", self.component_id)
-                };
-                *part.text_mut() = Some(Cow::Owned(new_text));
+            for sel in selector {
+                for part in sel.parts_mut() {
+                    let new_text = if let Some(t) = part.text() {
+                        format!("{t}.decor-{}", self.component_id)
+                    } else {
+                        format!(".decor-{}", self.component_id)
+                    };
+                    part.text_mut().map(|s| *s = new_text.into());
+                }
             }
         }
     }

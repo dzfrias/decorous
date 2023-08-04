@@ -152,3 +152,12 @@ decor_test!(
         assert_all!(dir.path());
     }
 );
+
+decor_test!(
+    can_run_scss_proprocessor,
+    SCSS,
+    |dir: &mut TempDir, mut cmd: Command| {
+        cmd.assert().success();
+        assert_all!(dir.path());
+    }
+);

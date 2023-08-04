@@ -3,12 +3,12 @@ source: crates/decorous-frontend/src/component/mod.rs
 expression: component.css()
 ---
 Some(
-    NoPreproc(
-        Css {
-            rules: [
-                Regular(
-                    RegularRule {
-                        selector: Selector {
+    Css {
+        rules: [
+            Regular(
+                RegularRule {
+                    selector: [
+                        Selector {
                             parts: [
                                 SelectorPart {
                                     text: Some(
@@ -25,19 +25,19 @@ Some(
                                 },
                             ],
                         },
-                        declarations: [
-                            Declaration {
-                                name: "color",
-                                values: [
-                                    Css(
-                                        "red",
-                                    ),
-                                ],
-                            },
-                        ],
-                    },
-                ),
-            ],
-        },
-    ),
+                    ],
+                    declarations: [
+                        Declaration {
+                            name: "color",
+                            values: [
+                                Css(
+                                    "red",
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
 )

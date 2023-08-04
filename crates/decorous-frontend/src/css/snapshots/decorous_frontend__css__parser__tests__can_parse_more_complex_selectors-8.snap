@@ -16,6 +16,12 @@ Ok(
                                     ),
                                     pseudoes: [],
                                 },
+                                SelectorPart {
+                                    text: Some(
+                                        "p",
+                                    ),
+                                    pseudoes: [],
+                                },
                             ],
                         },
                     ],
@@ -24,7 +30,7 @@ Ok(
                             name: "color",
                             values: [
                                 Css(
-                                    "green",
+                                    "red",
                                 ),
                             ],
                         },

@@ -24,3 +24,4 @@ scopeguard = "1.2.0"
 shlex = "1.1.0"
 which = "4.4.0"
 itertools = { workspace = true }
+duct = "0.13.6"

@@ -5,10 +5,10 @@ expression: parser.parse()
 Err(
     ParseError {
         fragment: Location {
-            offset: 3,
+            offset: 18,
             length: 1,
             line: 1,
-            column: 3,
+            column: 18,
         },
         help: None,
         err_type: ExpectedCharacter(

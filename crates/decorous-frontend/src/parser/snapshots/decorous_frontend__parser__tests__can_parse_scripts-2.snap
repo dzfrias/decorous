@@ -7,12 +7,12 @@ Ok(
         nodes: [],
         script: None,
         css: Some(
-            NoPreproc(
-                Css {
-                    rules: [
-                        Regular(
-                            RegularRule {
-                                selector: Selector {
+            Css {
+                rules: [
+                    Regular(
+                        RegularRule {
+                            selector: [
+                                Selector {
                                     parts: [
                                         SelectorPart {
                                             text: Some(
@@ -22,21 +22,21 @@ Ok(
                                         },
                                     ],
                                 },
-                                declarations: [
-                                    Declaration {
-                                        name: "height",
-                                        values: [
-                                            Css(
-                                                "100vh",
-                                            ),
-                                        ],
-                                    },
-                                ],
-                            },
-                        ),
-                    ],
-                },
-            ),
+                            ],
+                            declarations: [
+                                Declaration {
+                                    name: "height",
+                                    values: [
+                                        Css(
+                                            "100vh",
+                                        ),
+                                    ],
+                                },
+                            ],
+                        },
+                    ),
+                ],
+            },
         ),
         wasm: None,
     },

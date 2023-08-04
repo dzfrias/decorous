@@ -8,12 +8,23 @@ pub struct Config<'a> {
 
     #[serde(borrow)]
     pub compilers: HashMap<&'a str, CompilerConfig<'a>>,
+
+    #[serde(borrow)]
+    pub preprocessors: HashMap<&'a str, PreprocessPipeline<'a>>,
 }
 
 impl Default for Config<'_> {
     fn default() -> Self {
         Self {
             python: None,
+            preprocessors: HashMap::from_iter([(
+                "scss",
+                PreprocessPipeline {
+                    pipeline: vec!["sass --stdin"],
+                    target: PreprocTarget::Css,
+                },
+            )]),
+
             compilers: HashMap::from_iter([
                 (
                     "rust",
@@ -66,4 +77,17 @@ where
     D: Deserializer<'de>,
 {
     Ok(ScriptOrFile::File(<&Path>::deserialize(des)?))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PreprocessPipeline<'a> {
+    #[serde(borrow)]
+    pub pipeline: Vec<&'a str>,
+    pub target: PreprocTarget,
+}
+
+#[derive(Debug, Deserialize, Clone, Copy, Hash, PartialEq)]
+pub enum PreprocTarget {
+    Css,
+    Js,
 }

@@ -1,0 +1,29 @@
+---
+source: tests/tests.rs
+expression: all
+---
+
+---input.decor---
+#p Hello, my name is #span Diego /span /p
+
+---scss
+p {
+  color: green;
+  span {
+    color: red;
+  }
+}
+---
+
+---out.css---
+p.decor-0 {
+  color: green;
+}
+p.decor-0 span.decor-0 {
+  color: red;
+}
+
+---out.html---
+<p class="decor-0">Hello, my name is <span class="decor-0">Diego</span></p>
+---out.js---
+

@@ -1,6 +1,7 @@
 use std::io::{self, Write};
 
-use decorous_frontend::{ast::PreprocCss, css::ast::*, Component};
+use decorous_frontend::{css::ast::*, Component};
+use itertools::Itertools;
 use superfmt::{ContextBuilder, Formatter};
 
 use crate::{Metadata, RenderBackend};
@@ -14,14 +15,13 @@ impl RenderBackend for CssRenderer {
         _metadata: &Metadata,
     ) -> io::Result<()> {
         match component.css() {
-            Some(PreprocCss::Preproc(css)) => write!(out, "{css}"),
-            Some(PreprocCss::NoPreproc(css)) => render(css, out, component),
+            Some(css) => render(css, out, component),
             None => Ok(()),
         }
     }
 }
 
-fn render<T: io::Write>(css: &Css<'_>, out: &mut T, component: &Component) -> io::Result<()> {
+fn render<T: io::Write>(css: &Css, out: &mut T, component: &Component) -> io::Result<()> {
     let mut formatter = Formatter::new(out);
     for rule in css.rules() {
         write_rule(rule, &mut formatter, component)?;
@@ -30,7 +30,7 @@ fn render<T: io::Write>(css: &Css<'_>, out: &mut T, component: &Component) -> io
 }
 
 fn write_rule<T: io::Write>(
-    rule: &Rule<'_>,
+    rule: &Rule,
     formatter: &mut Formatter<'_, T>,
     component: &Component,
 ) -> io::Result<()> {
@@ -63,13 +63,15 @@ fn write_rule<T: io::Write>(
             }
         }
         Rule::Regular(regular) => {
-            formatter.write(regular.selector())?.begin_context(
-                ContextBuilder::default()
-                    .prepend("  ")
-                    .starts_with(" {\n")
-                    .ends_with("}\n")
-                    .build(),
-            )?;
+            formatter
+                .write(regular.selector().iter().join(", "))?
+                .begin_context(
+                    ContextBuilder::default()
+                        .prepend("  ")
+                        .starts_with(" {\n")
+                        .ends_with("}\n")
+                        .build(),
+                )?;
             for decl in regular.declarations() {
                 write_decl(decl, formatter, component)?;
             }
@@ -81,7 +83,7 @@ fn write_rule<T: io::Write>(
 }
 
 fn write_decl<T: io::Write>(
-    decl: &Declaration<'_>,
+    decl: &Declaration,
     f: &mut Formatter<'_, T>,
     component: &Component,
 ) -> io::Result<()> {
@@ -95,7 +97,7 @@ fn write_decl<T: io::Write>(
 }
 
 fn write_value<T: io::Write>(
-    value: &Value<'_>,
+    value: &Value,
     out: &mut Formatter<'_, T>,
     component: &Component,
 ) -> io::Result<()> {

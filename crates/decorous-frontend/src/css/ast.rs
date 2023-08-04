@@ -1,163 +1,163 @@
 use std::{borrow::Cow, fmt};
 
 use itertools::Itertools;
-use rslint_parser::SyntaxNode;
+use rslint_parser::{SmolStr, SyntaxNode};
 
 #[derive(Debug)]
-pub struct Css<'a> {
-    rules: Vec<Rule<'a>>,
+pub struct Css {
+    rules: Vec<Rule>,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Rule<'a> {
-    At(AtRule<'a>),
-    Regular(RegularRule<'a>),
+pub enum Rule {
+    At(AtRule),
+    Regular(RegularRule),
 }
 
 #[derive(Debug, PartialEq)]
-pub struct RegularRule<'a> {
-    selector: Selector<'a>,
-    declarations: Vec<Declaration<'a>>,
+pub struct RegularRule {
+    selector: Vec<Selector>,
+    declarations: Vec<Declaration>,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct AtRule<'a> {
-    name: &'a str,
-    additional: &'a str,
-    contents: Option<Vec<Rule<'a>>>,
+pub struct AtRule {
+    name: SmolStr,
+    additional: SmolStr,
+    contents: Option<Vec<Rule>>,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Selector<'a> {
-    parts: Vec<SelectorPart<'a>>,
+pub struct Selector {
+    parts: Vec<SelectorPart>,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct SelectorPart<'a> {
-    text: Option<Cow<'a, str>>,
-    pseudoes: Vec<Pseudo<'a>>,
+pub struct SelectorPart {
+    text: Option<SmolStr>,
+    pseudoes: Vec<Pseudo>,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Pseudo<'a> {
-    Element(&'a str),
+pub enum Pseudo {
+    Element(SmolStr),
     Class {
-        name: &'a str,
-        value: Option<&'a str>,
+        name: SmolStr,
+        value: Option<SmolStr>,
     },
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Declaration<'a> {
-    name: &'a str,
-    values: Vec<Value<'a>>,
+pub struct Declaration {
+    name: SmolStr,
+    values: Vec<Value>,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Value<'a> {
+pub enum Value {
     Mustache(SyntaxNode),
-    Css(&'a str),
+    Css(SmolStr),
 }
 
-impl<'a> Declaration<'a> {
-    pub fn new(name: &'a str, values: Vec<Value<'a>>) -> Self {
+impl Declaration {
+    pub fn new(name: SmolStr, values: Vec<Value>) -> Self {
         Self { name, values }
     }
 
     pub fn name(&self) -> &str {
-        self.name
+        &self.name
     }
 
-    pub fn values(&self) -> &[Value<'_>] {
+    pub fn values(&self) -> &[Value] {
         self.values.as_ref()
     }
 
-    pub fn values_mut(&mut self) -> &mut Vec<Value<'a>> {
+    pub fn values_mut(&mut self) -> &mut Vec<Value> {
         &mut self.values
     }
 
-    pub fn name_mut(&mut self) -> &mut &'a str {
+    pub fn name_mut(&mut self) -> &mut SmolStr {
         &mut self.name
     }
 }
 
-impl<'a> SelectorPart<'a> {
-    pub fn new(text: Option<Cow<'a, str>>, pseudoes: Vec<Pseudo<'a>>) -> Self {
+impl SelectorPart {
+    pub fn new(text: Option<SmolStr>, pseudoes: Vec<Pseudo>) -> Self {
         Self { text, pseudoes }
     }
 
-    pub fn text(&self) -> Option<&Cow<'a, str>> {
+    pub fn text(&self) -> Option<&SmolStr> {
         self.text.as_ref()
     }
 
-    pub fn pseudoes(&self) -> &[Pseudo<'_>] {
+    pub fn pseudoes(&self) -> &[Pseudo] {
         self.pseudoes.as_ref()
     }
 
-    pub fn text_mut(&mut self) -> &mut Option<Cow<'a, str>> {
-        &mut self.text
+    pub fn text_mut(&mut self) -> Option<&mut SmolStr> {
+        self.text.as_mut()
     }
 
-    pub fn pseudoes_mut(&mut self) -> &mut Vec<Pseudo<'a>> {
+    pub fn pseudoes_mut(&mut self) -> &mut Vec<Pseudo> {
         &mut self.pseudoes
     }
 }
 
-impl<'a> Selector<'a> {
-    pub fn new(parts: Vec<SelectorPart<'a>>) -> Self {
+impl Selector {
+    pub fn new(parts: Vec<SelectorPart>) -> Self {
         Self { parts }
     }
 
-    pub fn parts_mut(&mut self) -> &mut Vec<SelectorPart<'a>> {
+    pub fn parts_mut(&mut self) -> &mut Vec<SelectorPart> {
         &mut self.parts
     }
 
-    pub fn parts(&self) -> &[SelectorPart<'_>] {
+    pub fn parts(&self) -> &[SelectorPart] {
         self.parts.as_ref()
     }
 }
 
-impl<'a> RegularRule<'a> {
-    pub fn new(selector: Selector<'a>, declarations: Vec<Declaration<'a>>) -> Self {
+impl RegularRule {
+    pub fn new(selector: Vec<Selector>, declarations: Vec<Declaration>) -> Self {
         Self {
             selector,
             declarations,
         }
     }
 
-    pub fn selector(&self) -> &Selector<'a> {
+    pub fn selector(&self) -> &[Selector] {
         &self.selector
     }
 
-    pub fn declarations(&self) -> &[Declaration<'_>] {
+    pub fn declarations(&self) -> &[Declaration] {
         self.declarations.as_ref()
     }
 
-    pub fn selector_mut(&mut self) -> &mut Selector<'a> {
+    pub fn selector_mut(&mut self) -> &mut Vec<Selector> {
         &mut self.selector
     }
 
-    pub fn declarations_mut(&mut self) -> &mut Vec<Declaration<'a>> {
+    pub fn declarations_mut(&mut self) -> &mut Vec<Declaration> {
         &mut self.declarations
     }
 }
 
-impl<'a> Css<'a> {
-    pub fn new(rules: Vec<Rule<'a>>) -> Self {
+impl Css {
+    pub fn new(rules: Vec<Rule>) -> Self {
         Self { rules }
     }
 
-    pub fn rules(&self) -> &[Rule<'a>] {
+    pub fn rules(&self) -> &[Rule] {
         &self.rules
     }
 
-    pub fn rules_mut(&mut self) -> &mut Vec<Rule<'a>> {
+    pub fn rules_mut(&mut self) -> &mut Vec<Rule> {
         &mut self.rules
     }
 }
 
-impl<'a> AtRule<'a> {
-    pub fn new(name: &'a str, additional: &'a str, contents: Option<Vec<Rule<'a>>>) -> Self {
+impl AtRule {
+    pub fn new(name: SmolStr, additional: SmolStr, contents: Option<Vec<Rule>>) -> Self {
         Self {
             name,
             additional,
@@ -166,34 +166,34 @@ impl<'a> AtRule<'a> {
     }
 
     pub fn name(&self) -> &str {
-        self.name
+        &self.name
     }
 
     pub fn additional(&self) -> &str {
-        self.additional
+        &self.additional
     }
 
-    pub fn contents(&self) -> Option<&[Rule<'a>]> {
+    pub fn contents(&self) -> Option<&[Rule]> {
         self.contents.as_deref()
     }
 
-    pub fn contents_mut(&mut self) -> &mut Option<Vec<Rule<'a>>> {
+    pub fn contents_mut(&mut self) -> &mut Option<Vec<Rule>> {
         &mut self.contents
     }
 
-    pub fn additional_mut(&mut self) -> &mut &'a str {
+    pub fn additional_mut(&mut self) -> &mut SmolStr {
         &mut self.additional
     }
 
-    pub fn name_mut(&mut self) -> &mut &'a str {
+    pub fn name_mut(&mut self) -> &mut SmolStr {
         &mut self.name
     }
 }
 
 // ---Display impls---
 
-impl<'a> fmt::Display for SelectorPart<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for SelectorPart {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "{}{}",
@@ -203,8 +203,8 @@ impl<'a> fmt::Display for SelectorPart<'a> {
     }
 }
 
-impl<'a> fmt::Display for Value<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Mustache(s) => write!(f, "{s}"),
             Self::Css(css) => write!(f, "{css}"),
@@ -212,8 +212,8 @@ impl<'a> fmt::Display for Value<'a> {
     }
 }
 
-impl<'a> fmt::Display for Pseudo<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Pseudo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Element(elem) => write!(f, "::{elem}"),
             Self::Class {
@@ -227,14 +227,14 @@ impl<'a> fmt::Display for Pseudo<'a> {
     }
 }
 
-impl<'a> fmt::Display for Declaration<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Declaration {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}: {};", self.name, self.values().iter().join(" "))
     }
 }
 
-impl<'a> fmt::Display for AtRule<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for AtRule {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(contents) = self.contents() {
             write!(
                 f,
@@ -249,19 +249,19 @@ impl<'a> fmt::Display for AtRule<'a> {
     }
 }
 
-impl<'a> fmt::Display for RegularRule<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for RegularRule {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "{} {{ {} }}",
-            self.selector(),
+            self.selector().iter().join(", "),
             self.declarations().iter().join("; ")
         )
     }
 }
 
-impl<'a> fmt::Display for Rule<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Rule {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::At(at_rule) => write!(f, "{at_rule}"),
             Self::Regular(regular) => write!(f, "{regular}"),
@@ -269,14 +269,14 @@ impl<'a> fmt::Display for Rule<'a> {
     }
 }
 
-impl<'a> fmt::Display for Selector<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Selector {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.parts().iter().join(" "))
     }
 }
 
-impl<'a> fmt::Display for Css<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Css {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.rules().iter().join("\n"))
     }
 }

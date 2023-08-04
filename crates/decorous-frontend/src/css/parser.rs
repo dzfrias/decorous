@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use harpoon::Harpoon;
 use rslint_parser::AstNode;
 
@@ -23,7 +21,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(mut self) -> Result<Css<'a>> {
+    pub fn parse(mut self) -> Result<Css> {
         let mut rules = vec![];
         self.skip_whitespace();
         while self.harpoon.peek().is_some() {
@@ -33,7 +31,7 @@ impl<'a> Parser<'a> {
         Ok(Css::new(rules))
     }
 
-    fn parse_rule(&mut self) -> Result<Rule<'a>> {
+    fn parse_rule(&mut self) -> Result<Rule> {
         if self.harpoon.peek_is('@') {
             return Ok(Rule::At(self.parse_at_rule()?));
         }
@@ -51,7 +49,7 @@ impl<'a> Parser<'a> {
         Ok(Rule::Regular(RegularRule::new(selector, declarations)))
     }
 
-    fn parse_at_rule(&mut self) -> Result<AtRule<'a>> {
+    fn parse_at_rule(&mut self) -> Result<AtRule> {
         debug_assert_eq!(Some('@'), self.harpoon.consume());
         let name = self
             .harpoon
@@ -75,7 +73,7 @@ impl<'a> Parser<'a> {
             .text();
         if self.harpoon.peek_is(';') {
             debug_assert_eq!(Some(';'), self.harpoon.consume());
-            return Ok(AtRule::new(name, additional, None));
+            return Ok(AtRule::new(name.into(), additional.into(), None));
         }
 
         self.expect_consume('{')?;
@@ -87,36 +85,34 @@ impl<'a> Parser<'a> {
         }
         self.expect_consume('}')?;
 
-        Ok(AtRule::new(name, additional, Some(rules)))
+        Ok(AtRule::new(name.into(), additional.into(), Some(rules)))
     }
 
-    fn parse_selector(&mut self) -> Result<Selector<'a>> {
-        let mut parts = vec![];
-        parts.push(self.parse_selector_part()?);
-        self.skip_whitespace();
+    fn parse_selector(&mut self) -> Result<Vec<Selector>> {
+        let mut selectors = vec![];
+
+        {
+            let mut parts = vec![];
+            while !self.harpoon.peek_is_any(",{") && !self.harpoon.peek().is_none() {
+                parts.push(self.parse_selector_part()?);
+                self.skip_whitespace();
+            }
+            selectors.push(Selector::new(parts));
+        }
         while self.harpoon.peek_is(',') {
             debug_assert_eq!(Some(','), self.harpoon.consume());
-            self.skip_whitespace();
-            parts.push(self.parse_selector_part()?);
-            self.skip_whitespace();
+            let mut parts = vec![];
+            while !self.harpoon.peek_is_any(",{") && !self.harpoon.peek().is_none() {
+                parts.push(self.parse_selector_part()?);
+                self.skip_whitespace();
+            }
+            selectors.push(Selector::new(parts));
         }
 
-        if parts.len() == 1
-            && parts
-                .first()
-                .is_some_and(|p| p.text().is_some_and(|t| t.is_empty()) && p.pseudoes().is_empty())
-        {
-            return Err(ParseError::new(
-                ParseErrorType::ExpectedSelector,
-                Location::from_source(self.harpoon.offset(), self.harpoon.source()),
-                None,
-            ));
-        }
-
-        Ok(Selector::new(parts))
+        Ok(selectors)
     }
 
-    fn parse_selector_part(&mut self) -> Result<SelectorPart<'a>> {
+    fn parse_selector_part(&mut self) -> Result<SelectorPart> {
         fn parse_any<'a>(harpoon: &mut Harpoon<'a>) -> &'a str {
             harpoon
                 .harpoon(|harpoon| {
@@ -126,7 +122,7 @@ impl<'a> Parser<'a> {
         }
 
         let text = if !self.harpoon.peek_is(':') {
-            Some(Cow::Borrowed(parse_any(&mut self.harpoon)))
+            Some(parse_any(&mut self.harpoon))
         } else {
             None
         };
@@ -136,7 +132,7 @@ impl<'a> Parser<'a> {
             debug_assert_eq!(Some(':'), self.harpoon.consume());
             if self.harpoon.peek_is(':') {
                 debug_assert_eq!(Some(':'), self.harpoon.consume());
-                pseudoes.push(Pseudo::Element(parse_any(&mut self.harpoon)));
+                pseudoes.push(Pseudo::Element(parse_any(&mut self.harpoon).into()));
             } else {
                 let class_name = self
                     .harpoon
@@ -158,16 +154,16 @@ impl<'a> Parser<'a> {
                     None
                 };
                 pseudoes.push(Pseudo::Class {
-                    name: class_name,
-                    value,
+                    name: class_name.into(),
+                    value: value.map(|v| v.into()),
                 });
             }
         }
 
-        Ok(SelectorPart::new(text, pseudoes))
+        Ok(SelectorPart::new(text.map(|t| t.into()), pseudoes))
     }
 
-    fn parse_declaration(&mut self) -> Result<Declaration<'a>> {
+    fn parse_declaration(&mut self) -> Result<Declaration> {
         let name = self
             .harpoon
             .harpoon(|harpoon| harpoon.consume_until(':'))
@@ -189,7 +185,7 @@ impl<'a> Parser<'a> {
                 "declaration needs a closing semicolon",
             )),
         )?;
-        Ok(Declaration::new(name, values))
+        Ok(Declaration::new(name.into(), values))
     }
 
     fn expect_consume(&mut self, expected: char) -> Result<()> {
@@ -209,7 +205,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_value(&mut self) -> Result<Value<'a>> {
+    fn parse_value(&mut self) -> Result<Value> {
         if self.harpoon.peek_is('{') {
             debug_assert_eq!(Some('{'), self.harpoon.consume());
             let offset = self.harpoon.offset();
@@ -228,7 +224,7 @@ impl<'a> Parser<'a> {
                 .harpoon
                 .harpoon(|h| h.consume_while(|c| !matches!(c, ';' | '{' | '}' | ':')))
                 .text();
-            Ok(Value::Css(t))
+            Ok(Value::Css(t.into()))
         }
     }
 
@@ -268,7 +264,8 @@ mod tests {
             "p.green:has(h1, h2):hover { color: green; }",
             "p.green:has(h1, h2):hover::after { color: green; }",
             "p::after { color: green; }",
-            "p::after, span.yellow { color: green; }"
+            "p::after, span.yellow { color: green; }",
+            "p p { color: red; }"
         );
     }
 

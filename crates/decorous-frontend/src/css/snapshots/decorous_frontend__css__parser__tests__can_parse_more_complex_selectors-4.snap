@@ -7,27 +7,29 @@ Ok(
         rules: [
             Regular(
                 RegularRule {
-                    selector: Selector {
-                        parts: [
-                            SelectorPart {
-                                text: Some(
-                                    "p.green",
-                                ),
-                                pseudoes: [
-                                    Class {
-                                        name: "has",
-                                        value: Some(
-                                            "h1, h2",
-                                        ),
-                                    },
-                                    Class {
-                                        name: "hover",
-                                        value: None,
-                                    },
-                                ],
-                            },
-                        ],
-                    },
+                    selector: [
+                        Selector {
+                            parts: [
+                                SelectorPart {
+                                    text: Some(
+                                        "p.green",
+                                    ),
+                                    pseudoes: [
+                                        Class {
+                                            name: "has",
+                                            value: Some(
+                                                "h1, h2",
+                                            ),
+                                        },
+                                        Class {
+                                            name: "hover",
+                                            value: None,
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
                     declarations: [
                         Declaration {
                             name: "color",

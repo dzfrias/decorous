@@ -1,0 +1,10 @@
+#p Hello, my name is #span Diego /span /p
+
+---scss
+p {
+  color: green;
+  span {
+    color: red;
+  }
+}
+---

@@ -6,8 +6,8 @@ Ok(
     DecorousAst {
         nodes: [],
         script: Some(
-            MODULE@0..28
-              EXPR_STMT@0..28
+            MODULE@0..29
+              EXPR_STMT@0..29
                 CALL_EXPR@0..28
                   DOT_EXPR@0..11
                     NAME_REF@0..7
@@ -20,12 +20,40 @@ Ok(
                     LITERAL@12..27
                       STRING@12..27 "\" typescript? \""
                     R_PAREN@27..28 ")"
+                SEMICOLON@28..29 ";"
             ,
         ),
         css: Some(
-            Preproc(
-                "CSS sass:  hello ",
-            ),
+            Css {
+                rules: [
+                    Regular(
+                        RegularRule {
+                            selector: [
+                                Selector {
+                                    parts: [
+                                        SelectorPart {
+                                            text: Some(
+                                                "p",
+                                            ),
+                                            pseudoes: [],
+                                        },
+                                    ],
+                                },
+                            ],
+                            declarations: [
+                                Declaration {
+                                    name: "color",
+                                    values: [
+                                        Css(
+                                            "hello ",
+                                        ),
+                                    ],
+                                },
+                            ],
+                        },
+                    ),
+                ],
+            },
         ),
         wasm: None,
     },

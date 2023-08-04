@@ -7,26 +7,38 @@ Ok(
         rules: [
             Regular(
                 RegularRule {
-                    selector: Selector {
-                        parts: [
-                            SelectorPart {
-                                text: Some(
-                                    "p",
-                                ),
-                                pseudoes: [
-                                    Element(
-                                        "after",
+                    selector: [
+                        Selector {
+                            parts: [
+                                SelectorPart {
+                                    text: Some(
+                                        "p",
                                     ),
-                                ],
-                            },
-                            SelectorPart {
-                                text: Some(
-                                    "span.yellow",
-                                ),
-                                pseudoes: [],
-                            },
-                        ],
-                    },
+                                    pseudoes: [
+                                        Element(
+                                            "after",
+                                        ),
+                                    ],
+                                },
+                            ],
+                        },
+                        Selector {
+                            parts: [
+                                SelectorPart {
+                                    text: Some(
+                                        "",
+                                    ),
+                                    pseudoes: [],
+                                },
+                                SelectorPart {
+                                    text: Some(
+                                        "span.yellow",
+                                    ),
+                                    pseudoes: [],
+                                },
+                            ],
+                        },
+                    ],
                     declarations: [
                         Declaration {
                             name: "color",

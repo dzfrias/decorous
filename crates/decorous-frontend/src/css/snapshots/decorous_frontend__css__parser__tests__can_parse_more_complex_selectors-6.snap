@@ -7,20 +7,22 @@ Ok(
         rules: [
             Regular(
                 RegularRule {
-                    selector: Selector {
-                        parts: [
-                            SelectorPart {
-                                text: Some(
-                                    "p",
-                                ),
-                                pseudoes: [
-                                    Element(
-                                        "after",
+                    selector: [
+                        Selector {
+                            parts: [
+                                SelectorPart {
+                                    text: Some(
+                                        "p",
                                     ),
-                                ],
-                            },
-                        ],
-                    },
+                                    pseudoes: [
+                                        Element(
+                                            "after",
+                                        ),
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
                     declarations: [
                         Declaration {
                             name: "color",

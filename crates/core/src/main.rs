@@ -2,6 +2,7 @@ mod cli;
 mod compile_wasm;
 mod config;
 mod fmt_report;
+mod preprocessor;
 
 use std::{
     fs::{self, File},
@@ -18,7 +19,7 @@ use decorous_backend::{
     prerender::{HtmlPrerenderer, Prerenderer},
     render, render_with_wasm, Metadata,
 };
-use decorous_frontend::{parse, Component};
+use decorous_frontend::{parse_with_preprocessor, Component};
 use fmt_report::fmt_report;
 use handlebars::{no_escape, Handlebars};
 use serde_json::json;
@@ -27,7 +28,7 @@ use superfmt::{
     Formatter,
 };
 
-use crate::compile_wasm::MainCompiler;
+use crate::{compile_wasm::MainCompiler, preprocessor::Preproc};
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -52,7 +53,7 @@ fn main() -> Result<()> {
     let metadata = Metadata { name: &file_name };
 
     formatter.writeln_with_context("parsing...", Modifiers::BOLD)?;
-    let component = parse_component(&input)?;
+    let component = parse_component(&input, &config)?;
     formatter.writeln_with_context("parsed!", Color::Green)?;
 
     formatter.writeln_with_context("rendering...", Modifiers::BOLD)?;
@@ -166,8 +167,9 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata) -> Result<()>
     }
 }
 
-fn parse_component(input: &str) -> Result<Component> {
-    match parse(input) {
+fn parse_component<'a>(input: &'a str, config: &Config) -> Result<Component<'a>> {
+    let preproc = Preproc::new(config);
+    match parse_with_preprocessor(input, &preproc) {
         Ok(ast) => Ok(Component::new(ast)),
         Err(report) => {
             fmt_report(input, &report, &mut io::stderr())?;

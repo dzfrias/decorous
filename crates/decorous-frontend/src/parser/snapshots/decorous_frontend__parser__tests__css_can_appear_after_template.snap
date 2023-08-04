@@ -37,12 +37,12 @@ Ok(
         ],
         script: None,
         css: Some(
-            NoPreproc(
-                Css {
-                    rules: [
-                        Regular(
-                            RegularRule {
-                                selector: Selector {
+            Css {
+                rules: [
+                    Regular(
+                        RegularRule {
+                            selector: [
+                                Selector {
                                     parts: [
                                         SelectorPart {
                                             text: Some(
@@ -52,21 +52,21 @@ Ok(
                                         },
                                     ],
                                 },
-                                declarations: [
-                                    Declaration {
-                                        name: "color",
-                                        values: [
-                                            Css(
-                                                "blue",
-                                            ),
-                                        ],
-                                    },
-                                ],
-                            },
-                        ),
-                    ],
-                },
-            ),
+                            ],
+                            declarations: [
+                                Declaration {
+                                    name: "color",
+                                    values: [
+                                        Css(
+                                            "blue",
+                                        ),
+                                    ],
+                                },
+                            ],
+                        },
+                    ),
+                ],
+            },
         ),
         wasm: None,
     },

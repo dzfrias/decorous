@@ -18,10 +18,15 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: "Install python3.10"
+      - name: Install python3.10
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
+
+      - name: Install dart-sass
+        uses: jaxxstorm/action-install-gh-release@v1.10.0
+        with:
+          repo: sass/dart-sass
 
       - name: Install emscripten
         uses: mymindstorm/setup-emsdk@v11

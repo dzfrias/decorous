@@ -22,16 +22,25 @@ use self::errors::{Help, ParseError, ParseErrorType, Report};
 use crate::{
     ast::{
         Attribute, AttributeValue, Code, Comment, DecorousAst, Element, EventHandler, ForBlock,
-        IfBlock, Mustache, Node, NodeType, PreprocCss, SpecialBlock, Text,
+        IfBlock, Mustache, Node, NodeType, SpecialBlock, Text,
     },
-    css,
+    css::{self, ast::Css},
     location::Location,
 };
 pub use preprocessor::*;
 
 struct NullPreproc;
 
-impl Preprocessor for NullPreproc {}
+impl Preprocessor for NullPreproc {
+    fn preprocess(
+        &self,
+        _lang: &str,
+        _body: &str,
+        _target: PreprocessTarget,
+    ) -> std::result::Result<Override, PreprocessError> {
+        Ok(Override::None)
+    }
+}
 
 type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report<NomSpan<'a>>>;
 type NomSpan<'a> = LocatedSpan<&'a str>;
@@ -104,7 +113,7 @@ fn parse_code_blocks<'a, P: Preprocessor>(
     input: LocatedSpan<&'a str>,
     src: LocatedSpan<&'a str>,
     preproc: P,
-) -> Result<'a, (Option<SyntaxNode>, Option<PreprocCss<'a>>, Option<Code<'a>>)> {
+) -> Result<'a, (Option<SyntaxNode>, Option<Css>, Option<Code<'a>>)> {
     let (input, code_blocks) = many0(ws(code))(input)?;
     let mut script = None;
     let mut css = None;
@@ -140,10 +149,17 @@ fn parse_code_blocks<'a, P: Preprocessor>(
                         );
                     }
                 };
-                css = Some(PreprocCss::NoPreproc(ast));
+                css = Some(ast);
             }
             _ => {
-                if let Some(js) = preproc.preprocess_js(b.lang(), b.body()) {
+                if let Override::Js(js) = preproc
+                    .preprocess(b.lang(), b.body(), PreprocessTarget::Js)
+                    .map_err(|err| {
+                        nom::Err::Failure(
+                            ParseError::new(input, ParseErrorType::PreprocError(err), None).into(),
+                        )
+                    })?
+                {
                     script = match parse_js(&js) {
                         Ok(node) => Some(node),
                         Err((title, span)) => {
@@ -159,8 +175,34 @@ fn parse_code_blocks<'a, P: Preprocessor>(
                     continue;
                 }
 
-                if let Some(new_css) = preproc.preprocess_css(b.lang(), b.body()) {
-                    css = Some(PreprocCss::Preproc(new_css));
+                if let Override::Css(new_css) = preproc
+                    .preprocess(b.lang(), b.body(), PreprocessTarget::Css)
+                    .map_err(|err| {
+                        nom::Err::Failure(
+                            ParseError::new(
+                                src.slice(b.offset() + err.loc.offset()..),
+                                ParseErrorType::PreprocError(err),
+                                None,
+                            )
+                            .into(),
+                        )
+                    })?
+                {
+                    let p = css::Parser::new(&new_css);
+                    let ast = match p.parse() {
+                        Ok(css) => css,
+                        Err(err) => {
+                            let pos = src.slice(b.offset() + err.fragment().offset() + 1..);
+                            let help = err.help().cloned();
+                            return nom_err!(
+                                pos,
+                                Failure,
+                                ParseErrorType::CssParsingError(err.into()),
+                                help
+                            );
+                        }
+                    };
+                    css = Some(ast);
                     continue;
                 }
 
@@ -773,19 +815,19 @@ mod tests {
         struct Preproc;
 
         impl Preprocessor for Preproc {
-            fn preprocess_js(&self, lang: &str, body: &str) -> Option<String> {
-                if lang == "ts" {
-                    Some(format!("console.log(\"{body}\")"))
-                } else {
-                    None
-                }
-            }
-            fn preprocess_css(&self, lang: &str, body: &str) -> Option<String> {
-                if lang == "sass" {
-                    Some(format!("CSS {lang}: {body}"))
-                } else {
-                    None
-                }
+            fn preprocess(
+                &self,
+                lang: &str,
+                body: &str,
+                _target: PreprocessTarget,
+            ) -> std::result::Result<Override, PreprocessError> {
+                let body = match lang {
+                    "ts" => Override::Js(format!("console.log(\"{body}\");")),
+                    "sass" => Override::Css(format!("p {{ color: {body}; }}")),
+                    _ => Override::None,
+                };
+
+                Ok(body)
             }
         }
 
