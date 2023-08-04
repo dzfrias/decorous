@@ -156,7 +156,12 @@ fn parse_code_blocks<'a, P: Preprocessor>(
                     .preprocess(b.lang(), b.body(), PreprocessTarget::Js)
                     .map_err(|err| {
                         nom::Err::Failure(
-                            ParseError::new(input, ParseErrorType::PreprocError(err), None).into(),
+                            ParseError::new(
+                                input,
+                                ParseErrorType::PreprocError(Box::new(err)),
+                                None,
+                            )
+                            .into(),
                         )
                     })?
                 {
@@ -181,7 +186,7 @@ fn parse_code_blocks<'a, P: Preprocessor>(
                         nom::Err::Failure(
                             ParseError::new(
                                 src.slice(b.offset() + err.loc.offset()..),
-                                ParseErrorType::PreprocError(err),
+                                ParseErrorType::PreprocError(Box::new(err)),
                                 None,
                             )
                             .into(),
@@ -565,7 +570,7 @@ fn get_unoffsetted_str(span: NomSpan) -> &str {
     unsafe {
         // Part of safety condition at https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html
         assert!(
-            span.location_offset() <= isize::max_value() as usize,
+            isize::try_from(span.location_offset()).is_ok(),
             "offset is too big"
         );
         let orig_ptr = self_ptr.offset(-(span.location_offset() as isize));

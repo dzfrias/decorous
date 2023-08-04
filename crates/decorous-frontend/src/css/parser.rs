@@ -93,7 +93,7 @@ impl<'a> Parser<'a> {
 
         {
             let mut parts = vec![];
-            while !self.harpoon.peek_is_any(",{") && !self.harpoon.peek().is_none() {
+            while !self.harpoon.peek_is_any(",{") && self.harpoon.peek().is_some() {
                 parts.push(self.parse_selector_part()?);
                 self.skip_whitespace();
             }
@@ -102,7 +102,7 @@ impl<'a> Parser<'a> {
         while self.harpoon.peek_is(',') {
             debug_assert_eq!(Some(','), self.harpoon.consume());
             let mut parts = vec![];
-            while !self.harpoon.peek_is_any(",{") && !self.harpoon.peek().is_none() {
+            while !self.harpoon.peek_is_any(",{") && self.harpoon.peek().is_some() {
                 parts.push(self.parse_selector_part()?);
                 self.skip_whitespace();
             }

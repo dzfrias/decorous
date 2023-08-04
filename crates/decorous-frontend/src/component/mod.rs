@@ -222,7 +222,9 @@ impl<'a> Component<'a> {
                     } else {
                         format!(".decor-{}", self.component_id)
                     };
-                    part.text_mut().map(|s| *s = new_text.into());
+                    if let Some(s) = part.text_mut() {
+                        *s = new_text.into();
+                    }
                 }
             }
         }

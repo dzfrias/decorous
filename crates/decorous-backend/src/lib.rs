@@ -62,7 +62,7 @@ where
                 },
                 out,
             )
-            .map_err(|err| WasmRenderError::Wasm(err))?;
+            .map_err(WasmRenderError::Wasm)?;
     }
     <B as RenderBackend>::render(out, component, metadata)?;
 

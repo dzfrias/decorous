@@ -74,10 +74,8 @@ dirty.fill(255);
 __update(dirty, true);
 dirty.fill(0);"
         )?;
-    } else {
-        if status.wrote_something() {
+    } else if status.wrote_something() {
             writeln!(js_out, "const ctx = __init_ctx();")?;
-        }
     }
     let status = render_update_body(component, &analysis, js_out)?;
     if status.wrote_something() {

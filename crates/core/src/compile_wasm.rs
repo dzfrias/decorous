@@ -41,11 +41,7 @@ impl<'a> MainCompiler<'a> {
             self.build_args
                 .iter()
                 .find_map(|(l, args)| if l == lang { Some(args.as_str()) } else { None });
-        if let Some(args) = args {
-            Shlex::new(args)
-        } else {
-            Shlex::new("")
-        }
+        args.map_or_else(|| Shlex::new(""), Shlex::new)
     }
 
     fn get_python(&self) -> Option<Cow<'_, Path>> {
@@ -55,10 +51,9 @@ impl<'a> MainCompiler<'a> {
 
         match which("python") {
             Ok(bin) => Some(bin.into()),
-            Err(which::Error::CannotFindBinaryPath) => match which("python3") {
-                Ok(bin) => Some(bin.into()),
-                Err(_) => None,
-            },
+            Err(which::Error::CannotFindBinaryPath) => {
+                which("python3").map_or(None, |bin| Some(bin.into()))
+            }
             Err(_) => None,
         }
     }

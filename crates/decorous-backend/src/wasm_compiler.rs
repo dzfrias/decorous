@@ -9,7 +9,6 @@ pub struct CodeInfo<'a> {
     pub body: &'a str,
     pub exports: &'a [SmolStr],
 }
-
 /// The trait for anything that takes WebAssembly input and compiles it to JavaScript.
 ///
 /// After implementing it on a type, use the [`render_with_wasm`](super::render_with_wasm)

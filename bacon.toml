@@ -24,7 +24,6 @@ command = [
     "-W", "clippy::checked_conversions",
     "-W", "clippy::dbg_macro",
     "-W", "clippy::debug_assert_with_mut_call",
-    "-W", "clippy::doc_markdown",
     "-W", "clippy::empty_enum",
     "-W", "clippy::enum_glob_use",
     "-W", "clippy::exit",

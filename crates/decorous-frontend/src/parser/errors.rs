@@ -31,7 +31,7 @@ pub enum ParseErrorType {
     #[error("css parsing error: {0}")]
     CssParsingError(Box<css::error::ParseError<Location>>),
     #[error("{0}")]
-    PreprocError(PreprocessError),
+    PreprocError(Box<PreprocessError>),
     #[error("byte processing error: {}", 0.to_string())]
     Nom(nom::error::ErrorKind),
 }

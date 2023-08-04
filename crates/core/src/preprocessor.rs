@@ -45,7 +45,7 @@ impl Preprocessor for Preproc<'_> {
                         Cow::Owned(format!("error preprocessing this code block: {err}")),
                     )
                 })?;
-            to_pipe = Cow::Owned(out)
+            to_pipe = Cow::Owned(out);
         }
 
         match to_pipe {

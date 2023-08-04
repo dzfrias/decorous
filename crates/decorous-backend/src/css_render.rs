@@ -14,10 +14,9 @@ impl RenderBackend for CssRenderer {
         component: &Component,
         _metadata: &Metadata,
     ) -> io::Result<()> {
-        match component.css() {
-            Some(css) => render(css, out, component),
-            None => Ok(()),
-        }
+        component
+            .css()
+            .map_or(Ok(()), |css| render(css, out, component))
     }
 }
 
