@@ -6,7 +6,7 @@ use std::{borrow::Cow, collections::HashSet};
 #[cfg(not(debug_assertions))]
 use rand::Rng;
 use rslint_parser::{
-    ast::{ArrowExpr, Decl, ExportDecl, FnDecl, ImportDecl, VarDecl},
+    ast::{ArrowExpr, Decl, ExportDecl, FnDecl, ImportDecl, LabelledStmt, VarDecl},
     AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
 };
 
@@ -276,6 +276,24 @@ impl<'a> Component<'a> {
                     }
                 }
                 self.hoist.push(child);
+            } else if let Some(labl_stmt) = child.try_to::<LabelledStmt>() {
+                if labl_stmt.label().unwrap().ident_token().unwrap().text() != "$" {
+                    self.toplevel_nodes.push(ToplevelNodeData {
+                        node: child,
+                        substitute_assign_refs: false,
+                    });
+                    continue;
+                }
+                let Some(stmt) = labl_stmt.stmt() else {
+                    continue;
+                };
+
+                self.toplevel_nodes.push(ToplevelNodeData {
+                    node: stmt.syntax().clone(),
+                    substitute_assign_refs: false,
+                });
+                self.declared_vars
+                    .insert_reactive_block(stmt.syntax().clone());
             } else {
                 self.toplevel_nodes.push(ToplevelNodeData {
                     node: child,
@@ -615,5 +633,17 @@ mod tests {
             "---js export function x() { console.log(\"hi\"); }; export let l = 1 ---",
         );
         insta::assert_debug_snapshot!(component.exports())
+    }
+
+    #[test]
+    fn can_extract_reactive_blocks() {
+        let component = make_component("---js $: $: { let y = 4; }; ---");
+        insta::assert_debug_snapshot!(component.declared_vars());
+    }
+
+    #[test]
+    fn reactive_blocks_are_still_included_as_toplevel_nodes() {
+        let component = make_component("---js $: let x = 3; $: { let y = 4; } ---");
+        insta::assert_debug_snapshot!(component.toplevel_nodes());
     }
 }

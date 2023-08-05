@@ -90,6 +90,16 @@ fn render<T: io::Write>(
         }
     }
 
+    for (block, id) in component.declared_vars().all_reactive_blocks() {
+        let replaced = codegen_utils::replace_assignments(
+            block,
+            &utils::get_unbound_refs(block),
+            component.declared_vars(),
+            None,
+        );
+        writeln!(render_to, "let __reactive{id} = () => {{ {replaced} }};")?;
+    }
+
     let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
     for (name, idx) in component.declared_vars().all_vars() {
         ctx[*idx as usize] = Cow::Borrowed(name);
@@ -99,6 +109,9 @@ fn render<T: io::Write>(
     }
     for idx in component.declared_vars().all_bindings().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__binding{idx}"));
+    }
+    for idx in component.declared_vars().all_reactive_blocks().values() {
+        ctx[*idx as usize] = Cow::Owned(format!("__reactive{idx}"));
     }
     writeln!(render_to, "return [{}];", ctx.join(","))?;
     writeln!(render_to, "}}")?;
@@ -235,5 +248,10 @@ mod tests {
     #[test]
     fn can_render_bindings() {
         test_render!("---js let x = 0; --- #input[:x:]/input");
+    }
+
+    #[test]
+    fn can_render_reactive_blocks() {
+        test_render!("---js let x = 0; let y = 0; $: y = x + 1; --- #input[:x:]/input");
     }
 }

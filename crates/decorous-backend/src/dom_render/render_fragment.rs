@@ -26,6 +26,7 @@ pub(crate) fn render_fragment<T: io::Write>(
     let mut mounts = vec![];
     let mut updates = vec![];
     let mut detaches = vec![];
+    render_reactive_blocks(&mut updates, declared);
     traverse_with(
         nodes,
         &mut |elem| collapse_children(elem).is_none(),
@@ -55,6 +56,14 @@ pub(crate) fn render_fragment<T: io::Write>(
         update_body = unsafe { str::from_utf8_unchecked(&updates) },
         detach_body = unsafe { str::from_utf8_unchecked(&detaches) }
     )
+}
+
+fn render_reactive_blocks(updates: &mut Vec<u8>, declared: &DeclaredVariables) {
+    for (block, id) in declared.all_reactive_blocks() {
+        let unbound = utils::get_unbound_refs(block);
+        let dirty = codegen_utils::calc_dirty(&unbound, declared, None);
+        force_writeln!(updates, "if ({dirty}) {{ ctx[{id}]() }}");
+    }
 }
 
 fn render_decl(f: &mut Vec<u8>, node: &Node<'_, FragmentMetadata>, declared: &DeclaredVariables) {

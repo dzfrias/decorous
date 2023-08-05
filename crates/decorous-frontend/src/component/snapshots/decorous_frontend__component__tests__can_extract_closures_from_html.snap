@@ -34,6 +34,7 @@ DeclaredVariables {
     bindings: {},
     scopes: {},
     css_mustaches: {},
+    reactive_blocks: {},
     current_id: 1,
     css_current: 0,
 }

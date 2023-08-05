@@ -1,0 +1,39 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component.declared_vars()
+---
+DeclaredVariables {
+    vars: {},
+    arrow_exprs: {},
+    bindings: {},
+    scopes: {},
+    css_mustaches: {},
+    reactive_blocks: {
+        LABELLED_STMT@4..21
+          NAME@4..5
+            IDENT@4..5 "$"
+          COLON@5..6 ":"
+          WHITESPACE@6..7 " "
+          BLOCK_STMT@7..21
+            L_CURLY@7..8 "{"
+            WHITESPACE@8..9 " "
+            VAR_DECL@9..19
+              IDENT@9..12 "let"
+              WHITESPACE@12..13 " "
+              DECLARATOR@13..18
+                SINGLE_PATTERN@13..14
+                  NAME@13..14
+                    IDENT@13..14 "y"
+                WHITESPACE@14..15 " "
+                EQ@15..16 "="
+                WHITESPACE@16..17 " "
+                LITERAL@17..18
+                  NUMBER@17..18 "4"
+              SEMICOLON@18..19 ";"
+            WHITESPACE@19..20 " "
+            R_CURLY@20..21 "}"
+        : 0,
+    },
+    current_id: 1,
+    css_current: 0,
+}

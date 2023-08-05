@@ -548,7 +548,17 @@ fn mustache_inner(input: NomSpan) -> Result<SyntaxNode> {
 
 fn parse_js(text: &str) -> std::result::Result<SyntaxNode, (String, Range<usize>)> {
     let res = parse_module(text, 0);
-    if res.errors().is_empty() {
+    if res.errors().is_empty()
+        || (res.errors().len() == 1
+            && res.errors().first().is_some_and(|err| {
+                // HACK: This essentially swallows the error... Not very stable, but
+                // I didn't find a well defined error identification system in the docs
+                // of rslint_errors.
+                //
+                // https://docs.rs/rslint_errors/0.2.0/rslint_errors/struct.Diagnostic.html
+                err.title.as_str() == "Duplicate statement labels are not allowed"
+            }))
+    {
         Ok(res.syntax())
     } else {
         // A bit of a weird way to get owned diagnostics...

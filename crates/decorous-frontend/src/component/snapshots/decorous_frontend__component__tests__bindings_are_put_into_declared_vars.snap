@@ -12,6 +12,7 @@ DeclaredVariables {
     },
     scopes: {},
     css_mustaches: {},
+    reactive_blocks: {},
     current_id: 2,
     css_current: 0,
 }

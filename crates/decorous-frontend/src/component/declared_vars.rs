@@ -11,6 +11,7 @@ pub struct DeclaredVariables {
     bindings: HashMap<SmolStr, u32>,
     scopes: HashMap<u32, Scope>,
     css_mustaches: HashMap<SyntaxNode, u32>,
+    reactive_blocks: HashMap<SyntaxNode, u32>,
     current_id: u32,
     css_current: u32,
 }
@@ -44,6 +45,11 @@ impl DeclaredVariables {
         self.bindings.insert(name, id);
     }
 
+    pub fn insert_reactive_block(&mut self, block: SyntaxNode) {
+        let id = self.generate_id();
+        self.reactive_blocks.insert(block, id);
+    }
+
     pub fn get_var<K>(&self, var: &K, scope_id: Option<u32>) -> Option<u32>
     where
         SmolStr: Borrow<K>,
@@ -67,6 +73,10 @@ impl DeclaredVariables {
         self.bindings.get(var).cloned()
     }
 
+    pub fn get_reactive_block(&self, block: &SyntaxNode) -> Option<u32> {
+        self.reactive_blocks.get(block).cloned()
+    }
+
     pub fn all_vars(&self) -> &HashMap<SmolStr, u32> {
         &self.vars
     }
@@ -81,6 +91,10 @@ impl DeclaredVariables {
 
     pub fn all_bindings(&self) -> &HashMap<SmolStr, u32> {
         &self.bindings
+    }
+
+    pub fn all_reactive_blocks(&self) -> &HashMap<SyntaxNode, u32> {
+        &self.reactive_blocks
     }
 
     pub fn is_scope_var<K>(&self, var: &K, scope_id: u32) -> bool
@@ -99,6 +113,7 @@ impl DeclaredVariables {
             + self.arrow_exprs.len()
             + self.scopes.values().map(|s| s.env.len()).sum::<usize>()
             + self.bindings.len()
+            + self.reactive_blocks.len()
     }
 
     pub fn is_empty(&self) -> bool {
