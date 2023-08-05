@@ -24,13 +24,22 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             python: None,
-            preprocessors: HashMap::from_iter([(
-                "scss".to_owned(),
-                PreprocessPipeline {
-                    pipeline: vec!["sass --stdin".to_owned()],
-                    target: PreprocTarget::Css,
-                },
-            )]),
+            preprocessors: HashMap::from_iter([
+                (
+                    "scss".to_owned(),
+                    PreprocessPipeline {
+                        pipeline: vec!["sass --stdin".to_owned()],
+                        target: PreprocTarget::Css,
+                    },
+                ),
+                (
+                    "sass".to_owned(),
+                    PreprocessPipeline {
+                        pipeline: vec!["sass --stdin --indented".to_owned()],
+                        target: PreprocTarget::Css,
+                    },
+                ),
+            ]),
 
             compilers: HashMap::from_iter([
                 (
