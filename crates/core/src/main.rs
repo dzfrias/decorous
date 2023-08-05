@@ -5,8 +5,10 @@ mod fmt_report;
 mod preprocessor;
 
 use std::{
+    env,
     fs::{self, File},
     io::{self, BufWriter, Write},
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
@@ -22,6 +24,7 @@ use decorous_backend::{
 use decorous_frontend::{parse_with_preprocessor, Component};
 use fmt_report::fmt_report;
 use handlebars::{no_escape, Handlebars};
+use merge::Merge;
 use serde_json::json;
 use superfmt::{
     style::{Color, Modifiers},
@@ -39,8 +42,18 @@ fn main() -> Result<()> {
     let _profiler = dhat::Profiler::new_heap();
 
     let args = Cli::parse();
-    // TODO: Search for config
-    let config = Config::default();
+    let config = {
+        let config_path = get_config_path(&env::current_dir()?, "decor.toml");
+        if let Some(p) = config_path {
+            let contents = fs::read_to_string(p).context("error reading config file")?;
+            let cfg = toml::from_str::<Config>(&contents)?;
+            let mut default = Config::default();
+            default.merge(cfg);
+            default
+        } else {
+            Config::default()
+        }
+    };
     let mut stdout = io::stdout();
     let mut formatter = Formatter::new(&mut stdout);
 
@@ -100,6 +113,13 @@ fn main() -> Result<()> {
     println!();
 
     Ok(())
+}
+
+fn get_config_path(source: &Path, config_name: impl AsRef<Path>) -> Option<PathBuf> {
+    source.ancestors().find_map(|p| {
+        let joined = p.join(&config_name);
+        joined.exists().then_some(joined)
+    })
 }
 
 fn render_html(args: &Cli, component: &Component, meta: &Metadata) -> Result<()> {

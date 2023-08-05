@@ -1,54 +1,61 @@
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, hash::Hash, path::PathBuf};
 
+use merge::Merge;
 use serde::{Deserialize, Deserializer};
 
 #[derive(Debug, Deserialize)]
-pub struct Config<'a> {
-    pub python: Option<&'a Path>,
+#[serde(default)]
+pub struct Config {
+    pub python: Option<PathBuf>,
 
-    #[serde(borrow)]
-    pub compilers: HashMap<&'a str, CompilerConfig<'a>>,
-
-    #[serde(borrow)]
-    pub preprocessors: HashMap<&'a str, PreprocessPipeline<'a>>,
+    pub compilers: HashMap<String, CompilerConfig>,
+    pub preprocessors: HashMap<String, PreprocessPipeline>,
 }
 
-impl Default for Config<'_> {
+impl Merge for Config {
+    fn merge(&mut self, other: Self) {
+        self.python.merge(other.python);
+        hashmap(&mut self.compilers, other.compilers);
+        hashmap(&mut self.preprocessors, other.preprocessors);
+    }
+}
+
+impl Default for Config {
     fn default() -> Self {
         Self {
             python: None,
             preprocessors: HashMap::from_iter([(
-                "scss",
+                "scss".to_owned(),
                 PreprocessPipeline {
-                    pipeline: vec!["sass --stdin"],
+                    pipeline: vec!["sass --stdin".to_owned()],
                     target: PreprocTarget::Css,
                 },
             )]),
 
             compilers: HashMap::from_iter([
                 (
-                    "rust",
+                    "rust".to_owned(),
                     CompilerConfig {
-                        ext_override: Some("rs"),
+                        ext_override: Some("rs".to_owned()),
                         script: ScriptOrFile::Script(include_str!("./compilers/rust.py")),
                     },
                 ),
                 (
-                    "c++",
+                    "c++".to_owned(),
                     CompilerConfig {
-                        ext_override: Some("cpp"),
+                        ext_override: Some("cpp".to_owned()),
                         script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
                     },
                 ),
                 (
-                    "c",
+                    "c".to_owned(),
                     CompilerConfig {
                         ext_override: None,
                         script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
                     },
                 ),
                 (
-                    "zig",
+                    "zig".to_owned(),
                     CompilerConfig {
                         ext_override: None,
                         script: ScriptOrFile::Script(include_str!("./compilers/zig.py")),
@@ -60,34 +67,41 @@ impl Default for Config<'_> {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CompilerConfig<'a> {
-    pub ext_override: Option<&'a str>,
+pub struct CompilerConfig {
+    pub ext_override: Option<String>,
     #[serde(deserialize_with = "deserialize_script")]
-    pub script: ScriptOrFile<'a>,
+    pub script: ScriptOrFile,
 }
 
 #[derive(Debug)]
-pub enum ScriptOrFile<'a> {
+pub enum ScriptOrFile {
     Script(&'static str),
-    File(&'a Path),
+    File(PathBuf),
 }
 
-fn deserialize_script<'de: 'a, 'a, D>(des: D) -> Result<ScriptOrFile<'a>, D::Error>
+fn deserialize_script<'de: 'a, 'a, D>(des: D) -> Result<ScriptOrFile, D::Error>
 where
     D: Deserializer<'de>,
 {
-    Ok(ScriptOrFile::File(<&Path>::deserialize(des)?))
+    Ok(ScriptOrFile::File(<PathBuf>::deserialize(des)?))
 }
 
 #[derive(Debug, Deserialize)]
-pub struct PreprocessPipeline<'a> {
-    #[serde(borrow)]
-    pub pipeline: Vec<&'a str>,
+pub struct PreprocessPipeline {
+    pub pipeline: Vec<String>,
     pub target: PreprocTarget,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, Hash, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum PreprocTarget {
     Css,
     Js,
+}
+
+fn hashmap<K, V>(left: &mut HashMap<K, V>, right: HashMap<K, V>)
+where
+    K: Eq + Hash,
+{
+    left.extend(right);
 }

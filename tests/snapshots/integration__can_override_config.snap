@@ -1,0 +1,28 @@
+---
+source: tests/tests.rs
+expression: all
+---
+
+---decor.toml---
+preprocessors.scss = { pipeline = ["echo 'span { color: red; }'"], target = "css" }
+---input.decor---
+#p Hello, my name is #span Diego /span /p
+
+---scss
+p {
+  color: green;
+  span {
+    color: red;
+  }
+}
+---
+
+---out.css---
+span.decor-0 {
+  color: red;
+}
+
+---out.html---
+<p class="decor-0">Hello, my name is <span class="decor-0">Diego</span></p>
+---out.js---
+

@@ -1,0 +1,14 @@
+---scss
+p {
+  color: red;
+  span {
+    color: green;
+  }
+}
+---
+
+---ts
+let x = 0;
+---
+
+#p {x}! #span:span! /p

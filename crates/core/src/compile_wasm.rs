@@ -18,17 +18,13 @@ use crate::config::{Config, ScriptOrFile};
 
 #[derive(Debug)]
 pub struct MainCompiler<'a> {
-    config: &'a Config<'a>,
+    config: &'a Config,
     build_args: &'a [(String, String)],
     out_name: &'a str,
 }
 
 impl<'a> MainCompiler<'a> {
-    pub fn new(
-        config: &'a Config<'a>,
-        out_name: &'a str,
-        build_args: &'a [(String, String)],
-    ) -> Self {
+    pub fn new(config: &'a Config, out_name: &'a str, build_args: &'a [(String, String)]) -> Self {
         Self {
             config,
             build_args,
@@ -45,7 +41,7 @@ impl<'a> MainCompiler<'a> {
     }
 
     fn get_python(&self) -> Option<Cow<'_, Path>> {
-        if let Some(py) = self.config.python {
+        if let Some(py) = &self.config.python {
             return Some(Cow::Borrowed(py));
         }
 
@@ -73,7 +69,7 @@ macro_rules! compile_for {
                     .compilers
                     .get(lang)
                     .with_context(|| format!("unsupported language: {lang}"))?;
-                let path: PathBuf = format!("__tmp.{}", config.ext_override.unwrap_or(lang)).into();
+                let path: PathBuf = format!("__tmp.{}", config.ext_override.as_deref().unwrap_or(lang)).into();
 
                 {
                     let mut f = File::create(&path)?;

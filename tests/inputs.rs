@@ -6,3 +6,4 @@ pub const WASM_C_CSS: &str = include_str!("./inputs/wasm_c_and_css.decor");
 pub const ZIG: &str = include_str!("./inputs/zig.decor");
 pub const ZIG_EXPORTS: &str = include_str!("./inputs/zig_exports.decor");
 pub const SCSS: &str = include_str!("./inputs/scss.decor");
+pub const SCSS_AND_TS: &str = include_str!("./inputs/scss_and_ts.decor");

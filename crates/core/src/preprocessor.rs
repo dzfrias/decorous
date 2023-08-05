@@ -7,11 +7,11 @@ use crate::config::{Config, PreprocTarget};
 
 #[derive(Debug)]
 pub struct Preproc<'a> {
-    config: &'a Config<'a>,
+    config: &'a Config,
 }
 
 impl<'a> Preproc<'a> {
-    pub fn new(config: &'a Config<'a>) -> Self {
+    pub fn new(config: &'a Config) -> Self {
         Self { config }
     }
 }

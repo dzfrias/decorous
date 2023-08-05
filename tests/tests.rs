@@ -161,3 +161,38 @@ decor_test!(
         assert_all!(dir.path());
     }
 );
+
+decor_test!(
+    can_override_config,
+    SCSS,
+    |dir: &mut TempDir, mut cmd: Command| {
+        let mut config =
+            File::create(dir.path().join("decor.toml")).expect("unable to create config file");
+
+        write!(
+            config,
+            "preprocessors.scss = {{ pipeline = [\"echo 'span {{ color: red; }}'\"], target = \"css\" }}"
+        ).expect("unable to write to config file");
+
+        cmd.assert().success();
+        assert_all!(dir.path());
+    }
+);
+
+decor_test!(
+    can_merge_configs,
+    SCSS_AND_TS,
+    |dir: &mut TempDir, mut cmd: Command| {
+        let mut config =
+            File::create(dir.path().join("decor.toml")).expect("unable to create config file");
+
+        write!(
+            config,
+            "preprocessors.ts = {{ pipeline = [\"echo x\"], target = \"js\" }}"
+        )
+        .expect("unable to write to config file");
+
+        cmd.assert().success();
+        assert_all!(dir.path());
+    }
+);
