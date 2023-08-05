@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 
 use anyhow::Context;
 use clap::{Parser as ArgParser, ValueEnum};
@@ -44,4 +44,13 @@ fn parse_key_val(s: &str) -> Result<(String, String), anyhow::Error> {
         .find('=')
         .with_context(|| format!("invalid LANG=ARGS: no `=` found in `{s}`"))?;
     Ok((s[..pos].to_owned(), s[pos + 1..].to_owned()))
+}
+
+impl Display for RenderMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Dom => write!(f, "dom"),
+            Self::Prerender => write!(f, "prerender"),
+        }
+    }
 }

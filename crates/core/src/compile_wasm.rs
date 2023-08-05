@@ -1,3 +1,4 @@
+use indicatif::ProgressBar;
 use std::{
     borrow::Cow,
     fs::{self, File},
@@ -5,6 +6,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     str,
+    time::Duration,
 };
 
 use anyhow::{bail, Context, Error, Result};
@@ -14,7 +16,10 @@ use scopeguard::defer;
 use shlex::Shlex;
 use which::which;
 
-use crate::config::{Config, ScriptOrFile};
+use crate::{
+    config::{Config, ScriptOrFile},
+    FINISHED,
+};
 
 #[derive(Debug)]
 pub struct MainCompiler<'a> {
@@ -71,6 +76,9 @@ macro_rules! compile_for {
                     .with_context(|| format!("unsupported language: {lang}"))?;
                 let path: PathBuf = format!("__tmp.{}", config.ext_override.as_deref().unwrap_or(lang)).into();
 
+                let spinner = ProgressBar::new_spinner().with_message(format!("Building WebAssembly ({lang})..."));
+                spinner.enable_steady_tick(Duration::from_micros(100));
+
                 {
                     let mut f = File::create(&path)?;
                     f.write_all(body.as_bytes())?;
@@ -82,7 +90,7 @@ macro_rules! compile_for {
                     });
                 });
 
-                match fs::create_dir("out") {
+                match fs::create_dir(self.out_name) {
                     Ok(()) => {}
                     Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
                     Err(err) => bail!(err),
@@ -134,6 +142,15 @@ macro_rules! compile_for {
                 }
 
                 out.write_all(&stdout)?;
+
+                spinner.finish_with_message(format!("{FINISHED} WebAssembly: {lang}{} (\x1b[34m{}/\x1b[0m)", {
+                    let mut args = self.build_args_for_lang(lang).join(" ");
+                    if !args.is_empty() {
+                        args.insert_str(0, " `");
+                        args.push('`')
+                    }
+                    args
+                }, self.out_name));
 
                 Ok(())
             }

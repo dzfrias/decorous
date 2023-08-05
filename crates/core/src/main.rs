@@ -9,6 +9,7 @@ use std::{
     fs::{self, File},
     io::{self, BufWriter, Write},
     path::{Path, PathBuf},
+    time::Instant,
 };
 
 use anyhow::{Context, Result};
@@ -26,10 +27,6 @@ use fmt_report::fmt_report;
 use handlebars::{no_escape, Handlebars};
 use merge::Merge;
 use serde_json::json;
-use superfmt::{
-    style::{Color, Modifiers},
-    Formatter,
-};
 
 use crate::{compile_wasm::MainCompiler, preprocessor::Preproc};
 
@@ -37,16 +34,25 @@ use crate::{compile_wasm::MainCompiler, preprocessor::Preproc};
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
+// ANSI green text
+pub const FINISHED: &str = "\x1b[32;1mDONE\x1b[0m";
+
 fn main() -> Result<()> {
+    let start = Instant::now();
+
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
     let args = Cli::parse();
+
     let config = {
-        let config_path = get_config_path(&env::current_dir()?, "decor.toml");
+        let config_path = get_config_path(
+            &env::current_dir().context("error reading current dir")?,
+            "decor.toml",
+        );
         if let Some(p) = config_path {
             let contents = fs::read_to_string(p).context("error reading config file")?;
-            let cfg = toml::from_str::<Config>(&contents)?;
+            let cfg = toml::from_str::<Config>(&contents).context("error parsing config")?;
             let mut default = Config::default();
             default.merge(cfg);
             default
@@ -54,8 +60,6 @@ fn main() -> Result<()> {
             Config::default()
         }
     };
-    let mut stdout = io::stdout();
-    let mut formatter = Formatter::new(&mut stdout);
 
     let input = fs::read_to_string(&args.input).context("error reading provided input file")?;
     let file_name = args
@@ -65,13 +69,11 @@ fn main() -> Result<()> {
         .to_string_lossy();
     let metadata = Metadata { name: &file_name };
 
-    formatter.writeln_with_context("parsing...", Modifiers::BOLD)?;
     let component = parse_component(&input, &config)?;
-    formatter.writeln_with_context("parsed!", Color::Green)?;
 
-    formatter.writeln_with_context("rendering...", Modifiers::BOLD)?;
-
-    let mut out = BufWriter::new(File::create(format!("{}.js", args.out))?);
+    let mut out = BufWriter::new(
+        File::create(format!("{}.js", args.out)).context("error creating out file")?,
+    );
     let mut wasm_compiler = MainCompiler::new(&config, &args.out, &args.build_args);
     match args.render_method {
         RenderMethod::Dom => {
@@ -80,7 +82,8 @@ fn main() -> Result<()> {
                 &mut out,
                 &metadata,
                 &mut wasm_compiler,
-            )?;
+            )
+            .context("error during rendering")?;
         }
         RenderMethod::Prerender => {
             render_with_wasm::<Prerenderer, _, _>(
@@ -88,9 +91,14 @@ fn main() -> Result<()> {
                 &mut out,
                 &metadata,
                 &mut wasm_compiler,
-            )?;
+            )
+            .context("error during rendering")?;
         }
     }
+    println!(
+        "  {FINISHED} JavaScript: {} (\x1b[34m{}.js\x1b[0m)",
+        args.render_method, args.out
+    );
     out.flush()
         .context("problem flushing buffered writer while rendering")?;
     drop(out);
@@ -105,9 +113,10 @@ fn main() -> Result<()> {
             ),
             &metadata,
         )?;
+        println!("  {FINISHED} CSS: (\x1b[34m{}.css\x1b[0m)", args.out);
     }
 
-    formatter.writeln_with_context("rendered!", Color::Green)?;
+    println!("  {FINISHED} compiled in ~{:.2?}!", start.elapsed());
 
     #[cfg(feature = "dhat-heap")]
     println!();
@@ -146,12 +155,15 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata) -> Result<()>
                 out,
             )?;
 
+            println!("  {FINISHED} HTML (\x1b[34mindex.html\x1b[0m)");
+
             Ok(())
         }
         RenderMethod::Prerender => {
             if args.html {
                 let mut out = vec![];
-                render::<HtmlPrerenderer, _>(component, &mut out, meta)?;
+                render::<HtmlPrerenderer, _>(component, &mut out, meta)
+                    .context("error when rendering HTML")?;
 
                 let body = json!({
                     "script": format!("{}.js", args.out),
@@ -169,6 +181,7 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata) -> Result<()>
                     File::create("index.html").context("problem creating index.html")?,
                 )?;
 
+                println!("  {FINISHED} HTML: prerender (\x1b[34mindex.html\x1b[0m)");
                 return Ok(());
             }
 
@@ -181,6 +194,7 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata) -> Result<()>
                 ),
                 meta,
             )?;
+            println!("  {FINISHED} HTML: prerender (\x1b[34m{html}\x1b[0m)");
 
             Ok(())
         }
@@ -189,11 +203,13 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata) -> Result<()>
 
 fn parse_component<'a>(input: &'a str, config: &Config) -> Result<Component<'a>> {
     let preproc = Preproc::new(config);
-    match parse_with_preprocessor(input, &preproc) {
+    let component = match parse_with_preprocessor(input, &preproc) {
         Ok(ast) => Ok(Component::new(ast)),
         Err(report) => {
             fmt_report(input, &report, &mut io::stderr())?;
             anyhow::bail!("\nthe decorous parser failed");
         }
-    }
+    };
+    println!("  {FINISHED} parsed");
+    component
 }

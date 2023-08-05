@@ -27,3 +27,4 @@ itertools = { workspace = true }
 duct = "0.13.6"
 merge = { version = "0.1", default-features = false }
 toml = "0.7.6"
+indicatif = "0.17"
