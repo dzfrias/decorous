@@ -372,7 +372,7 @@ fn render_update_body<T: io::Write>(
     for (block, id) in component.declared_vars().all_reactive_blocks() {
         let unbound = utils::get_unbound_refs(block);
         let dirty = codegen_utils::calc_dirty(&unbound, component.declared_vars(), None);
-        writeln!(formatter, "if (initial || {dirty}) {{ ctx[{id}]() }}")?;
+        writeln!(formatter, "if ({dirty}) {{ ctx[{id}](); }}")?;
     }
 
     for (meta, js) in analysis.reactive_data().mustaches() {
@@ -580,5 +580,10 @@ mod tests {
         test_render!(
             "---js let x = 0; --- #input[:x: @click={() => console.log(\"hello\")}]/input"
         );
+    }
+
+    #[test]
+    fn can_render_reactive_blocks() {
+        test_render!("---js let x = 0; let y = 0; $: y = x + 1; --- #input[:x:]/input");
     }
 }

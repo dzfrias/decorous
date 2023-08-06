@@ -1,0 +1,44 @@
+---
+source: crates/decorous-backend/src/prerender/mod.rs
+expression: output
+---
+const dirty = new Uint8Array(new ArrayBuffer(1));
+const elems = {"0":document.getElementById("0"),};
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+function __init_ctx() {
+  let x = 0;
+  let y = 0;
+  y = x + 1;
+  elems["0"].value = x;
+  let __binding3 = (ev) => __schedule_update(0, x = ev.target.value);
+  elems["0"].addEventListener("input", __binding3);
+  let __reactive2 = () => { __schedule_update(1, y = x + 1); };
+  return [x,y,__reactive2,__binding3];
+}
+const ctx = __init_ctx();
+let updating = false;
+function __update(dirty, initial) {
+  if (dirty[0] & 3) { ctx[2](); }
+  if (dirty[0] & 1) elems["0"].value = ctx[0];
+}
+dirty.fill(255);
+__update(dirty, true);
+dirty.fill(0);
+function __schedule_update(ctx_idx, val) {
+  ctx[ctx_idx] = val;
+  dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
+  if (updating) return;
+  updating = true;
+  Promise.resolve().then(() => {
+    __update(dirty, false);
+    updating = false;
+    dirty.fill(0);
+  });
+}
+
+---
+<input id="0"></input>
