@@ -32,7 +32,9 @@ const ctx = __init_ctx();
 function __update(dirty, initial) {
   let i = 0; for (const v of ([1, 2, 3])) { ctx[0] = v; if (i >= elems["0_block"].length) { elems["0_block"][i] = create_0_block(elems["0"].parentNode, elems["0"]); } elems["0_block"][i].u(dirty); i += 1; } elems["0_block"].slice(i).forEach((b) => b.d()); elems["0_block"].length = i;
 }
-__update(null, true);
+dirty.fill(255);
+__update(dirty, true);
+dirty.fill(0);
 
 ---
 <span id="0"></span>

@@ -15,14 +15,13 @@ function __init_ctx() {
 }
 const ctx = __init_ctx();
 let updating = false;
-dirty.fill(255);
-__update(dirty, true);
-dirty.fill(0);
 function __update(dirty, initial) {
   if (dirty[0] & 1) elems[1].data = ctx[0];
   if (dirty[0] & 1) elems["0"].setAttribute("style", `background: green; --decor-0: ${ctx[0]}; `);
 }
-__update(null, true);
+dirty.fill(255);
+__update(dirty, true);
+dirty.fill(0);
 function __schedule_update(ctx_idx, val) {
   ctx[ctx_idx] = val;
   dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);

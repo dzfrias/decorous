@@ -11,7 +11,9 @@ function replace(node) {
 function __update(dirty, initial) {
   if (initial) elems[4].data = name;
 }
-__update(null, true);
+dirty.fill(255);
+__update(dirty, true);
+dirty.fill(0);
 
 ---
 <div><p>Hi</p>Hello, <span id="4"></span></div>

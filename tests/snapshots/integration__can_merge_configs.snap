@@ -47,5 +47,7 @@ const ctx = __init_ctx();
 function __update(dirty, initial) {
   if (initial) elems[1].data = x;
 }
-__update(null, true);
+dirty.fill(255);
+__update(dirty, true);
+dirty.fill(0);
 

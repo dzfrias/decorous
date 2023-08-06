@@ -69,17 +69,19 @@ where
         writeln!(
             js_out,
             "const ctx = __init_ctx();
-let updating = false;
-dirty.fill(255);
-__update(dirty, true);
-dirty.fill(0);"
+let updating = false;"
         )?;
     } else if status.wrote_something() {
         writeln!(js_out, "const ctx = __init_ctx();")?;
     }
     let status = render_update_body(component, &analysis, js_out)?;
     if status.wrote_something() {
-        writeln!(js_out, "__update(null, true);")?;
+        writeln!(
+            js_out,
+            "dirty.fill(255);
+__update(dirty, true);
+dirty.fill(0);"
+        )?;
     }
     // If there are no reactive variables, nothing can be updated, so remove this.
     if has_reactive_variables {
@@ -312,6 +314,16 @@ fn render_ctx_init<T: io::Write>(
         )?;
     }
 
+    for (block, id) in component.declared_vars().all_reactive_blocks() {
+        let replaced = codegen_utils::replace_assignments(
+            block,
+            &utils::get_unbound_refs(block),
+            component.declared_vars(),
+            None,
+        );
+        writeln!(formatter, "let __reactive{id} = () => {{ {replaced} }};")?;
+    }
+
     let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
     for (name, idx) in component.declared_vars().all_vars() {
         ctx[*idx as usize] = Cow::Borrowed(name);
@@ -321,6 +333,9 @@ fn render_ctx_init<T: io::Write>(
     }
     for idx in component.declared_vars().all_bindings().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__binding{idx}"));
+    }
+    for idx in component.declared_vars().all_reactive_blocks().values() {
+        ctx[*idx as usize] = Cow::Owned(format!("__reactive{idx}"));
     }
     writeln!(formatter, "return [{}];", ctx.join(","))?;
 
@@ -353,6 +368,12 @@ fn render_update_body<T: io::Write>(
                 .prepend("  ")
                 .build(),
         )?;
+
+    for (block, id) in component.declared_vars().all_reactive_blocks() {
+        let unbound = utils::get_unbound_refs(block);
+        let dirty = codegen_utils::calc_dirty(&unbound, component.declared_vars(), None);
+        writeln!(formatter, "if (initial || {dirty}) {{ ctx[{id}]() }}")?;
+    }
 
     for (meta, js) in analysis.reactive_data().mustaches() {
         let unbound = utils::get_unbound_refs(js);
