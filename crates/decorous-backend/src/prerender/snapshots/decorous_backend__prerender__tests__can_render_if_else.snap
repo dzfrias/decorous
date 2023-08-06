@@ -2,7 +2,7 @@
 source: crates/decorous-backend/src/prerender/mod.rs
 expression: output
 ---
-const dirty = new Uint8Array(new ArrayBuffer(1));
+let x = 0;
 function create_0_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
@@ -23,29 +23,12 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
-function __init_ctx() {
-  let x = 0;
-  return [x];
-}
-const ctx = __init_ctx();
-let updating = false;
 function __update(dirty, initial) {
-  if (ctx[0] == 0) { if (elems["0_block"]) { elems["0_block"].u(dirty); } else { elems["0_block"] = create_0_block(elems["0"].parentNode, elems["0"]); } } else if (elems["0_block"]) { elems["0_block"].d(); elems["0_block"] = null; }
+  if (x == 0) { if (elems["0_block"]) { elems["0_block"].u(dirty); } else { elems["0_block"] = create_0_block(elems["0"].parentNode, elems["0"]); } } else if (elems["0_block"]) { elems["0_block"].d(); elems["0_block"] = null; }
 }
 dirty.fill(255);
 __update(dirty, true);
 dirty.fill(0);
-function __schedule_update(ctx_idx, val) {
-  ctx[ctx_idx] = val;
-  dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
-  if (updating) return;
-  updating = true;
-  Promise.resolve().then(() => {
-    __update(dirty, false);
-    updating = false;
-    dirty.fill(0);
-  });
-}
 
 ---
 <span id="0"></span>

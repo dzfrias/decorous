@@ -200,7 +200,7 @@ mod tests {
 
     #[test]
     fn can_write_mustache_tags() {
-        test_render!("---js let x = 0; --- {(x, x)}");
+        test_render!("---js let x = 0; --- {(x, x)} #button[@click={() => { x = 3; }}]:Hi");
     }
 
     #[test]
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn dirty_items_are_in_conditional() {
-        test_render!("---js let hello = 0; let test = 1; --- {(hello, test)}");
+        test_render!("---js let hello = 0; let test = 1; --- {(hello, test)} #button[@click={() => { test = 3; hello = 3; }}]:Hi");
     }
 
     #[test]

@@ -544,7 +544,7 @@ mod tests {
 
     #[test]
     fn multiple_variables_are_properly_in_dirty_buffer() {
-        test_render!("---js let x = 0; let y = 0; --- #p {x} and {y} and {x + y} /p");
+        test_render!("---js let x = 0; let y = 0; --- #p {x} and {y} and {x + y} /p #button[@click={() => { x = 3; y = 3; }}]:Hi");
     }
 
     #[test]

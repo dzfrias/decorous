@@ -3,16 +3,18 @@ source: crates/decorous-backend/src/prerender/mod.rs
 expression: output
 ---
 const dirty = new Uint8Array(new ArrayBuffer(1));
-const elems = {"1":replace(document.getElementById("1")),"3":replace(document.getElementById("3")),"5":replace(document.getElementById("5")),};
+const elems = {"1":replace(document.getElementById("1")),"3":replace(document.getElementById("3")),"5":replace(document.getElementById("5")),"6":document.getElementById("6"),};
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);
   return text;
 }
 function __init_ctx() {
+  let __closure2 = () => { __schedule_update(0, x = 3); __schedule_update(1, y = 3); };
   let x = 0;
   let y = 0;
-  return [x,y];
+  elems["6"].addEventListener("click", () => { __schedule_update(0, x = 3); __schedule_update(1, y = 3); });
+  return [x,y,__closure2];
 }
 const ctx = __init_ctx();
 let updating = false;
@@ -37,4 +39,4 @@ function __schedule_update(ctx_idx, val) {
 }
 
 ---
-<p><span id="1"></span> and <span id="3"></span> and <span id="5"></span></p>
+<p><span id="1"></span> and <span id="3"></span> and <span id="5"></span></p><button id="6">Hi</button>

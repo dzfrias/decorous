@@ -3,7 +3,7 @@
 use rslint_parser::{
     ast::{
         ArrowExpr, ArrowExprParams, AssignExpr, BlockStmt, Decl, Expr, ExprOrBlock, ExprStmt,
-        NameRef, ObjectPatternProp, Pattern, Script, Stmt,
+        NameRef, ObjectPatternProp, Pattern, Script, Stmt, VarDecl,
     },
     AstNode, SmolStr, SyntaxNode, SyntaxNodeExt,
 };
@@ -34,6 +34,14 @@ pub fn get_unbound_refs(syntax_node: &SyntaxNode) -> Vec<NameRef> {
         let mut all = vec![];
         get_unbound_refs_from_arrow_expr(syntax_node.to::<ArrowExpr>(), &mut declared, &mut all);
         return all;
+    } else if let Some(var_decl) = syntax_node.try_to::<VarDecl>() {
+        let mut declared = vec![];
+        let mut all = vec![];
+
+        for expr in var_decl.declared().filter_map(|decl| decl.value()) {
+            get_unbound_refs_from_expr(expr, &mut declared, &mut all);
+        }
+        return all;
     }
 
     let mut declared = vec![];
@@ -47,6 +55,11 @@ pub fn get_unbound_refs(syntax_node: &SyntaxNode) -> Vec<NameRef> {
             if descendent.is::<BlockStmt>() {
                 let old_len = declared.len();
                 get_unbound_refs_from_block(descendent.to(), &mut declared, &mut all);
+                declared.truncate(old_len);
+                false
+            } else if let Some(arrow_expr) = descendent.try_to::<ArrowExpr>() {
+                let old_len = declared.len();
+                get_unbound_refs_from_arrow_expr(arrow_expr, &mut declared, &mut all);
                 declared.truncate(old_len);
                 false
             } else {

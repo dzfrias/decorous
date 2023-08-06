@@ -408,27 +408,22 @@ impl<'a> Component<'a> {
             {
                 let tok = unbound.ident_token().unwrap();
                 let text = tok.text();
-                unmutated.retain(|(_, decls)| decls.contains(text));
+                unmutated.retain(|(_, decls)| !decls.contains(text));
             }
-            old_len == unmutated.len()
+            old_len != unmutated.len()
         }
 
         let mut unmutated: HashSet<(VarDecl, Vec<SmolStr>)> = HashSet::new();
-        for toplevel in self.toplevel_nodes() {
-            let does_mutate = remove_mutated(&toplevel.node, &mut unmutated);
-            if toplevel.node.is::<VarDecl>() {
-                let var_decl: VarDecl = toplevel.node.to();
-                let mut all_declared = vec![];
-                for decl in var_decl.declared() {
-                    all_declared.extend(utils::get_idents_from_pattern(decl.pattern().unwrap()));
-                }
-                // If the variable assignment has a mutation, that means the variable
-                // itself is not a valid candidate for being hoisted
-                if does_mutate {
-                    continue;
-                }
-                unmutated.insert((var_decl, all_declared));
+        for var_decl in self
+            .toplevel_nodes()
+            .iter()
+            .filter_map(|toplevel| toplevel.node.try_to::<VarDecl>())
+        {
+            let mut all_declared = vec![];
+            for decl in var_decl.declared() {
+                all_declared.extend(utils::get_idents_from_pattern(decl.pattern().unwrap()));
             }
+            unmutated.insert((var_decl, all_declared));
         }
         for node in self.descendents() {
             match node.node_type() {
@@ -460,6 +455,29 @@ impl<'a> Component<'a> {
                     remove_mutated(js, &mut unmutated);
                 }
                 NodeType::Text(_) | NodeType::Comment(_) => {}
+            }
+        }
+
+        'c: for toplevel in self.toplevel_nodes() {
+            let does_mutate = remove_mutated(&toplevel.node, &mut unmutated);
+            if let Some(var_decl) = toplevel.node.try_to::<VarDecl>() {
+                let unbound = utils::get_unbound_refs(&toplevel.node);
+                for unbound in unbound {
+                    let tok = unbound.ident_token().unwrap();
+                    let text = tok.text();
+                    if unmutated
+                        .iter()
+                        .any(|(_, declared)| !declared.contains(text))
+                    {
+                        unmutated.retain(|(decl, _)| decl != &var_decl);
+                        continue 'c;
+                    }
+                }
+
+                if !does_mutate {
+                    continue;
+                }
+                unmutated.retain(|(decl, _)| decl != &var_decl);
             }
         }
 
@@ -643,7 +661,7 @@ mod tests {
 
     #[test]
     fn reactive_blocks_are_still_included_as_toplevel_nodes() {
-        let component = make_component("---js $: let x = 3; $: { let y = 4; } ---");
+        let component = make_component("---js let z = 0; $: let x = z + 1; $: { let y = 4; } --- #button[@click={() => z = 33}]:hi");
         insta::assert_debug_snapshot!(component.toplevel_nodes());
     }
 }

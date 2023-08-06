@@ -2,23 +2,24 @@
 source: crates/decorous-backend/src/dom_render/mod.rs
 expression: "String::from_utf8(out).unwrap()"
 ---
-const dirty = new Uint8Array(new ArrayBuffer(1));
+let color = "red";
+const dirty = new Uint8Array(new ArrayBuffer(0));
 function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
-target.setAttribute("style", `--decor-0: ${ctx[0]}; `);
+target.setAttribute("style", `--decor-0: ${color}; `);
 return {
 u(dirty) {
-if (dirty[0] & 1) target.setAttribute("style", `--decor-0: ${ctx[0]}; `);
+if (true) target.setAttribute("style", `--decor-0: ${color}; `);
 },
 d() {
 }
 };
 }
 function __init_ctx() {
-let color = "red";
-return [color];
+
+return [];
 }
 const ctx = __init_ctx();
 const fragment = create_main_block(document.getElementById("test"));

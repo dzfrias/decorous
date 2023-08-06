@@ -2,37 +2,20 @@
 source: crates/decorous-backend/src/prerender/mod.rs
 expression: output
 ---
-const dirty = new Uint8Array(new ArrayBuffer(1));
+let x = 3;
 const elems = {"2":replace(document.getElementById("2")),"0":document.getElementById("0"),};
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);
   return text;
 }
-function __init_ctx() {
-  let x = 3;
-  return [x];
-}
-const ctx = __init_ctx();
-let updating = false;
 function __update(dirty, initial) {
-  if (dirty[0] & 1) elems[2].data = ctx[0];
-  if (dirty[0] & 1) elems["0"].setAttribute("class", ctx[0] + 3);
+  if (initial) elems[2].data = x;
+  if (initial) elems["0"].setAttribute("class", x + 3);
 }
 dirty.fill(255);
 __update(dirty, true);
 dirty.fill(0);
-function __schedule_update(ctx_idx, val) {
-  ctx[ctx_idx] = val;
-  dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
-  if (updating) return;
-  updating = true;
-  Promise.resolve().then(() => {
-    __update(dirty, false);
-    updating = false;
-    dirty.fill(0);
-  });
-}
 
 ---
 <p id="0">Hello <span id="2"></span></p>
