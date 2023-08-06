@@ -1,0 +1,68 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component
+---
+Component {
+    fragment_tree: [],
+    declared_vars: DeclaredVariables {
+        vars: {},
+        arrow_exprs: {},
+        bindings: {},
+        scopes: {},
+        css_mustaches: {},
+        reactive_blocks: {},
+        current_id: 1,
+        css_current: 0,
+    },
+    toplevel_nodes: [
+        ToplevelNodeData {
+            node: EXPR_STMT@40..58
+              CALL_EXPR@40..57
+                DOT_EXPR@40..51
+                  NAME_REF@40..47
+                    IDENT@40..47 "console"
+                  DOT@47..48 "."
+                  NAME@48..51
+                    IDENT@48..51 "log"
+                ARG_LIST@51..57
+                  L_PAREN@51..52 "("
+                  LITERAL@52..56
+                    STRING@52..56 "\"hi\""
+                  R_PAREN@56..57 ")"
+              SEMICOLON@57..58 ";"
+            ,
+            substitute_assign_refs: false,
+        },
+    ],
+    hoist: [
+        VAR_DECL@1..39
+          IDENT@1..4 "let"
+          WHITESPACE@4..5 " "
+          DECLARATOR@5..38
+            SINGLE_PATTERN@5..6
+              NAME@5..6
+                IDENT@5..6 "z"
+            WHITESPACE@6..7 " "
+            EQ@7..8 "="
+            WHITESPACE@8..9 " "
+            CALL_EXPR@9..38
+              DOT_EXPR@9..32
+                NAME_REF@9..17
+                  IDENT@9..17 "document"
+                DOT@17..18 "."
+                NAME@18..32
+                  IDENT@18..32 "getElementById"
+              ARG_LIST@32..38
+                L_PAREN@32..33 "("
+                LITERAL@33..37
+                  STRING@33..37 "\"id\""
+                R_PAREN@37..38 ")"
+          SEMICOLON@38..39 ";"
+        ,
+    ],
+    exports: [],
+    component_id: 0,
+    current_id: 0,
+    css: None,
+    wasm: None,
+}

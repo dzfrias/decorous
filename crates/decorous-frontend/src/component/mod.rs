@@ -1,8 +1,10 @@
 mod declared_vars;
+mod dep_graph;
 mod fragment;
 
-use std::{borrow::Cow, collections::HashSet};
+use std::borrow::Cow;
 
+use itertools::Itertools;
 #[cfg(not(debug_assertions))]
 use rand::Rng;
 use rslint_parser::{
@@ -15,6 +17,7 @@ use crate::{
         traverse_mut, Attribute, AttributeValue, Code, DecorousAst, Node, NodeIter, NodeType,
         SpecialBlock,
     },
+    component::dep_graph::DepGraph,
     css::{self, ast::Css},
     location::Location,
     utils,
@@ -396,102 +399,61 @@ impl<'a> Component<'a> {
     }
 
     fn hoist_unmutated_vars(&mut self) {
-        fn remove_mutated(
-            s: &SyntaxNode,
-            unmutated: &mut HashSet<(VarDecl, Vec<SmolStr>)>,
-        ) -> bool {
-            let old_len = unmutated.len();
-            let unbound = utils::get_unbound_refs(s);
-            for unbound in unbound
+        let mut graph = DepGraph::new(
+            &self
+                .toplevel_nodes()
                 .iter()
-                .filter(|nref| utils::is_from_assignment(nref))
-            {
-                let tok = unbound.ident_token().unwrap();
-                let text = tok.text();
-                unmutated.retain(|(_, decls)| !decls.contains(text));
-            }
-            old_len != unmutated.len()
-        }
+                .filter_map(|toplevel| toplevel.node.try_to::<VarDecl>())
+                .collect_vec(),
+        );
 
-        let mut unmutated: HashSet<(VarDecl, Vec<SmolStr>)> = HashSet::new();
-        for var_decl in self
-            .toplevel_nodes()
-            .iter()
-            .filter_map(|toplevel| toplevel.node.try_to::<VarDecl>())
-        {
-            let mut all_declared = vec![];
-            for decl in var_decl.declared() {
-                all_declared.extend(utils::get_idents_from_pattern(decl.pattern().unwrap()));
-            }
-            unmutated.insert((var_decl, all_declared));
-        }
         for node in self.descendents() {
             match node.node_type() {
                 NodeType::Element(elem) => {
                     for attr in elem.attrs() {
                         match attr {
                             Attribute::Binding(binding) => {
-                                unmutated.retain(|(_, decls)| {
-                                    decls.iter().all(|decl| &decl.as_str() != binding)
-                                });
+                                // Bindings are mutable
+                                graph.mark_mutated(binding);
                             }
                             Attribute::EventHandler(evt_handler) => {
-                                remove_mutated(evt_handler.expr(), &mut unmutated);
+                                graph.mark_mutated_from_node(evt_handler.expr());
                             }
                             Attribute::KeyValue(_, Some(AttributeValue::JavaScript(js))) => {
-                                remove_mutated(js, &mut unmutated);
+                                graph.mark_mutated_from_node(js);
                             }
                             Attribute::KeyValue(_, _) => {}
                         }
                     }
                 }
                 NodeType::SpecialBlock(SpecialBlock::If(block)) => {
-                    remove_mutated(block.expr(), &mut unmutated);
+                    graph.mark_mutated_from_node(block.expr());
                 }
                 NodeType::SpecialBlock(SpecialBlock::For(block)) => {
-                    remove_mutated(block.expr(), &mut unmutated);
+                    graph.mark_mutated_from_node(block.expr());
                 }
                 NodeType::Mustache(js) => {
-                    remove_mutated(js, &mut unmutated);
+                    graph.mark_mutated_from_node(js);
                 }
                 NodeType::Text(_) | NodeType::Comment(_) => {}
             }
         }
 
-        'c: for toplevel in self.toplevel_nodes() {
-            let does_mutate = remove_mutated(&toplevel.node, &mut unmutated);
-            if let Some(var_decl) = toplevel.node.try_to::<VarDecl>() {
-                let unbound = utils::get_unbound_refs(&toplevel.node);
-                for unbound in unbound {
-                    let tok = unbound.ident_token().unwrap();
-                    let text = tok.text();
-                    if unmutated
-                        .iter()
-                        .any(|(_, declared)| !declared.contains(text))
-                    {
-                        unmutated.retain(|(decl, _)| decl != &var_decl);
-                        continue 'c;
-                    }
-                }
-
-                if !does_mutate {
-                    continue;
-                }
-                unmutated.retain(|(decl, _)| decl != &var_decl);
-            }
+        for toplevel in self.toplevel_nodes() {
+            graph.mark_mutated_from_node(&toplevel.node);
         }
 
-        for (decl, vars) in unmutated {
-            for var in vars {
-                self.declared_vars.remove_var(&var);
+        for v in graph.get_unmutated() {
+            for var in &v.declared_vars {
+                self.declared_vars.remove_var(var);
             }
             let pos = self
                 .toplevel_nodes()
                 .iter()
-                .position(|node| &node.node == decl.syntax())
+                .position(|node| &node.node == v.decl.syntax())
                 .expect("VarDecl should be in toplevel nodes");
             self.toplevel_nodes.remove(pos);
-            self.hoist.push(decl.syntax().clone());
+            self.hoist.push(v.decl.syntax().clone());
         }
     }
 
@@ -663,5 +625,13 @@ mod tests {
     fn reactive_blocks_are_still_included_as_toplevel_nodes() {
         let component = make_component("---js let z = 0; $: let x = z + 1; $: { let y = 4; } --- #button[@click={() => z = 33}]:hi");
         insta::assert_debug_snapshot!(component.toplevel_nodes());
+    }
+
+    #[test]
+    fn globals_are_not_subject_to_hoist_optimizations() {
+        let component = make_component(
+            "---js let z = document.getElementById(\"id\"); console.log(\"hi\"); ---",
+        );
+        insta::assert_debug_snapshot!(component);
     }
 }
