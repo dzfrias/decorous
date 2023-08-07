@@ -8,7 +8,6 @@ use std::{
     env,
     fs::{self, File},
     io::{self, BufWriter, Write},
-    path::{Path, PathBuf},
     time::Instant,
 };
 
@@ -50,35 +49,58 @@ fn main() -> Result<()> {
         "component cannot be both modularized and prerendered!"
     );
 
-    let config = {
-        let config_path = get_config_path(
-            &env::current_dir().context("error reading current dir")?,
-            "decor.toml",
-        );
-        if let Some(p) = config_path {
-            let contents = fs::read_to_string(p).context("error reading config file")?;
-            let cfg = toml::from_str::<Config>(&contents).context("error parsing config")?;
-            let mut default = Config::default();
-            default.merge(cfg);
-            default
-        } else {
-            Config::default()
-        }
-    };
-
+    let config = get_config()?;
     let input = fs::read_to_string(&args.input).context("error reading provided input file")?;
-    let file_name = args
-        .input
-        .file_stem()
-        .expect("file name should never be .. or /, if read was successful")
-        .to_string_lossy();
+
     let metadata = Metadata {
-        name: &file_name,
+        name: {
+            &args
+                .input
+                .file_stem()
+                .expect("file name should never be .. or /, if read was successful")
+                .to_string_lossy()
+        },
         modularize: args.modularize,
     };
-
     let component = parse_component(&input, &config)?;
 
+    render_js(&args, config, &component, &metadata)?;
+    render_html(&args, &component, &metadata)?;
+    if component.css().is_some() {
+        render_css(&args, component, metadata)?;
+    }
+
+    println!("  {FINISHED} compiled in ~{:.2?}!", start.elapsed());
+
+    #[cfg(feature = "dhat-heap")]
+    println!();
+
+    Ok(())
+}
+
+fn render_css(
+    args: &Cli,
+    component: Component<'_>,
+    metadata: Metadata<'_>,
+) -> Result<(), anyhow::Error> {
+    let name = format!("{}.css", args.out);
+    render::<CssRenderer, _>(
+        &component,
+        &mut BufWriter::new(
+            File::create(&name).with_context(|| format!("problem creating {name}"))?,
+        ),
+        &metadata,
+    )?;
+    println!("  {FINISHED} CSS: (\x1b[34m{}.css\x1b[0m)", args.out);
+    Ok(())
+}
+
+fn render_js(
+    args: &Cli,
+    config: Config,
+    component: &Component<'_>,
+    metadata: &Metadata<'_>,
+) -> Result<()> {
     let mut out = BufWriter::new(
         File::create(format!("{}.js", args.out)).context("error creating out file")?,
     );
@@ -86,18 +108,18 @@ fn main() -> Result<()> {
     match args.render_method {
         RenderMethod::Dom => {
             render_with_wasm::<DomRenderer, _, _>(
-                &component,
+                component,
                 &mut out,
-                &metadata,
+                metadata,
                 &mut wasm_compiler,
             )
             .context("error during rendering")?;
         }
         RenderMethod::Prerender => {
             render_with_wasm::<Prerenderer, _, _>(
-                &component,
+                component,
                 &mut out,
-                &metadata,
+                metadata,
                 &mut wasm_compiler,
             )
             .context("error during rendering")?;
@@ -109,34 +131,25 @@ fn main() -> Result<()> {
     );
     out.flush()
         .context("problem flushing buffered writer while rendering")?;
-    drop(out);
-
-    render_html(&args, &component, &metadata)?;
-    if component.css().is_some() {
-        let name = format!("{}.css", args.out);
-        render::<CssRenderer, _>(
-            &component,
-            &mut BufWriter::new(
-                File::create(&name).with_context(|| format!("problem creating {name}"))?,
-            ),
-            &metadata,
-        )?;
-        println!("  {FINISHED} CSS: (\x1b[34m{}.css\x1b[0m)", args.out);
-    }
-
-    println!("  {FINISHED} compiled in ~{:.2?}!", start.elapsed());
-
-    #[cfg(feature = "dhat-heap")]
-    println!();
 
     Ok(())
 }
 
-fn get_config_path(source: &Path, config_name: impl AsRef<Path>) -> Option<PathBuf> {
-    source.ancestors().find_map(|p| {
-        let joined = p.join(&config_name);
+fn get_config() -> Result<Config> {
+    let source = env::current_dir().context("error reading current dir")?;
+    let config_path = source.ancestors().find_map(|p| {
+        let joined = p.join(&"decor.toml");
         joined.exists().then_some(joined)
-    })
+    });
+    if let Some(p) = config_path {
+        let contents = fs::read_to_string(p).context("error reading config file")?;
+        let cfg = toml::from_str::<Config>(&contents).context("error parsing config")?;
+        let mut default = Config::default();
+        default.merge(cfg);
+        Ok(default)
+    } else {
+        Ok(Config::default())
+    }
 }
 
 fn render_html(args: &Cli, component: &Component, meta: &Metadata) -> Result<()> {
