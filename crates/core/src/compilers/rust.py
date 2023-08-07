@@ -5,8 +5,9 @@ from pathlib import Path
 
 
 def main():
-    input = os.environ["DECOR_INPUT"]
+    input = Path(os.environ["DECOR_INPUT"])
     outdir = os.environ["DECOR_OUT"]
+    name = input.stem
 
     PROJECT_NAME = "decor-out"
 
@@ -27,7 +28,7 @@ def main():
             "--target",
             "web",
             "--out-name",
-            "decor_out",
+            name,
             "--out-dir",
             Path("..") / outdir,
             "--color",
@@ -36,6 +37,8 @@ def main():
         ],
         check=True,
     )
+
+    os.environ["DECOR_WASM"] = os.path.join(outdir, f"{name}_bg.wasm")
 
     print(
         f"""import init, * as wasm from "/{outdir}/decor_out.js";

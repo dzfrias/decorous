@@ -51,7 +51,7 @@ pub fn add(x: i32, y: i32) -> i32 {
 ---.gitignore---
 IGNORED
 
----decor_out.d.ts---
+---__tmp.d.ts---
 /* tslint:disable */
 /* eslint-disable */
 /**
@@ -89,7 +89,7 @@ export function initSync(module: SyncInitInput): InitOutput;
 */
 export default function __wbg_init (module_or_path?: InitInput | Promise<InitInput>): Promise<InitOutput>;
 
----decor_out.js---
+---__tmp.js---
 let wasm;
 
 /**
@@ -172,7 +172,7 @@ async function __wbg_init(input) {
     if (wasm !== undefined) return wasm;
 
     if (typeof input === 'undefined') {
-        input = new URL('decor_out_bg.wasm', import.meta.url);
+        input = new URL('__tmp_bg.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 
@@ -190,10 +190,10 @@ async function __wbg_init(input) {
 export { initSync }
 export default __wbg_init;
 
----decor_out_bg.wasm---
+---__tmp_bg.wasm---
 IGNORED
 
----decor_out_bg.wasm.d.ts---
+---__tmp_bg.wasm.d.ts---
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
@@ -204,12 +204,12 @@ export function add(a: number, b: number): number;
   "name": "decor-out",
   "version": "0.1.0",
   "files": [
-    "decor_out_bg.wasm",
-    "decor_out.js",
-    "decor_out.d.ts"
+    "__tmp_bg.wasm",
+    "__tmp.js",
+    "__tmp.d.ts"
   ],
-  "module": "decor_out.js",
-  "types": "decor_out.d.ts",
+  "module": "__tmp.js",
+  "types": "__tmp.d.ts",
   "sideEffects": [
     "./snippets/*"
   ]

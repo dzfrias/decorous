@@ -82,7 +82,7 @@ fn main() -> Result<()> {
     let mut out = BufWriter::new(
         File::create(format!("{}.js", args.out)).context("error creating out file")?,
     );
-    let mut wasm_compiler = MainCompiler::new(&config, &args.out, &args.build_args);
+    let mut wasm_compiler = MainCompiler::new(&config, &args.out, &args.build_args, args.optimize);
     match args.render_method {
         RenderMethod::Dom => {
             render_with_wasm::<DomRenderer, _, _>(

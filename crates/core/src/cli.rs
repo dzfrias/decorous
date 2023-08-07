@@ -10,6 +10,22 @@ pub enum RenderMethod {
     Prerender,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum OptimizationLevel {
+    #[clap(name = "1")]
+    SpeedMinor,
+    #[clap(name = "2")]
+    SpeedMedium,
+    #[clap(name = "3")]
+    SpeedMajor,
+    #[clap(name = "4")]
+    SpeedAggressive,
+    #[clap(name = "s")]
+    Size,
+    #[clap(name = "z")]
+    SizeAggressive,
+}
+
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
@@ -27,6 +43,9 @@ pub struct Cli {
         default_value_if("modularize", ArgPredicate::IsPresent, "dom")
     )]
     pub render_method: RenderMethod,
+
+    #[arg(short = 'O', default_value = None)]
+    pub optimize: Option<OptimizationLevel>,
 
     /// Generate a full index.html file instead of just a fragment (or none at all).
     #[arg(long)]
