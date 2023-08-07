@@ -80,3 +80,16 @@ impl Display for RenderMethod {
         }
     }
 }
+
+impl Display for OptimizationLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OptimizationLevel::SpeedMinor => write!(f, "O1"),
+            OptimizationLevel::SpeedMedium => write!(f, "O2"),
+            OptimizationLevel::SpeedMajor => write!(f, "O3"),
+            OptimizationLevel::SpeedAggressive => write!(f, "O4"),
+            OptimizationLevel::Size => write!(f, "Os"),
+            OptimizationLevel::SizeAggressive => write!(f, "Oz"),
+        }
+    }
+}

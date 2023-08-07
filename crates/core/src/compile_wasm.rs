@@ -142,6 +142,17 @@ macro_rules! compile_for {
                     );
                 }
 
+                out.write_all(&stdout)?;
+
+                spinner.finish_with_message(format!("{FINISHED} WebAssembly: {lang}{} (\x1b[34m{}/\x1b[0m)", {
+                    let mut args = self.build_args_for_lang(lang).join(" ");
+                    if !args.is_empty() {
+                        args.insert_str(0, " `");
+                        args.push('`')
+                    }
+                    args
+                }, self.out_name));
+
 
                 if let Some(opt) = self.opt_level {
                     let (shrink, speed) = match opt {
@@ -153,6 +164,9 @@ macro_rules! compile_for {
                         OptimizationLevel::SizeAggressive => (2, 2),
                     };
                     for entry in fs::read_dir(self.out_name)? {
+                        let spinner = ProgressBar::new_spinner().with_message(format!("Optimizing WebAssembly ({opt})..."));
+                        spinner.enable_steady_tick(Duration::from_micros(100));
+
                         let entry = entry?;
                         let path = entry.path();
 
@@ -168,19 +182,14 @@ macro_rules! compile_for {
                         module.optimize(&config);
                         let out = module.write();
                         fs::write(&path, out)?;
+
+                        spinner.finish_with_message(
+                            format!("{FINISHED} optimized WebAssembly: {opt} (\x1b[34m{}\x1b[0m)", path.display())
+                        );
                     }
+
                 }
 
-                out.write_all(&stdout)?;
-
-                spinner.finish_with_message(format!("{FINISHED} WebAssembly: {lang}{} (\x1b[34m{}/\x1b[0m)", {
-                    let mut args = self.build_args_for_lang(lang).join(" ");
-                    if !args.is_empty() {
-                        args.insert_str(0, " `");
-                        args.push('`')
-                    }
-                    args
-                }, self.out_name));
 
                 Ok(())
             }
