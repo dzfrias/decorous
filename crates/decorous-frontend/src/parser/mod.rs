@@ -118,7 +118,7 @@ fn parse_code_blocks<'a, P: Preprocessor>(
         match b.lang() {
             "js" => {
                 let syntax_node = parse_js_block(b.body(), b.offset(), src)?;
-                blocks.set_script(syntax_node).map_err(|_| {
+                blocks.set_script(syntax_node).map_err(|_err| {
                     nom_err!(
                         src.slice(b.offset()..),
                         Failure,
@@ -129,7 +129,7 @@ fn parse_code_blocks<'a, P: Preprocessor>(
             }
             "css" => {
                 let ast = parse_css_block(b.body(), b.offset(), src)?;
-                blocks.set_css(ast).map_err(|_| {
+                blocks.set_css(ast).map_err(|_err| {
                     nom_err!(
                         src.slice(b.offset()..),
                         Failure,
@@ -151,7 +151,7 @@ fn parse_code_blocks<'a, P: Preprocessor>(
                 })? {
                     Override::Css(new_css) => {
                         let ast = parse_css_block(&new_css, b.offset(), src)?;
-                        blocks.set_css(ast).map_err(|_| {
+                        blocks.set_css(ast).map_err(|_err| {
                             nom_err!(
                                 src.slice(b.offset()..),
                                 Failure,
@@ -162,7 +162,7 @@ fn parse_code_blocks<'a, P: Preprocessor>(
                     }
                     Override::Js(js) => {
                         let script = parse_js_block(&js, b.offset(), src)?;
-                        blocks.set_script(script).map_err(|_| {
+                        blocks.set_script(script).map_err(|_err| {
                             nom_err!(
                                 src.slice(b.offset()..),
                                 Failure,
@@ -173,7 +173,7 @@ fn parse_code_blocks<'a, P: Preprocessor>(
                     }
                     Override::None => {
                         let offset = b.offset();
-                        blocks.set_wasm(b).map_err(|_| {
+                        blocks.set_wasm(b).map_err(|_err| {
                             nom_err!(
                                 src.slice(offset..),
                                 Failure,

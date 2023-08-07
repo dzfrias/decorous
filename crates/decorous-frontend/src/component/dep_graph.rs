@@ -72,7 +72,7 @@ impl DepGraph {
         {
             let tok = unbound.ident_token().unwrap();
             let ident = tok.text();
-            self.mark_mutated(&ident);
+            self.mark_mutated(ident);
         }
     }
 

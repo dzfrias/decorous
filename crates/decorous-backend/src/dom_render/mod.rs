@@ -30,7 +30,7 @@ fn render<T: io::Write>(
         writeln!(render_to, "{hoist}")?;
     }
 
-    render_init_ctx(render_to, &component)?;
+    render_init_ctx(render_to, component)?;
 
     if metadata.modularize {
         writeln!(render_to, "export default function initialize(target) {{")?;
