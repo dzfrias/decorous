@@ -2,6 +2,11 @@
 source: crates/decorous-backend/src/dom_render/mod.rs
 expression: "String::from_utf8(out).unwrap()"
 ---
+function __init_ctx() {
+let x = 3;
+x = 4;
+return [x];
+}
 const dirty = new Uint8Array(new ArrayBuffer(1));
 function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
@@ -13,11 +18,6 @@ u(dirty) {
 d() {
 }
 };
-}
-function __init_ctx() {
-let x = 3;
-x = 4;
-return [x];
 }
 const ctx = __init_ctx();
 const fragment = create_main_block(document.getElementById("test"));

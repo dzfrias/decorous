@@ -4,6 +4,10 @@ expression: "String::from_utf8(out).unwrap()"
 ---
 import data from "data";
 let x = 3;
+function __init_ctx() {
+
+return [];
+}
 const dirty = new Uint8Array(new ArrayBuffer(0));
 function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
@@ -20,10 +24,6 @@ d() {
 e0.parentNode.removeChild(e0);
 }
 };
-}
-function __init_ctx() {
-
-return [];
 }
 const ctx = __init_ctx();
 const fragment = create_main_block(document.getElementById("test"));

@@ -134,8 +134,15 @@ mod tests {
         let mut out = vec![];
         let input = "---css body { color: {color}; } ---";
         let component = make_component(input);
-        CssRenderer::render(&mut out, &component, &Metadata { name: "test" })
-            .expect("render should not fail");
+        CssRenderer::render(
+            &mut out,
+            &component,
+            &Metadata {
+                name: "test",
+                modularize: false,
+            },
+        )
+        .expect("render should not fail");
         insta::assert_snapshot!(String::from_utf8(out).unwrap());
     }
 }

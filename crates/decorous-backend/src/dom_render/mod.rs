@@ -30,12 +30,19 @@ fn render<T: io::Write>(
         writeln!(render_to, "{hoist}")?;
     }
 
+    render_init_ctx(render_to, &component)?;
+
+    if metadata.modularize {
+        writeln!(render_to, "export default function initialize(target) {{")?;
+    }
+
     writeln!(
         render_to,
         "const dirty = new Uint8Array(new ArrayBuffer({}));",
         // Ceiling division to get the amount of bytes needed in the ArrayBuffer
         ((component.declared_vars().len() + 7) / 8)
     )?;
+
     render_fragment(
         component.fragment_tree(),
         None,
@@ -44,9 +51,43 @@ fn render<T: io::Write>(
         render_to,
     )?;
 
-    writeln!(render_to, "function __init_ctx() {{")?;
+    writeln!(render_to, "const ctx = __init_ctx();")?;
+    if metadata.modularize {
+        writeln!(render_to, "const fragment = create_main_block(target);")?;
+    } else {
+        writeln!(
+            render_to,
+            "const fragment = create_main_block(document.getElementById(\"{}\"));",
+            metadata.name
+        )?;
+    }
+    writeln!(render_to, "let updating = false;")?;
     writeln!(
         render_to,
+        "function __schedule_update(ctx_idx, val) {{
+ctx[ctx_idx] = val;
+dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
+if (updating) return;
+updating = true;
+Promise.resolve().then(() => {{
+fragment.u(dirty);
+updating = false;
+dirty.fill(0);
+}});
+}}"
+    )?;
+
+    if metadata.modularize {
+        writeln!(render_to, "}}")?;
+    }
+
+    Ok(())
+}
+
+fn render_init_ctx<W: io::Write>(out: &mut W, component: &Component<'_>) -> io::Result<()> {
+    writeln!(out, "function __init_ctx() {{")?;
+    writeln!(
+        out,
         "{}",
         component
             .toplevel_nodes()
@@ -65,10 +106,9 @@ fn render<T: io::Write>(
             })
             .join("\n")
     )?;
-
     for (arrow_expr, (idx, scope)) in component.declared_vars().all_arrow_exprs() {
         writeln!(
-            render_to,
+            out,
             "let __closure{idx} = {};",
             codegen_utils::replace_assignments(
                 arrow_expr.syntax(),
@@ -78,18 +118,16 @@ fn render<T: io::Write>(
             )
         )?;
     }
-
     for (name, id) in component.declared_vars().all_bindings() {
         if let Some(var_id) = component.declared_vars().get_var(name, None) {
             writeln!(
-                render_to,
+                out,
                 "let __binding{id} = (ev) => __schedule_update({var_id}, {name} = ev.target.value);"
             )?;
         } else {
             todo!("unbound var lint");
         }
     }
-
     for (block, id) in component.declared_vars().all_reactive_blocks() {
         let replaced = codegen_utils::replace_assignments(
             block,
@@ -97,9 +135,8 @@ fn render<T: io::Write>(
             component.declared_vars(),
             None,
         );
-        writeln!(render_to, "let __reactive{id} = () => {{ {replaced} }};")?;
+        writeln!(out, "let __reactive{id} = () => {{ {replaced} }};")?;
     }
-
     let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
     for (name, idx) in component.declared_vars().all_vars() {
         ctx[*idx as usize] = Cow::Borrowed(name);
@@ -113,30 +150,8 @@ fn render<T: io::Write>(
     for idx in component.declared_vars().all_reactive_blocks().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__reactive{idx}"));
     }
-    writeln!(render_to, "return [{}];", ctx.join(","))?;
-    writeln!(render_to, "}}")?;
-
-    writeln!(render_to, "const ctx = __init_ctx();")?;
-    writeln!(
-        render_to,
-        "const fragment = create_main_block(document.getElementById(\"{}\"));",
-        metadata.name
-    )?;
-    writeln!(render_to, "let updating = false;")?;
-    writeln!(
-        render_to,
-        "function __schedule_update(ctx_idx, val) {{
-ctx[ctx_idx] = val;
-dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
-if (updating) return;
-updating = true;
-Promise.resolve().then(() => {{
-fragment.u(dirty);
-updating = false;
-dirty.fill(0);
-}});
-}}"
-    )?;
+    writeln!(out, "return [{}];", ctx.join(","))?;
+    writeln!(out, "}}")?;
 
     Ok(())
 }
@@ -152,10 +167,20 @@ mod tests {
     }
 
     macro_rules! test_render {
-        ($input:expr) => {
+        ($input:expr$(, $metadata:expr)?) => {
             let component = make_component($input);
             let mut out = vec![];
-            render(&component, &mut out, &Metadata { name: "test" }).unwrap();
+            #[allow(unused)]
+            let mut metadata = Metadata { name: "test", modularize: false };
+            $(
+                metadata = $metadata;
+             )?
+            render(
+                &component,
+                &mut out,
+                &metadata
+            )
+            .unwrap();
 
             insta::assert_snapshot!(String::from_utf8(out).unwrap());
         };
@@ -253,5 +278,16 @@ mod tests {
     #[test]
     fn can_render_reactive_blocks() {
         test_render!("---js let x = 0; let y = 0; $: y = x + 1; --- #input[:x:]/input");
+    }
+
+    #[test]
+    fn can_render_modularize() {
+        test_render!(
+            "---js let x = 0; --- #p {x} /p",
+            Metadata {
+                name: "test",
+                modularize: true,
+            }
+        );
     }
 }

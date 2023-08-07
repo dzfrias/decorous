@@ -12,7 +12,7 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use clap::Parser;
 use cli::{Cli, RenderMethod};
 use config::Config;
@@ -45,6 +45,11 @@ fn main() -> Result<()> {
 
     let args = Cli::parse();
 
+    ensure!(
+        !(args.render_method == RenderMethod::Prerender && args.modularize),
+        "component cannot be both modularized and prerendered!"
+    );
+
     let config = {
         let config_path = get_config_path(
             &env::current_dir().context("error reading current dir")?,
@@ -67,7 +72,10 @@ fn main() -> Result<()> {
         .file_stem()
         .expect("file name should never be .. or /, if read was successful")
         .to_string_lossy();
-    let metadata = Metadata { name: &file_name };
+    let metadata = Metadata {
+        name: &file_name,
+        modularize: args.modularize,
+    };
 
     let component = parse_component(&input, &config)?;
 

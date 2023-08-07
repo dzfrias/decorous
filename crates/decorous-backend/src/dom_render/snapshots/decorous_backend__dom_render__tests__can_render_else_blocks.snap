@@ -3,6 +3,10 @@ source: crates/decorous-backend/src/dom_render/mod.rs
 expression: "String::from_utf8(out).unwrap()"
 ---
 let hello = 0;
+function __init_ctx() {
+
+return [];
+}
 const dirty = new Uint8Array(new ArrayBuffer(0));
 function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
@@ -50,10 +54,6 @@ if (e0) e0.d();
 e0_anchor.parentNode.removeChild(e0_anchor);
 }
 };
-}
-function __init_ctx() {
-
-return [];
 }
 const ctx = __init_ctx();
 const fragment = create_main_block(document.getElementById("test"));

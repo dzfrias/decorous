@@ -498,8 +498,8 @@ mod tests {
                 let mut html_out = Vec::new();
                 let mut css_out = Vec::new();
                 render(&component, &mut js_out).unwrap();
-                <HtmlPrerenderer as RenderBackend>::render(&mut html_out, &component, &Metadata { name: "test" }).unwrap();
-                <CssRenderer as RenderBackend>::render(&mut css_out, &component, &Metadata { name: "test" }).unwrap();
+                <HtmlPrerenderer as RenderBackend>::render(&mut html_out, &component, &Metadata { name: "test", modularize: false }).unwrap();
+                <CssRenderer as RenderBackend>::render(&mut css_out, &component, &Metadata { name: "test", modularize: false }).unwrap();
                 let mut output = format!("{}\n---\n{}", String::from_utf8(js_out).unwrap(), String::from_utf8(html_out).unwrap());
                 if component.css().is_some() {
                     write!(output, "\n---\n{}", String::from_utf8(css_out).unwrap()).unwrap();

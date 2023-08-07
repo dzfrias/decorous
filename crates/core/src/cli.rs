@@ -1,7 +1,7 @@
 use std::{fmt::Display, path::PathBuf};
 
 use anyhow::Context;
-use clap::{Parser as ArgParser, ValueEnum};
+use clap::{builder::ArgPredicate, Parser, ValueEnum};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
@@ -10,7 +10,7 @@ pub enum RenderMethod {
     Prerender,
 }
 
-#[derive(Debug, ArgParser)]
+#[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
     /// The decor file to compile.
@@ -20,12 +20,19 @@ pub struct Cli {
     /// The base name of the output file(s) to generate.
     #[arg(short, long, value_name = "NAME", default_value = "out")]
     pub out: String,
-    #[arg(short, long, default_value = "prerender")]
+    #[arg(
+        short,
+        long,
+        default_value = "prerender",
+        default_value_if("modularize", ArgPredicate::IsPresent, "dom")
+    )]
     pub render_method: RenderMethod,
 
     /// Generate a full index.html file instead of just a fragment (or none at all).
     #[arg(long)]
     pub html: bool,
+    #[arg(short, long)]
+    pub modularize: bool,
 
     /// Pass a build argument(s) to a given WASM compiler.
     #[arg(

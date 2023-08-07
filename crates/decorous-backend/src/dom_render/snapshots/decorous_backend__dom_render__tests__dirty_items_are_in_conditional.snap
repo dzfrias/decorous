@@ -2,6 +2,12 @@
 source: crates/decorous-backend/src/dom_render/mod.rs
 expression: "String::from_utf8(out).unwrap()"
 ---
+function __init_ctx() {
+let hello = 0;
+let test = 1;
+let __closure2 = () => { __schedule_update(1, test = 3); __schedule_update(0, hello = 3); };
+return [hello,test,__closure2];
+}
 const dirty = new Uint8Array(new ArrayBuffer(1));
 function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
@@ -25,12 +31,6 @@ e1.parentNode.removeChild(e1);
 e2.parentNode.removeChild(e2);
 }
 };
-}
-function __init_ctx() {
-let hello = 0;
-let test = 1;
-let __closure2 = () => { __schedule_update(1, test = 3); __schedule_update(0, hello = 3); };
-return [hello,test,__closure2];
 }
 const ctx = __init_ctx();
 const fragment = create_main_block(document.getElementById("test"));

@@ -15,6 +15,7 @@ pub use crate::wasm_compiler::CodeInfo;
 #[derive(Debug)]
 pub struct Metadata<'name> {
     pub name: &'name str,
+    pub modularize: bool,
 }
 
 pub trait RenderBackend {
