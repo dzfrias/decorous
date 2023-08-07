@@ -20,7 +20,7 @@ decor_test!(
     dom_render_does_not_generate_html,
     NO_JS,
     |dir: &mut TempDir, mut cmd: Command| {
-        cmd.arg("-r").arg("dom");
+        cmd.arg("-r").arg("csr");
         cmd.assert().success();
         assert_all!(dir.path());
     }
@@ -89,7 +89,7 @@ decor_test!(
     css_file_is_generated_dom_method,
     CSS,
     |dir: &mut TempDir, mut cmd: Command| {
-        cmd.arg("-r").arg("dom");
+        cmd.arg("-r").arg("csr");
         cmd.assert().success();
         assert_all!(dir.path());
     }
@@ -198,7 +198,7 @@ decor_test!(
 );
 
 decor_test!(can_modularize, JS, |dir: &mut TempDir, mut cmd: Command| {
-    cmd.args(["--render-method", "dom", "--modularize"]);
+    cmd.args(["--render-method", "csr", "--modularize"]);
     cmd.assert().success();
     assert_all!(dir.path());
 });

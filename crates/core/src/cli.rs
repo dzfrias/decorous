@@ -6,7 +6,7 @@ use clap::{builder::ArgPredicate, Parser, ValueEnum};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum RenderMethod {
-    Dom,
+    Csr,
     Prerender,
 }
 
@@ -40,7 +40,7 @@ pub struct Cli {
         short,
         long,
         default_value = "prerender",
-        default_value_if("modularize", ArgPredicate::IsPresent, "dom")
+        default_value_if("modularize", ArgPredicate::IsPresent, "csr")
     )]
     pub render_method: RenderMethod,
 
@@ -75,7 +75,7 @@ fn parse_key_val(s: &str) -> Result<(String, String), anyhow::Error> {
 impl Display for RenderMethod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Dom => write!(f, "dom"),
+            Self::Csr => write!(f, "csr"),
             Self::Prerender => write!(f, "prerender"),
         }
     }

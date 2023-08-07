@@ -5,6 +5,7 @@ mod fmt_report;
 mod preprocessor;
 
 use std::{
+    borrow::Cow,
     env,
     fs::{self, File},
     io::{self, BufWriter, Write},
@@ -76,7 +77,24 @@ fn main() -> Result<()> {
         render_css(&args, component, metadata)?;
     }
 
-    println!("  {FINISHED} compiled in ~{:.2?}!", start.elapsed());
+    let mods = {
+        let mut mods = Vec::with_capacity(2);
+        let opt = args
+            .optimize
+            .map(|opt| Cow::Owned(opt.to_string()))
+            .unwrap_or(Cow::Borrowed("debug"));
+        mods.push(opt);
+        if args.modularize {
+            mods.push(Cow::Borrowed("modularized"))
+        }
+        mods
+    };
+
+    println!(
+        "  {FINISHED} compiled in ~{:.2?} ({})",
+        start.elapsed(),
+        mods.join(" + ")
+    );
 
     #[cfg(feature = "dhat-heap")]
     println!();
@@ -111,7 +129,7 @@ fn render_js(
     let mut out = BufWriter::new(File::create(js_name).context("error creating out file")?);
     let mut wasm_compiler = MainCompiler::new(&config, &args.out, &args.build_args, args.optimize);
     match args.render_method {
-        RenderMethod::Dom => {
+        RenderMethod::Csr => {
             render_with_wasm::<DomRenderer, _, _>(
                 component,
                 &mut out,
@@ -162,7 +180,7 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata, js_name: &str
     handlebars.register_escape_fn(no_escape);
     handlebars.register_template_string("index", include_str!("./templates/template.html"))?;
     match args.render_method {
-        RenderMethod::Dom => {
+        RenderMethod::Csr => {
             if !args.html {
                 return Ok(());
             }
