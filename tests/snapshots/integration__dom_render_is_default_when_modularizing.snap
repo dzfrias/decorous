@@ -11,7 +11,7 @@ let counter = 0;
 #p The counter is: {counter} /p
 #button[@click={() => counter += 1}]:Click me!
 
----out.js---
+---out.mjs---
 function __init_ctx() {
 let counter = 0;
 let __closure1 = () => __schedule_update(0, counter += 1);

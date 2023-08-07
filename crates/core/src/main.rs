@@ -64,8 +64,14 @@ fn main() -> Result<()> {
     };
     let component = parse_component(&input, &config)?;
 
-    render_js(&args, config, &component, &metadata)?;
-    render_html(&args, &component, &metadata)?;
+    let js_name = if args.modularize {
+        format!("{}.mjs", args.out)
+    } else {
+        format!("{}.js", args.out)
+    };
+
+    render_js(&args, config, &component, &metadata, &js_name)?;
+    render_html(&args, &component, &metadata, &js_name)?;
     if component.css().is_some() {
         render_css(&args, component, metadata)?;
     }
@@ -100,10 +106,9 @@ fn render_js(
     config: Config,
     component: &Component<'_>,
     metadata: &Metadata<'_>,
+    js_name: &str,
 ) -> Result<()> {
-    let mut out = BufWriter::new(
-        File::create(format!("{}.js", args.out)).context("error creating out file")?,
-    );
+    let mut out = BufWriter::new(File::create(js_name).context("error creating out file")?);
     let mut wasm_compiler = MainCompiler::new(&config, &args.out, &args.build_args, args.optimize);
     match args.render_method {
         RenderMethod::Dom => {
@@ -152,7 +157,7 @@ fn get_config() -> Result<Config> {
     }
 }
 
-fn render_html(args: &Cli, component: &Component, meta: &Metadata) -> Result<()> {
+fn render_html(args: &Cli, component: &Component, meta: &Metadata, js_name: &str) -> Result<()> {
     let mut handlebars = Handlebars::new();
     handlebars.register_escape_fn(no_escape);
     handlebars.register_template_string("index", include_str!("./templates/template.html"))?;
@@ -164,7 +169,7 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata) -> Result<()>
             let out = File::create("index.html").context("problem creating index.html")?;
 
             let body = json!({
-                "script": format!("{}.js", args.out),
+                "script": js_name,
                 "css": component.css().is_some().then(|| format!("{}.css", args.out)),
                 "name": meta.name,
                 "html": None::<&str>,
@@ -187,7 +192,7 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata) -> Result<()>
                     .context("error when rendering HTML")?;
 
                 let body = json!({
-                    "script": format!("{}.js", args.out),
+                    "script": js_name,
                     "css": component.css().is_some().then(|| format!("{}.css", args.out)),
                     "name": meta.name,
                     // SAFETY: HtmlPrerenderer only produces valid UTF-8
