@@ -1,0 +1,67 @@
+---
+source: tests/tests.rs
+expression: all
+---
+
+---input.decor---
+---js
+let counter = 0;
+---
+
+#p The counter is: {counter} /p
+#button[@click={() => counter += 1}]:Click me!
+
+---out.js---
+function __init_ctx() {
+let counter = 0;
+let __closure1 = () => __schedule_update(0, counter += 1);
+return [counter,__closure1];
+}
+export default function initialize(target) {
+const dirty = new Uint8Array(new ArrayBuffer(1));
+function create_main_block(target, anchor) {
+function mount(target, newNode, anchor) {
+target.insertBefore(newNode, anchor || null);
+}
+const e0 = document.createElement("p");
+const e1 = document.createTextNode("The counter is: ");
+const e2 = document.createTextNode(ctx[0]);
+const e3 = document.createTextNode(" ");
+const e4 = document.createElement("button");
+e4.textContent = "Click me!";
+e4.addEventListener("click", ctx[1])
+const e6 = document.createTextNode(" ");
+mount(target, e0, anchor);
+e0.appendChild(e1);
+e0.appendChild(e2);
+mount(target, e3, anchor);
+mount(target, e4, anchor);
+mount(target, e6, anchor);
+return {
+u(dirty) {
+if (dirty[0] & 1) e2.data = ctx[0];
+},
+d() {
+e0.parentNode.removeChild(e0);
+e3.parentNode.removeChild(e3);
+e4.parentNode.removeChild(e4);
+e6.parentNode.removeChild(e6);
+}
+};
+}
+const ctx = __init_ctx();
+const fragment = create_main_block(target);
+let updating = false;
+function __schedule_update(ctx_idx, val) {
+ctx[ctx_idx] = val;
+dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
+if (updating) return;
+updating = true;
+Promise.resolve().then(() => {
+fragment.u(dirty);
+updating = false;
+dirty.fill(0);
+});
+}
+}
+

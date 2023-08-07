@@ -196,3 +196,19 @@ decor_test!(
         assert_all!(dir.path());
     }
 );
+
+decor_test!(can_modularize, JS, |dir: &mut TempDir, mut cmd: Command| {
+    cmd.args(["--render-method", "dom", "--modularize"]);
+    cmd.assert().success();
+    assert_all!(dir.path());
+});
+
+decor_test!(
+    dom_render_is_default_when_modularizing,
+    JS,
+    |dir: &mut TempDir, mut cmd: Command| {
+        cmd.arg("--modularize");
+        cmd.assert().success();
+        assert_all!(dir.path());
+    }
+);

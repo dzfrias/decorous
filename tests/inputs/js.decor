@@ -1,0 +1,6 @@
+---js
+let counter = 0;
+---
+
+#p The counter is: {counter} /p
+#button[@click={() => counter += 1}]:Click me!
