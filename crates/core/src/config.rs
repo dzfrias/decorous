@@ -77,6 +77,13 @@ impl Default for Config {
                         script: ScriptOrFile::Script(include_str!("./compilers/go.py")),
                     },
                 ),
+                (
+                    "tinygo".to_owned(),
+                    CompilerConfig {
+                        ext_override: Some("go".to_owned()),
+                        script: ScriptOrFile::Script(include_str!("./compilers/tinygo.py")),
+                    },
+                ),
             ]),
         }
     }
