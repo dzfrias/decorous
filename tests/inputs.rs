@@ -8,3 +8,4 @@ pub const ZIG: &str = include_str!("./inputs/zig.decor");
 pub const ZIG_EXPORTS: &str = include_str!("./inputs/zig_exports.decor");
 pub const SCSS: &str = include_str!("./inputs/scss.decor");
 pub const SCSS_AND_TS: &str = include_str!("./inputs/scss_and_ts.decor");
+pub const GO: &str = include_str!("./inputs/go.decor");

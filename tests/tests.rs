@@ -212,3 +212,12 @@ decor_test!(
         assert_all!(dir.path());
     }
 );
+
+decor_test!(
+    can_build_go_wasm,
+    GO,
+    |dir: &mut TempDir, mut cmd: Command| {
+        cmd.assert().success();
+        assert_all!(dir.path(), ignore: ["out.wasm", "wasm_exec.js"]);
+    }
+);

@@ -70,6 +70,13 @@ impl Default for Config {
                         script: ScriptOrFile::Script(include_str!("./compilers/zig.py")),
                     },
                 ),
+                (
+                    "go".to_owned(),
+                    CompilerConfig {
+                        ext_override: None,
+                        script: ScriptOrFile::Script(include_str!("./compilers/go.py")),
+                    },
+                ),
             ]),
         }
     }
