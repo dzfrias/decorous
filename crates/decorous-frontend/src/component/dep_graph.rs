@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use petgraph::{graph::NodeIndex, Graph};
 use rslint_parser::{ast::VarDecl, AstNode, SmolStr, SyntaxNode};
 
 use crate::utils;
@@ -8,8 +7,7 @@ use crate::utils;
 /// with their dependencies. This is used for optimizations.
 #[derive(Debug, Clone)]
 pub struct DepGraph {
-    vertices: Vec<Declaration>,
-    graph: HashMap<VarDecl, Vec<VarDecl>>,
+    graph: Graph<Declaration, ()>,
 }
 
 #[derive(Debug, Clone)]
@@ -21,48 +19,51 @@ pub struct Declaration {
 
 impl DepGraph {
     pub fn new(decls: &[VarDecl]) -> Self {
-        let mut vertices = Vec::with_capacity(decls.len());
-        let mut graph = HashMap::with_capacity(decls.len());
+        let mut graph: Graph<Declaration, ()> = Graph::new();
 
         for var_decl in decls {
             let mut all_declared = vec![];
             for pat in var_decl.declared().filter_map(|d| d.pattern()) {
                 all_declared.extend(utils::get_idents_from_pattern(pat));
             }
-            let edge = Declaration {
+            let node = Declaration {
                 declared_vars: all_declared,
                 decl: var_decl.clone(),
                 mutated: false,
             };
-            vertices.push(edge);
-            graph.insert(var_decl.clone(), vec![]);
+            graph.add_node(node);
         }
 
-        let mut s = Self { vertices, graph };
+        let mut s = Self { graph };
         s.compute_edges();
         s
     }
 
     pub fn mark_mutated(&mut self, ident: &str) -> bool {
-        let target = self
-            .vertices
-            .iter_mut()
-            .find(|v| v.declared_vars.iter().any(|var| var.as_str() == ident));
-        // Vertex not found, ident not in scope
+        let target = self.graph.node_indices().find(|i| {
+            self.graph[*i]
+                .declared_vars
+                .iter()
+                .any(|var| var.as_str() == ident)
+        });
         let Some(target) = target else {
             return false;
         };
-        target.mutated = true;
-        for dependent in self.graph.get_mut(&target.decl).unwrap() {
-            // Get the corresponding vertex
-            let dependent = self
-                .vertices
-                .iter_mut()
-                .find(|v| &v.decl == dependent)
-                .unwrap();
-            dependent.mutated = true;
+        self.mark_neighbors_mutated(target);
+        self.graph[target].mutated = true;
+        let mut edges = self.graph.neighbors(target).detach();
+        while let Some(i) = edges.next_node(&self.graph) {
+            self.graph[i].mutated = true;
         }
         true
+    }
+
+    fn mark_neighbors_mutated(&mut self, target: NodeIndex) {
+        self.graph[target].mutated = true;
+        let mut edges = self.graph.neighbors(target).detach();
+        while let Some(i) = edges.next_node(&self.graph) {
+            self.mark_neighbors_mutated(i);
+        }
     }
 
     pub fn mark_mutated_from_node(&mut self, node: &SyntaxNode) {
@@ -77,22 +78,29 @@ impl DepGraph {
     }
 
     pub fn get_unmutated(&self) -> impl Iterator<Item = &Declaration> + '_ {
-        self.vertices.iter().filter(|v| !v.mutated)
+        self.graph.raw_nodes().iter().filter_map(|node| {
+            if !node.weight.mutated {
+                Some(&node.weight)
+            } else {
+                None
+            }
+        })
     }
 
     fn compute_edges(&mut self) {
-        for v in &self.vertices {
-            let deps = utils::get_unbound_refs(v.decl.syntax());
-            for e in deps.into_iter().filter_map(|dep| {
+        for i in self.graph.node_indices() {
+            let decl = &self.graph[i];
+            let deps = utils::get_unbound_refs(decl.decl.syntax());
+            for dep in deps {
                 let tok = dep.ident_token().unwrap();
                 let ident = tok.text();
-                let origin = self
-                    .vertices
-                    .iter()
-                    .find(|v| v.declared_vars.contains(ident))?;
-                Some(origin.decl.clone())
-            }) {
-                self.graph.get_mut(&e).unwrap().push(v.decl.clone());
+                let Some(origin) = self
+                    .graph
+                    .node_indices()
+                    .find(|v| self.graph[*v].declared_vars.contains(ident)) else {
+                    continue;
+                };
+                self.graph.add_edge(origin, i, ());
             }
         }
     }
