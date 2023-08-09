@@ -3,7 +3,29 @@ source: crates/decorous-frontend/src/component/mod.rs
 expression: component
 ---
 Component {
-    fragment_tree: [],
+    fragment_tree: [
+        Node {
+            metadata: FragmentMetadata {
+                id: 0,
+                parent_id: None,
+                location: Location {
+                    offset: 68,
+                    length: 3,
+                    line: 1,
+                    column: 69,
+                },
+                scope: None,
+            },
+            node_type: Mustache(
+                Mustache(
+                    EXPR_STMT@0..1
+                      NAME_REF@0..1
+                        IDENT@0..1 "z"
+                    ,
+                ),
+            ),
+        },
+    ],
     declared_vars: DeclaredVariables {
         vars: {},
         arrow_exprs: {},
@@ -62,7 +84,7 @@ Component {
     ],
     exports: [],
     component_id: 0,
-    current_id: 0,
+    current_id: 1,
     css: None,
     wasm: None,
 }

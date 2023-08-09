@@ -1,49 +1,84 @@
 use std::collections::HashMap;
 
-use petgraph::{graph::NodeIndex, Graph};
-use rslint_parser::{ast::VarDecl, AstNode, SmolStr, SyntaxNode};
+use petgraph::{graph::NodeIndex, Direction, Graph};
+use rslint_parser::{ast::Decl, AstNode, SmolStr, SyntaxNode};
 use smallvec::SmallVec;
 
 use crate::utils;
 
 /// A directed acyclic graph containing the variables declared in a script along
 /// with their dependencies. This is used for optimizations.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DepGraph {
+    // Directed graph from variable declarations to their dependents (NOT dependencies)
     graph: Graph<Declaration, ()>,
     var_lookup: HashMap<SmolStr, NodeIndex>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Declaration {
-    pub decl: VarDecl,
+    pub decl: Decl,
     pub declared_vars: SmallVec<[SmolStr; 1]>,
     pub mutated: bool,
+    pub used: bool,
 }
 
 impl DepGraph {
-    pub fn new(decls: &[VarDecl]) -> Self {
+    pub fn new(decls: &[Decl]) -> Self {
         let mut graph = Graph::new();
         let mut var_lookup = HashMap::new();
 
-        for var_decl in decls {
+        for decl in decls
+            .iter()
+            .filter(|decl| matches!(decl, Decl::FnDecl(_) | Decl::VarDecl(_)))
+        {
             let node = Declaration {
-                decl: var_decl.clone(),
+                decl: decl.clone(),
                 declared_vars: SmallVec::new(),
                 mutated: false,
+                used: false,
             };
             let idx = graph.add_node(node);
-            for pat in var_decl.declared().filter_map(|d| d.pattern()) {
-                for ident in utils::get_idents_from_pattern(pat) {
-                    var_lookup.insert(ident.clone(), idx);
-                    graph[idx].declared_vars.push(ident);
+            match decl {
+                Decl::VarDecl(var_decl) => {
+                    for pat in var_decl.declared().filter_map(|d| d.pattern()) {
+                        for ident in utils::get_idents_from_pattern(pat) {
+                            var_lookup.insert(ident.clone(), idx);
+                            graph[idx].declared_vars.push(ident);
+                        }
+                    }
                 }
+                Decl::FnDecl(fn_decl) => {
+                    let name = fn_decl.name().unwrap();
+                    let tok = name.ident_token().unwrap();
+                    let ident = tok.text();
+                    var_lookup.insert(ident.clone(), idx);
+                    graph[idx].declared_vars.push(ident.clone());
+                }
+                _ => unreachable!(),
             }
         }
 
         let mut s = Self { graph, var_lookup };
         s.compute_edges();
         s
+    }
+
+    pub fn mark_used(&mut self, ident: &str) -> bool {
+        let target = self.var_lookup.get(ident);
+        let Some(target) = target else {
+            return false;
+        };
+        self.mark_neighbors_used(*target);
+        true
+    }
+
+    pub fn mark_used_from_node(&mut self, node: &SyntaxNode) {
+        for unbound in utils::get_unbound_refs(node) {
+            let tok = unbound.ident_token().unwrap();
+            let ident = tok.text();
+            self.mark_used(ident);
+        }
     }
 
     pub fn mark_mutated(&mut self, ident: &str) -> bool {
@@ -76,11 +111,34 @@ impl DepGraph {
         })
     }
 
+    pub fn get_unused(&self) -> impl Iterator<Item = &Declaration> + '_ {
+        self.graph.raw_nodes().iter().filter_map(|node| {
+            if !node.weight.used {
+                Some(&node.weight)
+            } else {
+                None
+            }
+        })
+    }
+
     fn mark_neighbors_mutated(&mut self, target: NodeIndex) {
         self.graph[target].mutated = true;
+        self.graph[target].used = true;
         let mut edges = self.graph.neighbors(target).detach();
         while let Some(i) = edges.next_node(&self.graph) {
             self.mark_neighbors_mutated(i);
+        }
+    }
+
+    fn mark_neighbors_used(&mut self, target: NodeIndex) {
+        self.graph[target].used = true;
+        // Get edges that point to this node
+        let mut edges = self
+            .graph
+            .neighbors_directed(target, Direction::Incoming)
+            .detach();
+        while let Some(i) = edges.next_node(&self.graph) {
+            self.mark_neighbors_used(i);
         }
     }
 

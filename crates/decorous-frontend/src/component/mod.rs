@@ -32,9 +32,9 @@ pub struct Component<'a> {
     toplevel_nodes: Vec<ToplevelNodeData>,
     hoist: Vec<SyntaxNode>,
     exports: Vec<SmolStr>,
+
     component_id: u8,
     current_id: u32,
-
     css: Option<Css>,
     wasm: Option<Code<'a>>,
 }
@@ -64,7 +64,7 @@ impl<'a> Component<'a> {
             wasm: None,
         };
         c.compute(ast);
-        c.hoist_unmutated_vars();
+        c.perform_dep_analysis();
         c
     }
 
@@ -398,12 +398,12 @@ impl<'a> Component<'a> {
         }
     }
 
-    fn hoist_unmutated_vars(&mut self) {
+    fn perform_dep_analysis(&mut self) {
         let mut graph = DepGraph::new(
             &self
                 .toplevel_nodes()
                 .iter()
-                .filter_map(|toplevel| toplevel.node.try_to::<VarDecl>())
+                .filter_map(|toplevel| toplevel.node.try_to::<Decl>())
                 .collect_vec(),
         );
 
@@ -417,9 +417,11 @@ impl<'a> Component<'a> {
                                 graph.mark_mutated(binding);
                             }
                             Attribute::EventHandler(evt_handler) => {
+                                graph.mark_used_from_node(evt_handler.expr());
                                 graph.mark_mutated_from_node(evt_handler.expr());
                             }
                             Attribute::KeyValue(_, Some(AttributeValue::JavaScript(js))) => {
+                                graph.mark_used_from_node(js);
                                 graph.mark_mutated_from_node(js);
                             }
                             Attribute::KeyValue(_, _) => {}
@@ -427,23 +429,31 @@ impl<'a> Component<'a> {
                     }
                 }
                 NodeType::SpecialBlock(SpecialBlock::If(block)) => {
+                    graph.mark_used_from_node(block.expr());
                     graph.mark_mutated_from_node(block.expr());
                 }
                 NodeType::SpecialBlock(SpecialBlock::For(block)) => {
+                    graph.mark_used_from_node(block.expr());
                     graph.mark_mutated_from_node(block.expr());
                 }
                 NodeType::Mustache(js) => {
+                    graph.mark_used_from_node(js);
                     graph.mark_mutated_from_node(js);
                 }
                 NodeType::Text(_) | NodeType::Comment(_) => {}
             }
         }
 
+        for mustache in self.declared_vars().css_mustaches().keys() {
+            graph.mark_used_from_node(mustache);
+            graph.mark_mutated_from_node(mustache);
+        }
+
         for toplevel in self.toplevel_nodes() {
             graph.mark_mutated_from_node(&toplevel.node);
         }
 
-        for v in graph.get_unmutated() {
+        for v in graph.get_unused() {
             for var in &v.declared_vars {
                 self.declared_vars.remove_var(var);
             }
@@ -452,6 +462,19 @@ impl<'a> Component<'a> {
                 .iter()
                 .position(|node| &node.node == v.decl.syntax())
                 .expect("VarDecl should be in toplevel nodes");
+            self.toplevel_nodes.remove(pos);
+        }
+
+        for v in graph.get_unmutated() {
+            for var in &v.declared_vars {
+                self.declared_vars.remove_var(var);
+            }
+            let Some(pos) = self
+                .toplevel_nodes()
+                .iter()
+                .position(|node| &node.node == v.decl.syntax()) else {
+                continue
+            };
             self.toplevel_nodes.remove(pos);
             self.hoist.push(v.decl.syntax().clone());
         }
@@ -630,7 +653,7 @@ mod tests {
     #[test]
     fn globals_are_not_subject_to_hoist_optimizations() {
         let component = make_component(
-            "---js let z = document.getElementById(\"id\"); console.log(\"hi\"); ---",
+            "---js let z = document.getElementById(\"id\"); console.log(\"hi\"); --- {z}",
         );
         insta::assert_debug_snapshot!(component);
     }
@@ -641,5 +664,22 @@ mod tests {
             "---js let x = 0; let y = x + 1; let z = y + 1; --- #button[@click={() => x = 1}]:Wow!",
         );
         assert!(component.hoist().is_empty());
+    }
+
+    #[test]
+    fn prunes_unused_variables() {
+        let component = make_component("---js let x = 0; let y = x; ---");
+        assert!(component.toplevel_nodes().is_empty());
+        assert!(component.hoist().is_empty());
+        assert!(component.declared_vars().is_empty());
+    }
+
+    #[test]
+    fn used_variables_cause_dependencies_to_be_used_as_well() {
+        let component = make_component(
+            "---js let x = 0; function y() { return x; } --- #button[@click={y}]:Hi",
+        );
+        assert!(component.toplevel_nodes().is_empty());
+        insta::assert_debug_snapshot!(component.hoist());
     }
 }
