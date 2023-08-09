@@ -232,4 +232,9 @@ function __init_ctx() {
   return [__closure0];
 }
 const ctx = __init_ctx();
+function __update(dirty, initial) {
+}
+dirty.fill(255);
+__update(dirty, true);
+dirty.fill(0);
 
