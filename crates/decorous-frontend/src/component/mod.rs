@@ -634,4 +634,12 @@ mod tests {
         );
         insta::assert_debug_snapshot!(component);
     }
+
+    #[test]
+    fn checks_all_edges_relating_to_dependents_of_hoist_graph() {
+        let component = make_component(
+            "---js let x = 0; let y = x + 1; let z = y + 1; --- #button[@click={() => x = 1}]:Wow!",
+        );
+        assert!(component.hoist().is_empty());
+    }
 }

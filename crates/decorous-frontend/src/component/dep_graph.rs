@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use petgraph::{graph::NodeIndex, Graph};
 use rslint_parser::{ast::VarDecl, AstNode, SmolStr, SyntaxNode};
+use smallvec::SmallVec;
 
 use crate::utils;
 
@@ -8,62 +11,48 @@ use crate::utils;
 #[derive(Debug, Clone)]
 pub struct DepGraph {
     graph: Graph<Declaration, ()>,
+    var_lookup: HashMap<SmolStr, NodeIndex>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Declaration {
     pub decl: VarDecl,
-    pub declared_vars: Vec<SmolStr>,
+    pub declared_vars: SmallVec<[SmolStr; 1]>,
     pub mutated: bool,
 }
 
 impl DepGraph {
     pub fn new(decls: &[VarDecl]) -> Self {
-        let mut graph: Graph<Declaration, ()> = Graph::new();
+        let mut graph = Graph::new();
+        let mut var_lookup = HashMap::new();
 
         for var_decl in decls {
-            let mut all_declared = vec![];
-            for pat in var_decl.declared().filter_map(|d| d.pattern()) {
-                all_declared.extend(utils::get_idents_from_pattern(pat));
-            }
             let node = Declaration {
-                declared_vars: all_declared,
                 decl: var_decl.clone(),
+                declared_vars: SmallVec::new(),
                 mutated: false,
             };
-            graph.add_node(node);
+            let idx = graph.add_node(node);
+            for pat in var_decl.declared().filter_map(|d| d.pattern()) {
+                for ident in utils::get_idents_from_pattern(pat) {
+                    var_lookup.insert(ident.clone(), idx);
+                    graph[idx].declared_vars.push(ident);
+                }
+            }
         }
 
-        let mut s = Self { graph };
+        let mut s = Self { graph, var_lookup };
         s.compute_edges();
         s
     }
 
     pub fn mark_mutated(&mut self, ident: &str) -> bool {
-        let target = self.graph.node_indices().find(|i| {
-            self.graph[*i]
-                .declared_vars
-                .iter()
-                .any(|var| var.as_str() == ident)
-        });
+        let target = self.var_lookup.get(ident);
         let Some(target) = target else {
             return false;
         };
-        self.mark_neighbors_mutated(target);
-        self.graph[target].mutated = true;
-        let mut edges = self.graph.neighbors(target).detach();
-        while let Some(i) = edges.next_node(&self.graph) {
-            self.graph[i].mutated = true;
-        }
+        self.mark_neighbors_mutated(*target);
         true
-    }
-
-    fn mark_neighbors_mutated(&mut self, target: NodeIndex) {
-        self.graph[target].mutated = true;
-        let mut edges = self.graph.neighbors(target).detach();
-        while let Some(i) = edges.next_node(&self.graph) {
-            self.mark_neighbors_mutated(i);
-        }
     }
 
     pub fn mark_mutated_from_node(&mut self, node: &SyntaxNode) {
@@ -87,6 +76,14 @@ impl DepGraph {
         })
     }
 
+    fn mark_neighbors_mutated(&mut self, target: NodeIndex) {
+        self.graph[target].mutated = true;
+        let mut edges = self.graph.neighbors(target).detach();
+        while let Some(i) = edges.next_node(&self.graph) {
+            self.mark_neighbors_mutated(i);
+        }
+    }
+
     fn compute_edges(&mut self) {
         for i in self.graph.node_indices() {
             let decl = &self.graph[i];
@@ -94,13 +91,10 @@ impl DepGraph {
             for dep in deps {
                 let tok = dep.ident_token().unwrap();
                 let ident = tok.text();
-                let Some(origin) = self
-                    .graph
-                    .node_indices()
-                    .find(|v| self.graph[*v].declared_vars.contains(ident)) else {
+                let Some(origin) = self.var_lookup.get(ident) else {
                     continue;
                 };
-                self.graph.add_edge(origin, i, ());
+                self.graph.add_edge(*origin, i, ());
             }
         }
     }
