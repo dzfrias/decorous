@@ -353,8 +353,10 @@ fn render_update_body<T: io::Write>(
 
     if analysis.reactive_data().mustaches().is_empty()
         && analysis.reactive_data().bindings().is_empty()
+        && component.declared_vars().all_reactive_blocks().is_empty()
         && analysis.reactive_data().special_blocks().is_empty()
         && analysis.reactive_data().key_values().is_empty()
+        && analysis.reactive_data().event_listeners().is_empty()
     {
         return Ok(WriteStatus::Nothing);
     }
