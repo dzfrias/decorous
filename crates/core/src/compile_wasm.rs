@@ -9,12 +9,12 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{anyhow, bail, Context, Error, Result};
-use binaryen::{CodegenConfig, Module};
+use anyhow::{bail, Context, Error, Result};
 use decorous_backend::{dom_render::DomRenderer, prerender::Prerenderer, CodeInfo, WasmCompiler};
 use itertools::Itertools;
 use scopeguard::defer;
 use shlex::Shlex;
+use wasm_opt::OptimizationOptions;
 use which::which;
 
 use crate::{
@@ -168,7 +168,7 @@ macro_rules! compile_for {
                     for path in &wasm_files {
                         let spinner = ProgressBar::new_spinner().with_message(format!("Optimizing WebAssembly ({opt})..."));
                         spinner.enable_steady_tick(Duration::from_micros(100));
-                        optimize(&path, opt)?;
+                        optimize(path, opt).context("problem optimizing WebAssembly")?;
                         spinner.finish_with_message(
                             format!("{FINISHED} optimized WebAssembly: {opt} (\x1b[34m{}\x1b[0m)", path.display())
                         );
@@ -179,7 +179,7 @@ macro_rules! compile_for {
                     for path in &wasm_files {
                         let spinner = ProgressBar::new_spinner().with_message(format!("Stripping WebAssembly..."));
                         spinner.enable_steady_tick(Duration::from_micros(100));
-                        strip(&path)?;
+                        strip(&path).context("problem stripping WebAssembly binary")?;
                         spinner.finish_with_message(
                             format!("{FINISHED} stripped WebAssembly (\x1b[34m{}\x1b[0m)", path.display())
                         );
@@ -208,27 +208,18 @@ fn strip(file: impl AsRef<Path>) -> Result<()> {
 }
 
 fn optimize(path: impl AsRef<Path>, level: OptimizationLevel) -> Result<()> {
-    let (shrink, speed) = match level {
-        OptimizationLevel::SpeedMinor => (0, 1),
-        OptimizationLevel::SpeedMedium => (0, 2),
-        OptimizationLevel::SpeedMajor => (0, 3),
-        OptimizationLevel::SpeedAggressive => (0, 4),
-        OptimizationLevel::Size => (1, 2),
-        OptimizationLevel::SizeAggressive => (2, 2),
+    let opts = match level {
+        OptimizationLevel::SpeedMinor => OptimizationOptions::new_opt_level_1(),
+        OptimizationLevel::SpeedMedium => OptimizationOptions::new_opt_level_2(),
+        OptimizationLevel::SpeedMajor => OptimizationOptions::new_opt_level_3(),
+        OptimizationLevel::SpeedAggressive => OptimizationOptions::new_opt_level_4(),
+        OptimizationLevel::Size => OptimizationOptions::new_optimize_for_size(),
+        OptimizationLevel::SizeAggressive => {
+            OptimizationOptions::new_optimize_for_size_aggressively()
+        }
     };
     let path = path.as_ref();
-    let contents = fs::read(path)?;
-    // Uses wasm-opt (https://github.com/WebAssembly/binaryen) optimizations
-    let mut module = Module::read(&contents)
-        .map_err(|_err| anyhow!("could not optimize .wasm file: {}", path.display()))?;
-    let config = CodegenConfig {
-        shrink_level: shrink,
-        optimization_level: speed,
-        debug_info: false,
-    };
-    module.optimize(&config);
-    let out = module.write();
-    fs::write(path, out)?;
+    opts.run(path, path)?;
 
     Ok(())
 }
