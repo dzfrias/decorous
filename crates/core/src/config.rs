@@ -47,6 +47,7 @@ impl Default for Config {
                     CompilerConfig {
                         ext_override: Some("rs".to_owned()),
                         script: ScriptOrFile::Script(include_str!("./compilers/rust.py")),
+                        features: vec![],
                     },
                 ),
                 (
@@ -54,6 +55,7 @@ impl Default for Config {
                     CompilerConfig {
                         ext_override: Some("cpp".to_owned()),
                         script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
+                        features: vec![],
                     },
                 ),
                 (
@@ -61,6 +63,7 @@ impl Default for Config {
                     CompilerConfig {
                         ext_override: None,
                         script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
+                        features: vec![],
                     },
                 ),
                 (
@@ -68,6 +71,7 @@ impl Default for Config {
                     CompilerConfig {
                         ext_override: None,
                         script: ScriptOrFile::Script(include_str!("./compilers/zig.py")),
+                        features: vec![],
                     },
                 ),
                 (
@@ -75,6 +79,7 @@ impl Default for Config {
                     CompilerConfig {
                         ext_override: None,
                         script: ScriptOrFile::Script(include_str!("./compilers/go.py")),
+                        features: vec![WasmFeature(wasm_opt::Feature::BulkMemory)],
                     },
                 ),
                 (
@@ -82,6 +87,7 @@ impl Default for Config {
                     CompilerConfig {
                         ext_override: Some("go".to_owned()),
                         script: ScriptOrFile::Script(include_str!("./compilers/tinygo.py")),
+                        features: vec![],
                     },
                 ),
             ]),
@@ -94,6 +100,44 @@ pub struct CompilerConfig {
     pub ext_override: Option<String>,
     #[serde(deserialize_with = "deserialize_script")]
     pub script: ScriptOrFile,
+    pub features: Vec<WasmFeature>,
+}
+
+#[derive(Debug)]
+pub struct WasmFeature(pub wasm_opt::Feature);
+
+impl<'de> Deserialize<'de> for WasmFeature {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use wasm_opt::Feature::*;
+
+        let feature_str = <&str>::deserialize(deserializer)?;
+        let feature = match feature_str {
+            "atomics" => Atomics,
+            "trunc_sat" => TruncSat,
+            "simd" => Simd,
+            "bulk_memory" => BulkMemory,
+            "exception_handling" => ExceptionHandling,
+            "tail_call" => TailCall,
+            "reference_types" => ReferenceTypes,
+            "multivalue" => Multivalue,
+            "gc" => Gc,
+            "memory64" => Memory64,
+            "gc_nn_locals" => GcNnLocals,
+            "relaxed_simd" => RelaxedSimd,
+            "extended_const" => ExtendedConst,
+            "strings" => Strings,
+            "multi_memories" => MultiMemories,
+            "mvp" => Mvp,
+            "all" => All,
+            "all_possible" => AllPossible,
+            _ => return Err(serde::de::Error::custom("invalid WebAssembly feature")),
+        };
+
+        Ok(WasmFeature(feature))
+    }
 }
 
 #[derive(Debug)]

@@ -19,7 +19,7 @@ use which::which;
 
 use crate::{
     cli::OptimizationLevel,
-    config::{Config, ScriptOrFile},
+    config::{Config, ScriptOrFile, WasmFeature},
     FINISHED,
 };
 
@@ -168,7 +168,7 @@ macro_rules! compile_for {
                     for path in &wasm_files {
                         let spinner = ProgressBar::new_spinner().with_message(format!("Optimizing WebAssembly ({opt})..."));
                         spinner.enable_steady_tick(Duration::from_micros(100));
-                        optimize(path, opt).context("problem optimizing WebAssembly")?;
+                        optimize(path, opt, &config.features).context("problem optimizing WebAssembly")?;
                         spinner.finish_with_message(
                             format!("{FINISHED} optimized WebAssembly: {opt} (\x1b[34m{}\x1b[0m)", path.display())
                         );
@@ -207,8 +207,14 @@ fn strip(file: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
-fn optimize(path: impl AsRef<Path>, level: OptimizationLevel) -> Result<()> {
-    let opts = match level {
+fn optimize(
+    path: impl AsRef<Path>,
+    level: OptimizationLevel,
+    features: &[WasmFeature],
+) -> Result<()> {
+    let enabled_featues = features.iter().map(|feat| feat.0).collect();
+
+    let mut opts = match level {
         OptimizationLevel::SpeedMinor => OptimizationOptions::new_opt_level_1(),
         OptimizationLevel::SpeedMedium => OptimizationOptions::new_opt_level_2(),
         OptimizationLevel::SpeedMajor => OptimizationOptions::new_opt_level_3(),
@@ -219,6 +225,7 @@ fn optimize(path: impl AsRef<Path>, level: OptimizationLevel) -> Result<()> {
         }
     };
     let path = path.as_ref();
+    opts.features.enabled = enabled_featues;
     opts.run(path, path)?;
 
     Ok(())
