@@ -242,3 +242,23 @@ decor_test_multiple!(
         metadata.len()
     }
 );
+
+decor_test_multiple!(
+    can_optimize_binaries,
+    WASM_C,
+    |not_optimized, optimized| {
+        assert!(optimized < not_optimized);
+    },
+    not_optimized: |dir: &mut TempDir, mut cmd: Command| {
+        cmd.assert().success();
+        let metadata = fs::metadata(dir.path().join("out/__tmp.wasm")).unwrap();
+        metadata.len()
+    },
+    optimized: |dir: &mut TempDir, mut cmd: Command| {
+        // Optimize for size
+        cmd.arg("-Oz");
+        cmd.assert().success();
+        let metadata = fs::metadata(dir.path().join("out/__tmp.wasm")).unwrap();
+        metadata.len()
+    }
+);
