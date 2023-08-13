@@ -504,6 +504,7 @@ dependencies = [
  "decorous-frontend",
  "dhat",
  "duct",
+ "duct_sh",
  "handlebars",
  "indicatif",
  "itertools 0.11.0",
@@ -587,6 +588,15 @@ dependencies = [
  "once_cell",
  "os_pipe",
  "shared_child",
+]
+
+[[package]]
+name = "duct_sh"
+version = "0.13.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "615d089cab1325f327e21daaf5737227634dec91bc398860c8343c1d40827360"
+dependencies = [
+ "duct",
 ]
 
 [[package]]
