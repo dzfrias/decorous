@@ -1,6 +1,8 @@
 mod inputs;
 mod macros;
 
+use std::fs;
+
 use assert_cmd::Command;
 use tempdir::TempDir;
 
@@ -219,5 +221,24 @@ decor_test!(
     |dir: &mut TempDir, mut cmd: Command| {
         cmd.assert().success();
         assert_all!(dir.path(), ignore: ["out.wasm", "wasm_exec.js"]);
+    }
+);
+
+decor_test_multiple!(
+    can_strip_binaries,
+    WASM_C,
+    |no_strip, strip| {
+        assert!(strip < no_strip);
+    },
+    no_strip: |dir: &mut TempDir, mut cmd: Command| {
+        cmd.assert().success();
+        let metadata = fs::metadata(dir.path().join("out/__tmp.wasm")).unwrap();
+        metadata.len()
+    },
+    strip: |dir: &mut TempDir, mut cmd: Command| {
+        cmd.arg("--strip");
+        cmd.assert().success();
+        let metadata = fs::metadata(dir.path().join("out/__tmp.wasm")).unwrap();
+        metadata.len()
     }
 );

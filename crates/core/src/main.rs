@@ -127,7 +127,13 @@ fn render_js(
     js_name: &str,
 ) -> Result<()> {
     let mut out = BufWriter::new(File::create(js_name).context("error creating out file")?);
-    let mut wasm_compiler = MainCompiler::new(&config, &args.out, &args.build_args, args.optimize);
+    let mut wasm_compiler = MainCompiler::new(
+        &config,
+        &args.out,
+        &args.build_args,
+        args.optimize,
+        args.strip,
+    );
     match args.render_method {
         RenderMethod::Csr => {
             render_with_wasm::<DomRenderer, _, _>(

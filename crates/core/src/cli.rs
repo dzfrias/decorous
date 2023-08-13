@@ -46,14 +46,18 @@ pub struct Cli {
 
     #[arg(short = 'O', default_value = None)]
     pub optimize: Option<OptimizationLevel>,
+    /// Strip custom sections from the WebAssembly file.
+    #[arg(long)]
+    pub strip: bool,
 
     /// Generate a full index.html file instead of just a fragment (or none at all).
     #[arg(long)]
     pub html: bool,
+    /// Generate an ES6 compliant module for the output.
     #[arg(short, long)]
     pub modularize: bool,
 
-    /// Pass a build argument(s) to a given WASM compiler.
+    /// Pass build argument(s) to a given WASM compiler.
     #[arg(
         short = 'B',
         long,

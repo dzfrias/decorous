@@ -8,7 +8,7 @@ version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f4fa78e18c64fce05e902adecd7a5eed15a5e0a3439f7b0e169f0252214865e3"
 dependencies = [
- "gimli",
+ "gimli 0.27.3",
 ]
 
 [[package]]
@@ -297,7 +297,7 @@ dependencies = [
  "heck 0.4.1",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -488,6 +488,7 @@ dependencies = [
  "shlex",
  "superfmt",
  "toml",
+ "walrus",
  "which",
 ]
 
@@ -611,6 +612,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fallible-iterator"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
+
+[[package]]
 name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -641,6 +648,17 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
+]
+
+[[package]]
+name = "gimli"
+version = "0.26.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22030e2c5a68ec659fde1e949a745124b48e6fa8b045b7ed5bd1fe4ccc5c4e5d"
+dependencies = [
+ "fallible-iterator",
+ "indexmap 1.9.3",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -724,6 +742,12 @@ name = "hermit-abi"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "443144c8cdadd93ebf52ddb4056d257f5b52c04d3c804e657d19eb73fc33668b"
+
+[[package]]
+name = "id-arena"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25a2bc672d1148e28034f176e01fffebb08b35768468cc954630da77a1449005"
 
 [[package]]
 name = "indexmap"
@@ -838,6 +862,12 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
+name = "leb128"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "884e2677b40cc8c339eaefcb701c32ef1fd2493d71118dc0ca4b6a736c93bd67"
 
 [[package]]
 name = "lexical"
@@ -1093,7 +1123,7 @@ dependencies = [
  "pest_meta",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -1482,7 +1512,7 @@ checksum = "401797fe7833d72109fedec6bfcbe67c0eed9b99772f26eb8afd261f0abc6fd3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -1590,6 +1620,17 @@ dependencies = [
 
 [[package]]
 name = "syn"
+version = "1.0.109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
+name = "syn"
 version = "2.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b60f673f44a8255b9c8c657daf66a596d435f2da81a555b06dc644d080ba45e0"
@@ -1657,7 +1698,7 @@ checksum = "f9456a42c5b0d803c8cd86e73dd7cc9edd429499f37a3550d286d5e86720569f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -1782,6 +1823,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "walrus"
+version = "0.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc27d837c587f863d99515dc8cae7cef1098bd1d99fa29373e3660c12766265e"
+dependencies = [
+ "anyhow",
+ "gimli 0.26.2",
+ "id-arena",
+ "leb128",
+ "log",
+ "walrus-macro",
+ "wasm-encoder",
+ "wasmparser",
+]
+
+[[package]]
+name = "walrus-macro"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a6e5bd22c71e77d60140b0bd5be56155a37e5bd14e24f5f87298040d0cc40d7"
+dependencies = [
+ "heck 0.3.3",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "wasi"
 version = "0.11.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1808,7 +1877,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.27",
  "wasm-bindgen-shared",
 ]
 
@@ -1830,7 +1899,7 @@ checksum = "54681b18a46765f095758388f2d0cf16eb8d4169b639ab575a8f5693af210c7b"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.27",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -1840,6 +1909,21 @@ name = "wasm-bindgen-shared"
 version = "0.2.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca6ad05a4870b2bf5fe995117d3728437bd27d7cd5f06f13c17443ef369775a1"
+
+[[package]]
+name = "wasm-encoder"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18c41dbd92eaebf3612a39be316540b8377c871cb9bde6b064af962984912881"
+dependencies = [
+ "leb128",
+]
+
+[[package]]
+name = "wasmparser"
+version = "0.80.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "449167e2832691a1bff24cde28d2804e90e09586a448c8e76984792c44334a6b"
 
 [[package]]
 name = "web-sys"

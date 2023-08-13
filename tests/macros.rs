@@ -22,8 +22,39 @@ macro_rules! decor_test {
     };
 }
 
+#[allow(unused_macros)]
+macro_rules! decor_test_multiple {
+    ($name:ident, $input:expr, $compare:expr, $($func_name:ident: $func:expr),+) => {
+        #[test]
+        fn $name() {
+            use ::std::{fs::File, io::Write};
+
+            $(
+                let $func_name = {
+                    let mut dir = TempDir::new(concat!(stringify!($name), stringify!($func_name))).expect("could not create temp dir");
+                    let mut f = File::create(dir.path().join("input.decor"))
+                        .expect("could not create temp file");
+                    f.write_all($input.as_bytes())
+                        .expect("could not write to temp file");
+                    drop(f);
+                    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+                    cmd.current_dir(dir.path());
+                    cmd.arg("input.decor");
+                    let res = $func(&mut dir, cmd);
+                    dir.close().expect("could not close temp dir");
+                    res
+                };
+             )+
+
+            $compare($($func_name),+);
+        }
+    };
+}
+
 #[allow(unused_imports)]
 pub(crate) use decor_test;
+#[allow(unused_imports)]
+pub(crate) use decor_test_multiple;
 
 /// Takes a snapshot of the current directory.
 #[allow(unused_macros)]

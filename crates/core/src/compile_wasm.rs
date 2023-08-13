@@ -29,6 +29,7 @@ pub struct MainCompiler<'a> {
     build_args: &'a [(String, String)],
     out_name: &'a str,
     opt_level: Option<OptimizationLevel>,
+    strip: bool,
 }
 
 impl<'a> MainCompiler<'a> {
@@ -37,12 +38,14 @@ impl<'a> MainCompiler<'a> {
         out_name: &'a str,
         build_args: &'a [(String, String)],
         opt_level: Option<OptimizationLevel>,
+        strip: bool,
     ) -> Self {
         Self {
             config,
             build_args,
             out_name,
             opt_level,
+            strip,
         }
     }
 
@@ -153,41 +156,34 @@ macro_rules! compile_for {
                     args
                 }, self.out_name));
 
+                let wasm_files = fs::read_dir(self.out_name)?
+                    .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+                    .filter(|path| match path.extension() {
+                        Some(ext) if ext == OsStr::new("wasm") => true,
+                        _ => false,
+                    })
+                    .collect_vec();
 
                 if let Some(opt) = self.opt_level {
-                    let (shrink, speed) = match opt {
-                        OptimizationLevel::SpeedMinor => (0, 1),
-                        OptimizationLevel::SpeedMedium => (0, 2),
-                        OptimizationLevel::SpeedMajor => (0, 3),
-                        OptimizationLevel::SpeedAggressive => (0, 4),
-                        OptimizationLevel::Size => (1, 2),
-                        OptimizationLevel::SizeAggressive => (2, 2),
-                    };
-                    for entry in fs::read_dir(self.out_name)? {
+                    for path in &wasm_files {
                         let spinner = ProgressBar::new_spinner().with_message(format!("Optimizing WebAssembly ({opt})..."));
                         spinner.enable_steady_tick(Duration::from_micros(100));
-
-                        let entry = entry?;
-                        let path = entry.path();
-
-                        match path.extension() {
-                            Some(ext) if ext == OsStr::new("wasm") => {},
-                            _ => continue,
-                        }
-
-                        let contents = fs::read(&path)?;
-                        // Uses wasm-opt (https://github.com/WebAssembly/binaryen) optimizations
-                        let mut module = Module::read(&contents).map_err(|_err| anyhow!("could not optimize .wasm file: {}", path.display()))?;
-                        let config = CodegenConfig { shrink_level : shrink, optimization_level: speed, debug_info: false };
-                        module.optimize(&config);
-                        let out = module.write();
-                        fs::write(&path, out)?;
-
+                        optimize(&path, opt)?;
                         spinner.finish_with_message(
                             format!("{FINISHED} optimized WebAssembly: {opt} (\x1b[34m{}\x1b[0m)", path.display())
                         );
                     }
+                }
 
+                if self.strip {
+                    for path in &wasm_files {
+                        let spinner = ProgressBar::new_spinner().with_message(format!("Stripping WebAssembly..."));
+                        spinner.enable_steady_tick(Duration::from_micros(100));
+                        strip(&path)?;
+                        spinner.finish_with_message(
+                            format!("{FINISHED} stripped WebAssembly (\x1b[34m{}\x1b[0m)", path.display())
+                        );
+                    }
                 }
 
 
@@ -199,3 +195,40 @@ macro_rules! compile_for {
 
 compile_for!(DomRenderer);
 compile_for!(Prerenderer);
+
+fn strip(file: impl AsRef<Path>) -> Result<()> {
+    let mut module = walrus::Module::from_file(&file)?;
+    let to_remove = module.customs.iter().map(|(id, _)| id).collect_vec();
+    for id in to_remove {
+        module.customs.delete(id);
+    }
+    module.emit_wasm_file(file)?;
+
+    Ok(())
+}
+
+fn optimize(path: impl AsRef<Path>, level: OptimizationLevel) -> Result<()> {
+    let (shrink, speed) = match level {
+        OptimizationLevel::SpeedMinor => (0, 1),
+        OptimizationLevel::SpeedMedium => (0, 2),
+        OptimizationLevel::SpeedMajor => (0, 3),
+        OptimizationLevel::SpeedAggressive => (0, 4),
+        OptimizationLevel::Size => (1, 2),
+        OptimizationLevel::SizeAggressive => (2, 2),
+    };
+    let path = path.as_ref();
+    let contents = fs::read(&path)?;
+    // Uses wasm-opt (https://github.com/WebAssembly/binaryen) optimizations
+    let mut module = Module::read(&contents)
+        .map_err(|_err| anyhow!("could not optimize .wasm file: {}", path.display()))?;
+    let config = CodegenConfig {
+        shrink_level: shrink,
+        optimization_level: speed,
+        debug_info: false,
+    };
+    module.optimize(&config);
+    let out = module.write();
+    fs::write(&path, out)?;
+
+    Ok(())
+}
