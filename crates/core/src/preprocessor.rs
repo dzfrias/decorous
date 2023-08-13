@@ -34,7 +34,7 @@ impl Preprocessor for Preproc<'_> {
             let split = shlex::split(&comp).ok_or_else(|| {
                 PreprocessError::new(
                     Location::default(),
-                    Cow::Owned(format!("could not shell split: {comp}")),
+                    Cow::Owned(format!("could not shell split \"{comp}\"")),
                 )
             })?;
             let Some((first, rest)) = split.split_first() else {
@@ -46,7 +46,9 @@ impl Preprocessor for Preproc<'_> {
                 .map_err(|err| {
                     PreprocessError::new(
                         Location::default(),
-                        Cow::Owned(format!("error preprocessing this code block: {err}")),
+                        Cow::Owned(format!(
+                            "error preprocessing this code block: {err} with program {first} with args {rest:?}"
+                        )),
                     )
                 })?;
             to_pipe = Cow::Owned(out);
