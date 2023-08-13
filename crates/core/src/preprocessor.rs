@@ -31,24 +31,13 @@ impl Preprocessor for Preproc<'_> {
         for (i, comp) in cfg.pipeline.iter().enumerate() {
             let spinner = ProgressBar::new_spinner().with_message("Running preprocessor...");
             spinner.enable_steady_tick(Duration::from_micros(100));
-            let split = shlex::split(&comp).ok_or_else(|| {
-                PreprocessError::new(
-                    Location::default(),
-                    Cow::Owned(format!("could not shell split \"{comp}\"")),
-                )
-            })?;
-            let Some((first, rest)) = split.split_first() else {
-                continue;
-            };
             let out = cmd!("echo", to_pipe.as_ref())
-                .pipe(duct::cmd(first, rest))
+                .pipe(cmd!("sh", "-c", comp))
                 .read()
                 .map_err(|err| {
                     PreprocessError::new(
                         Location::default(),
-                        Cow::Owned(format!(
-                            "error preprocessing this code block: {err} with program {first} with args {rest:?}"
-                        )),
+                        Cow::Owned(format!("error preprocessing this code block: {err}")),
                     )
                 })?;
             to_pipe = Cow::Owned(out);
