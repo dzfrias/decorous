@@ -90,6 +90,14 @@ impl Default for Config {
                         features: vec![],
                     },
                 ),
+                (
+                    "wat".to_owned(),
+                    CompilerConfig {
+                        ext_override: None,
+                        script: ScriptOrFile::Script(include_str!("./compilers/wat.py")),
+                        features: vec![],
+                    },
+                ),
             ]),
         }
     }
