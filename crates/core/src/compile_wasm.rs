@@ -217,7 +217,7 @@ fn optimize(path: impl AsRef<Path>, level: OptimizationLevel) -> Result<()> {
         OptimizationLevel::SizeAggressive => (2, 2),
     };
     let path = path.as_ref();
-    let contents = fs::read(&path)?;
+    let contents = fs::read(path)?;
     // Uses wasm-opt (https://github.com/WebAssembly/binaryen) optimizations
     let mut module = Module::read(&contents)
         .map_err(|_err| anyhow!("could not optimize .wasm file: {}", path.display()))?;
@@ -228,7 +228,7 @@ fn optimize(path: impl AsRef<Path>, level: OptimizationLevel) -> Result<()> {
     };
     module.optimize(&config);
     let out = module.write();
-    fs::write(&path, out)?;
+    fs::write(path, out)?;
 
     Ok(())
 }

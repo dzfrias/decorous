@@ -81,11 +81,10 @@ fn main() -> Result<()> {
         let mut mods = Vec::with_capacity(2);
         let opt = args
             .optimize
-            .map(|opt| Cow::Owned(opt.to_string()))
-            .unwrap_or(Cow::Borrowed("debug"));
+            .map_or(Cow::Borrowed("debug"), |opt| Cow::Owned(opt.to_string()));
         mods.push(opt);
         if args.modularize {
-            mods.push(Cow::Borrowed("modularized"))
+            mods.push(Cow::Borrowed("modularized"));
         }
         mods
     };
@@ -167,7 +166,7 @@ fn render_js(
 fn get_config() -> Result<Config> {
     let source = env::current_dir().context("error reading current dir")?;
     let config_path = source.ancestors().find_map(|p| {
-        let joined = p.join(&"decor.toml");
+        let joined = p.join("decor.toml");
         joined.exists().then_some(joined)
     });
     if let Some(p) = config_path {
