@@ -31,8 +31,12 @@ impl Preprocessor for Preproc<'_> {
         for (i, comp) in cfg.pipeline.iter().enumerate() {
             let spinner = ProgressBar::new_spinner().with_message("Running preprocessor...");
             spinner.enable_steady_tick(Duration::from_micros(100));
+            #[cfg(not(target_os = "windows"))]
+            let pipe_expr = cmd!("sh", "-c", comp);
+            #[cfg(target_os = "windows")]
+            let pipe_expr = cmd!("cmd.exe", "/C", comp);
             let out = cmd!("echo", to_pipe.as_ref())
-                .pipe(cmd!("sh", "-c", comp))
+                .pipe(pipe_expr)
                 .read()
                 .map_err(|err| {
                     PreprocessError::new(
