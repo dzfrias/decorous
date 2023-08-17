@@ -29,5 +29,5 @@ duct = "0.13.6"
 merge = { version = "0.1", default-features = false }
 toml = "0.7.6"
 indicatif = "0.17"
-wasm-opt = "0.114"
+wasm-opt = "0.114.1"
 walrus = "0.20"
