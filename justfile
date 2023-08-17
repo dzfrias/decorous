@@ -25,12 +25,11 @@ regression:
   ./scripts/bench_regression.sh ./old ./new
   rm ./old ./new
 
-bench FILE MODE="dom":
+bench FILE:
   cargo build --release
-  hyperfine "./target/release/decorous {{FILE}} -r {{MODE}}" --warmup 5
+  hyperfine "./target/release/decorous {{FILE}}" --warmup 5
   @echo Cleaning up!
-  @rm out.js
-  @if [[ {{MODE}} == "prerender" ]]; then rm out.html; fi
+  @rm out*
   @if [[ -d "./out" ]]; then rm -rf out; fi
 
 microbench:
