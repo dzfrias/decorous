@@ -1,13 +1,16 @@
+use smallvec::SmallVec;
 use std::{borrow::Cow, ops::Range};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Report {
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: SmallVec<[Diagnostic; 1]>,
 }
 
 impl Report {
-    pub fn new(diagnostics: Vec<Diagnostic>) -> Self {
-        Self { diagnostics }
+    pub fn new() -> Self {
+        Self {
+            diagnostics: SmallVec::new(),
+        }
     }
 
     pub fn diagnostics(&self) -> &[Diagnostic] {
@@ -103,5 +106,13 @@ impl DiagnosticBuilder {
 impl Extend<Diagnostic> for Report {
     fn extend<T: IntoIterator<Item = Diagnostic>>(&mut self, iter: T) {
         self.diagnostics.extend(iter);
+    }
+}
+
+impl FromIterator<Diagnostic> for Report {
+    fn from_iter<T: IntoIterator<Item = Diagnostic>>(iter: T) -> Self {
+        Self {
+            diagnostics: iter.into_iter().collect(),
+        }
     }
 }

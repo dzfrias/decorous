@@ -88,7 +88,9 @@ impl From<ParseError<LocatedSpan<&str>>> for Report {
             msg: Cow::Borrowed("here"),
             span: err.fragment().location_offset()..err.fragment().location_offset() + 1,
         });
-        Self(decorous_errors::Report::new(vec![diagnostic]))
+        let mut report = decorous_errors::Report::new();
+        report.add_diagnostic(diagnostic);
+        Report(report)
     }
 }
 
