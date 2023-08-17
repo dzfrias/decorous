@@ -4,28 +4,29 @@ expression: element(input.into())
 ---
 Err(
     Failure(
-        Report {
-            errors: [
-                ParseError {
-                    fragment: LocatedSpan {
+        Report(
+            Report {
+                diagnostics: [
+                    Diagnostic {
+                        msg: "parser error: invalid character, expected ]",
+                        severity: Error,
+                        helpers: [
+                            Helper {
+                                msg: "from here",
+                                span: 4..5,
+                            },
+                            Helper {
+                                msg: "here",
+                                span: 18..19,
+                            },
+                        ],
                         offset: 18,
-                        line: 1,
-                        fragment: "/div",
-                        extra: (),
+                        note: Some(
+                            "attribute bracket was never closed",
+                        ),
                     },
-                    help: Some(
-                        Help {
-                            corresponding_line: Some(
-                                1,
-                            ),
-                            message: "attribute bracket was never closed",
-                        },
-                    ),
-                    err_type: ExpectedCharacter(
-                        ']',
-                    ),
-                },
-            ],
-        },
+                ],
+            },
+        ),
     ),
 )

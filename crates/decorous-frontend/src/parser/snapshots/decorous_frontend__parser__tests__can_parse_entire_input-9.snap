@@ -4,22 +4,19 @@ expression: parse(input.into())
 ---
 Err(
     Report {
-        errors: [
-            ParseError {
-                fragment: Location {
-                    offset: 11,
-                    length: 1,
-                    line: 1,
-                    column: 12,
-                },
-                help: Some(
-                    Help {
-                        corresponding_line: None,
-                        message: "expected because event handlers must always have curly braces as their values",
+        diagnostics: [
+            Diagnostic {
+                msg: "parser error: invalid character, expected {",
+                severity: Error,
+                helpers: [
+                    Helper {
+                        msg: "here",
+                        span: 11..12,
                     },
-                ),
-                err_type: ExpectedCharacter(
-                    '{',
+                ],
+                offset: 11,
+                note: Some(
+                    "expected because event handlers must always have curly braces as their values",
                 ),
             },
         ],

@@ -4,22 +4,19 @@ expression: parse(input.into())
 ---
 Err(
     Report {
-        errors: [
-            ParseError {
-                fragment: Location {
-                    offset: 10,
-                    length: 1,
-                    line: 1,
-                    column: 11,
-                },
-                help: Some(
-                    Help {
-                        corresponding_line: None,
-                        message: "value-less event handlers are not allowed",
+        diagnostics: [
+            Diagnostic {
+                msg: "parser error: invalid character, expected =",
+                severity: Error,
+                helpers: [
+                    Helper {
+                        msg: "here",
+                        span: 10..11,
                     },
-                ),
-                err_type: ExpectedCharacter(
-                    '=',
+                ],
+                offset: 10,
+                note: Some(
+                    "value-less event handlers are not allowed",
                 ),
             },
         ],

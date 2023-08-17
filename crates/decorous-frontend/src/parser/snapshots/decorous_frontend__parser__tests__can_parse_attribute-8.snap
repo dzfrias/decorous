@@ -4,26 +4,25 @@ expression: attribute(input.into())
 ---
 Err(
     Failure(
-        Report {
-            errors: [
-                ParseError {
-                    fragment: LocatedSpan {
+        Report(
+            Report {
+                diagnostics: [
+                    Diagnostic {
+                        msg: "parser error: invalid character, expected {",
+                        severity: Error,
+                        helpers: [
+                            Helper {
+                                msg: "here",
+                                span: 12..13,
+                            },
+                        ],
                         offset: 12,
-                        line: 1,
-                        fragment: "\"wrong\"",
-                        extra: (),
+                        note: Some(
+                            "expected because event handlers must always have curly braces as their values",
+                        ),
                     },
-                    help: Some(
-                        Help {
-                            corresponding_line: None,
-                            message: "expected because event handlers must always have curly braces as their values",
-                        },
-                    ),
-                    err_type: ExpectedCharacter(
-                        '{',
-                    ),
-                },
-            ],
-        },
+                ],
+            },
+        ),
     ),
 )

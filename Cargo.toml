@@ -24,6 +24,7 @@ itertools = { workspace = true }
 members = [
     "crates/decorous-frontend",
     "crates/decorous-backend",
+    "crates/decorous-errors",
     "crates/core",
     "crates/superfmt",
     "crates/harpoon",

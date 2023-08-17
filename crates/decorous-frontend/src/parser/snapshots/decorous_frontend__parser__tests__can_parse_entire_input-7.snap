@@ -4,25 +4,23 @@ expression: parse(input.into())
 ---
 Err(
     Report {
-        errors: [
-            ParseError {
-                fragment: Location {
-                    offset: 5,
-                    length: 1,
-                    line: 1,
-                    column: 6,
-                },
-                help: Some(
-                    Help {
-                        corresponding_line: Some(
-                            1,
-                        ),
-                        message: "tag never closed",
+        diagnostics: [
+            Diagnostic {
+                msg: "parser error: unclosed tag: div",
+                severity: Error,
+                helpers: [
+                    Helper {
+                        msg: "from here",
+                        span: 1..2,
                     },
-                ),
-                err_type: UnclosedTag(
-                    "div",
-                    1,
+                    Helper {
+                        msg: "here",
+                        span: 5..6,
+                    },
+                ],
+                offset: 5,
+                note: Some(
+                    "tag never closed",
                 ),
             },
         ],

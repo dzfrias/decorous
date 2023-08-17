@@ -4,29 +4,29 @@ expression: element(input.into())
 ---
 Err(
     Failure(
-        Report {
-            errors: [
-                ParseError {
-                    fragment: LocatedSpan {
+        Report(
+            Report {
+                diagnostics: [
+                    Diagnostic {
+                        msg: "parser error: unclosed tag: div",
+                        severity: Error,
+                        helpers: [
+                            Helper {
+                                msg: "from here",
+                                span: 1..2,
+                            },
+                            Helper {
+                                msg: "here",
+                                span: 4..5,
+                            },
+                        ],
                         offset: 4,
-                        line: 1,
-                        fragment: "",
-                        extra: (),
+                        note: Some(
+                            "tag never closed",
+                        ),
                     },
-                    help: Some(
-                        Help {
-                            corresponding_line: Some(
-                                1,
-                            ),
-                            message: "tag never closed",
-                        },
-                    ),
-                    err_type: UnclosedTag(
-                        "div",
-                        1,
-                    ),
-                },
-            ],
-        },
+                ],
+            },
+        ),
     ),
 )

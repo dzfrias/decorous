@@ -4,26 +4,25 @@ expression: attribute(input.into())
 ---
 Err(
     Failure(
-        Report {
-            errors: [
-                ParseError {
-                    fragment: LocatedSpan {
+        Report(
+            Report {
+                diagnostics: [
+                    Diagnostic {
+                        msg: "parser error: invalid character, expected =",
+                        severity: Error,
+                        helpers: [
+                            Helper {
+                                msg: "here",
+                                span: 6..7,
+                            },
+                        ],
                         offset: 6,
-                        line: 1,
-                        fragment: "",
-                        extra: (),
+                        note: Some(
+                            "value-less event handlers are not allowed",
+                        ),
                     },
-                    help: Some(
-                        Help {
-                            corresponding_line: None,
-                            message: "value-less event handlers are not allowed",
-                        },
-                    ),
-                    err_type: ExpectedCharacter(
-                        '=',
-                    ),
-                },
-            ],
-        },
+                ],
+            },
+        ),
     ),
 )

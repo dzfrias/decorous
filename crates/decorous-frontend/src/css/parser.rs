@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
             .harpoon
             .harpoon(|harpoon| harpoon.consume_until(':'))
             .text();
-        let line = self.harpoon.line();
+        let offset = self.harpoon.offset();
         self.expect_consume(':')?;
         self.skip_whitespace();
         let mut values = vec![];
@@ -180,8 +180,8 @@ impl<'a> Parser<'a> {
         }
         self.expect_consume_with_help(
             ';',
-            Some(Help::with_line(
-                line as u32,
+            Some(Help::with_span(
+                offset..offset + 1,
                 "declaration needs a closing semicolon",
             )),
         )?;

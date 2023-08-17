@@ -4,16 +4,18 @@ expression: parse(input.into())
 ---
 Err(
     Report {
-        errors: [
-            ParseError {
-                fragment: Location {
-                    offset: 30,
-                    length: 1,
-                    line: 1,
-                    column: 31,
-                },
-                help: None,
-                err_type: CannotHaveTwoWasmBlocks,
+        diagnostics: [
+            Diagnostic {
+                msg: "parser error: cannot have more than one WebAssembly block",
+                severity: Error,
+                helpers: [
+                    Helper {
+                        msg: "here",
+                        span: 30..31,
+                    },
+                ],
+                offset: 30,
+                note: None,
             },
         ],
     },

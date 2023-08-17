@@ -4,16 +4,18 @@ expression: parse(input.into())
 ---
 Err(
     Report {
-        errors: [
-            ParseError {
-                fragment: Location {
-                    offset: 35,
-                    length: 1,
-                    line: 1,
-                    column: 36,
-                },
-                help: None,
-                err_type: CannotHaveTwoStyles,
+        diagnostics: [
+            Diagnostic {
+                msg: "parser error: cannot have more than one style block",
+                severity: Error,
+                helpers: [
+                    Helper {
+                        msg: "here",
+                        span: 35..36,
+                    },
+                ],
+                offset: 35,
+                note: None,
             },
         ],
     },

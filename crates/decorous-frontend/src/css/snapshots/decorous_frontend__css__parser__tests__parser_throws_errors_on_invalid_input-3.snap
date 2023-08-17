@@ -12,8 +12,8 @@ Err(
         },
         help: Some(
             Help {
-                corresponding_line: Some(
-                    1,
+                corresponding_span: Some(
+                    15..16,
                 ),
                 message: "declaration needs a closing semicolon",
             },

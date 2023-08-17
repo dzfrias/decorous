@@ -14,6 +14,7 @@ path = "src/main.rs"
 clap = { version = "4.3.11", features = ["derive"] }
 decorous-frontend = { path = "../decorous-frontend" }
 decorous-backend = { path = "../decorous-backend" }
+decorous-errors = { path = "../decorous-errors" }
 superfmt = { path = "../superfmt" }
 anyhow = "1.0.71"
 dhat = { version = "0.3", optional = true }

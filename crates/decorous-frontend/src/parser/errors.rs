@@ -1,7 +1,7 @@
-use std::fmt;
+use std::{borrow::Cow, fmt, ops::Range};
 
+use decorous_errors::{DiagnosticBuilder, Severity};
 use nom_locate::LocatedSpan;
-use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 
 use crate::{css, location::Location, PreprocessError};
@@ -11,8 +11,8 @@ use crate::{css, location::Location, PreprocessError};
 pub enum ParseErrorType {
     #[error("invalid closing tag, expected {0}")]
     InvalidClosingTag(String),
-    #[error("unclosed tag: {0} from line {1}")]
-    UnclosedTag(String, u32),
+    #[error("unclosed tag: {0}")]
+    UnclosedTag(String),
     #[error("invalid character, expected {0}")]
     ExpectedCharacter(char),
     #[error("invalid character, expected {0:?}, got {1}")]
@@ -57,44 +57,43 @@ pub struct ParseError<T> {
 /// An error help message, commonly created alongside a [`ParseError`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Help {
-    corresponding_line: Option<u32>,
+    corresponding_span: Option<Range<usize>>,
     message: &'static str,
 }
 
 /// A full report of [`ParseError`]s.
 ///
 /// This is usually produced along the [`parse`](crate::parse) function.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Report<T> {
-    errors: SmallVec<[ParseError<T>; 1]>,
-}
+#[derive(Debug, Clone)]
+pub struct Report(pub decorous_errors::Report);
 
-impl<T> Report<T> {
-    pub fn errors(&self) -> &[ParseError<T>] {
-        self.errors.as_ref()
-    }
-}
-
-impl From<Report<LocatedSpan<&str>>> for Report<Location> {
-    fn from(report: Report<LocatedSpan<&str>>) -> Self {
-        let mut new_report = SmallVec::with_capacity(report.errors.len());
-        for err in report.errors {
-            new_report.push(ParseError::new(err.fragment.into(), err.err_type, err.help));
+impl From<ParseError<LocatedSpan<&str>>> for Report {
+    fn from(err: ParseError<LocatedSpan<&str>>) -> Self {
+        let mut diagnostic = DiagnosticBuilder::new(
+            err.to_string(),
+            Severity::Error,
+            err.fragment().location_offset(),
+        )
+        .build();
+        if let Some(help) = err.help() {
+            diagnostic.note = Some(Cow::Borrowed(help.message()));
+            if let Some(span) = help.corresponding_span() {
+                diagnostic.helpers.push(decorous_errors::Helper {
+                    msg: Cow::Borrowed("from here"),
+                    span: span.clone(),
+                })
+            }
         }
-        Self { errors: new_report }
+        diagnostic.helpers.push(decorous_errors::Helper {
+            msg: Cow::Borrowed("here"),
+            span: err.fragment().location_offset()..err.fragment().location_offset() + 1,
+        });
+        Self(decorous_errors::Report::new(vec![diagnostic]))
     }
 }
 
-impl<T> From<ParseError<T>> for Report<T> {
-    fn from(err: ParseError<T>) -> Self {
-        Self {
-            errors: smallvec![err],
-        }
-    }
-}
-
-impl<T> nom::error::ParseError<T> for Report<T> {
-    fn from_error_kind(fragment: T, kind: nom::error::ErrorKind) -> Self {
+impl nom::error::ParseError<LocatedSpan<&str>> for Report {
+    fn from_error_kind(fragment: LocatedSpan<&str>, kind: nom::error::ErrorKind) -> Self {
         Self::from(ParseError {
             fragment,
             err_type: ParseErrorType::Nom(kind),
@@ -102,16 +101,19 @@ impl<T> nom::error::ParseError<T> for Report<T> {
         })
     }
 
-    fn append(input: T, kind: nom::error::ErrorKind, mut other: Self) -> Self {
-        other.errors.push(ParseError {
-            fragment: input,
-            err_type: ParseErrorType::Nom(kind),
-            help: None,
-        });
+    fn append(input: LocatedSpan<&str>, kind: nom::error::ErrorKind, mut other: Self) -> Self {
+        other.0.add_diagnostic(
+            DiagnosticBuilder::new(
+                ParseErrorType::Nom(kind).to_string(),
+                Severity::Error,
+                input.location_offset(),
+            )
+            .build(),
+        );
         other
     }
 
-    fn from_char(input: T, c: char) -> Self {
+    fn from_char(input: LocatedSpan<&str>, c: char) -> Self {
         Self::from(ParseError {
             fragment: input,
             err_type: ParseErrorType::ExpectedCharacter(c),
@@ -143,9 +145,9 @@ impl<T> ParseError<T> {
 }
 
 impl Help {
-    pub fn with_line(line: u32, message: &'static str) -> Self {
+    pub fn with_span(span: Range<usize>, message: &'static str) -> Self {
         Self {
-            corresponding_line: Some(line),
+            corresponding_span: Some(span),
             message,
         }
     }
@@ -153,16 +155,16 @@ impl Help {
     /// Creates a new `Help`, with no corresponding line.
     pub fn with_message(message: &'static str) -> Self {
         Self {
-            corresponding_line: None,
+            corresponding_span: None,
             message,
         }
     }
 
-    pub fn corresponding_line(&self) -> Option<u32> {
-        self.corresponding_line
+    pub fn corresponding_span(&self) -> Option<&Range<usize>> {
+        self.corresponding_span.as_ref()
     }
 
-    pub fn message(&self) -> &str {
+    pub fn message(&self) -> &'static str {
         self.message
     }
 }

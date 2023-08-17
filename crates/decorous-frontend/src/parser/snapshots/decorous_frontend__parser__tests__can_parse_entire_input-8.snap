@@ -4,22 +4,19 @@ expression: parse(input.into())
 ---
 Err(
     Report {
-        errors: [
-            ParseError {
-                fragment: Location {
-                    offset: 12,
-                    length: 1,
-                    line: 1,
-                    column: 13,
-                },
-                help: Some(
-                    Help {
-                        corresponding_line: None,
-                        message: "mustache was never closed",
+        diagnostics: [
+            Diagnostic {
+                msg: "parser error: invalid character, expected }",
+                severity: Error,
+                helpers: [
+                    Helper {
+                        msg: "here",
+                        span: 12..13,
                     },
-                ),
-                err_type: ExpectedCharacter(
-                    '}',
+                ],
+                offset: 12,
+                note: Some(
+                    "mustache was never closed",
                 ),
             },
         ],

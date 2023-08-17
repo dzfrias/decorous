@@ -4,18 +4,18 @@ expression: parse(input.into())
 ---
 Err(
     Report {
-        errors: [
-            ParseError {
-                fragment: Location {
-                    offset: 14,
-                    length: 1,
-                    line: 1,
-                    column: 15,
-                },
-                help: None,
-                err_type: JavaScriptDiagnostics {
-                    title: "expected an expression, but found `;` instead",
-                },
+        diagnostics: [
+            Diagnostic {
+                msg: "parser error: parse error in JavaScript: expected an expression, but found `;` instead",
+                severity: Error,
+                helpers: [
+                    Helper {
+                        msg: "here",
+                        span: 14..15,
+                    },
+                ],
+                offset: 14,
+                note: None,
             },
         ],
     },

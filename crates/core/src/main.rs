@@ -1,14 +1,13 @@
 mod cli;
 mod compile_wasm;
 mod config;
-mod fmt_report;
 mod preprocessor;
 
 use std::{
     borrow::Cow,
     env,
     fs::{self, File},
-    io::{self, BufWriter, Write},
+    io::{BufWriter, Write},
     time::Instant,
 };
 
@@ -23,7 +22,6 @@ use decorous_backend::{
     render, render_with_wasm, Metadata,
 };
 use decorous_frontend::{parse_with_preprocessor, Component};
-use fmt_report::fmt_report;
 use handlebars::{no_escape, Handlebars};
 use merge::Merge;
 use serde_json::json;
@@ -255,7 +253,7 @@ fn parse_component<'a>(input: &'a str, config: &Config) -> Result<Component<'a>>
     let component = match parse_with_preprocessor(input, &preproc) {
         Ok(ast) => Ok(Component::new(ast)),
         Err(report) => {
-            fmt_report(input, &report, &mut io::stderr())?;
+            decorous_errors::fmt::report(report, "hi", input)?;
             anyhow::bail!("\nthe decorous parser failed");
         }
     };

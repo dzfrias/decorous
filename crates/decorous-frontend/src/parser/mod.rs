@@ -43,7 +43,7 @@ impl Preprocessor for NullPreproc {
     }
 }
 
-type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report<NomSpan<'a>>>;
+type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report>;
 type NomSpan<'a> = LocatedSpan<&'a str>;
 
 /// Helper macro for creating an `IResult` error by hand.
@@ -62,7 +62,7 @@ macro_rules! nom_err {
 pub fn parse_with_preprocessor<'i, P>(
     input: &'i str,
     preproc: &P,
-) -> std::result::Result<DecorousAst<'i>, Report<Location>>
+) -> std::result::Result<DecorousAst<'i>, decorous_errors::Report>
 where
     P: Preprocessor,
 {
@@ -82,7 +82,7 @@ where
             match err {
                 // NomSpans from the report are turned into Locations, so to not leak into the
                 // public interface of this module.
-                Failure(report) => Err(report.into()),
+                Failure(report) => Err(report.0),
                 _ => unreachable!(),
             }
         }
@@ -93,7 +93,7 @@ where
 /// Parses a string decorous syntax into an AST.
 ///
 /// A successful parse will yield a [`DecorousAst`]. An unsuccessful one will yield a [`Report`].
-pub fn parse(input: &str) -> std::result::Result<DecorousAst, Report<Location>> {
+pub fn parse(input: &str) -> std::result::Result<DecorousAst, decorous_errors::Report> {
     parse_with_preprocessor(input, &NullPreproc)
 }
 
@@ -193,7 +193,7 @@ fn parse_css_block<'a>(
     code: &str,
     offset: usize,
     src: LocatedSpan<&'a str>,
-) -> std::result::Result<Css, nom::Err<Report<LocatedSpan<&'a str>>>> {
+) -> std::result::Result<Css, nom::Err<Report>> {
     let p = css::Parser::new(code);
     let ast = p.parse().map_err(|err| {
         let pos = src.slice(offset + err.fragment().offset() + 1..);
@@ -212,7 +212,7 @@ fn parse_js_block<'a>(
     code: &str,
     offset: usize,
     src: LocatedSpan<&'a str>,
-) -> std::result::Result<SyntaxNode, nom::Err<Report<LocatedSpan<&'a str>>>> {
+) -> std::result::Result<SyntaxNode, nom::Err<Report>> {
     parse_js(code).map_err(|(title, span)| {
         let pos = src.slice(offset + span.start..);
         nom_err!(
@@ -248,7 +248,7 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
             None
         );
     }
-    if peek(ws(tag::<&str, NomSpan, Report<NomSpan>>("---")))(input).is_ok() {
+    if peek(ws(tag::<&str, NomSpan, Report>("---")))(input).is_ok() {
         return nom_err_res!(
             input,
             Error,
@@ -274,7 +274,6 @@ fn node(input: NomSpan) -> Result<Node<'_, Location>> {
 
 fn attributes(input: NomSpan) -> Result<Vec<Attribute>> {
     let (input, start_pos) = position(input)?;
-    let start_line = start_pos.location_line();
     delimited(
         ws_trailing(char('[')),
         separated_list0(multispace1, attribute),
@@ -283,8 +282,8 @@ fn attributes(input: NomSpan) -> Result<Vec<Attribute>> {
             failure_case(bad_char, move |_| {
                 (
                     ParseErrorType::ExpectedCharacter(']'),
-                    Some(Help::with_line(
-                        start_line,
+                    Some(Help::with_span(
+                        start_pos.location_offset()..start_pos.location_offset() + 1,
                         "attribute bracket was never closed",
                     )),
                 )
@@ -335,12 +334,9 @@ fn element(input: NomSpan) -> Result<Element<'_, Location>> {
                 ),
                 failure_case(bad_char, |_| {
                     (
-                        ParseErrorType::UnclosedTag(
-                            tag_name.to_string(),
-                            start_pos.location_line(),
-                        ),
-                        Some(Help::with_line(
-                            start_pos.location_line(),
+                        ParseErrorType::UnclosedTag(tag_name.to_string()),
+                        Some(Help::with_span(
+                            start_pos.location_offset()..start_pos.location_offset() + 1,
                             "tag never closed",
                         )),
                     )
@@ -430,7 +426,7 @@ fn parse_evt_handler(input: LocatedSpan<&str>) -> Result<Attribute> {
             )
         }),
     ))(input)?;
-    if peek(char::<NomSpan, Report<NomSpan>>('{'))(input).is_err() {
+    if peek(char::<NomSpan, Report>('{'))(input).is_err() {
         return nom_err_res!(
             input,
             Failure,

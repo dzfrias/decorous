@@ -4,26 +4,25 @@ expression: element(input.into())
 ---
 Err(
     Failure(
-        Report {
-            errors: [
-                ParseError {
-                    fragment: LocatedSpan {
+        Report(
+            Report {
+                diagnostics: [
+                    Diagnostic {
+                        msg: "parser error: invalid closing tag, expected div",
+                        severity: Error,
+                        helpers: [
+                            Helper {
+                                msg: "here",
+                                span: 20..21,
+                            },
+                        ],
                         offset: 20,
-                        line: 1,
-                        fragment: "notdiv",
-                        extra: (),
+                        note: Some(
+                            "replace this tag with the expected!",
+                        ),
                     },
-                    help: Some(
-                        Help {
-                            corresponding_line: None,
-                            message: "replace this tag with the expected!",
-                        },
-                    ),
-                    err_type: InvalidClosingTag(
-                        "div",
-                    ),
-                },
-            ],
-        },
+                ],
+            },
+        ),
     ),
 )

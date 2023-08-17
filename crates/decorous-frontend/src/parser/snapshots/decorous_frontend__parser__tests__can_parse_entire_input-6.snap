@@ -4,21 +4,20 @@ expression: parse(input.into())
 ---
 Err(
     Report {
-        errors: [
-            ParseError {
-                fragment: Location {
-                    offset: 0,
-                    length: 1,
-                    line: 1,
-                    column: 1,
-                },
-                help: Some(
-                    Help {
-                        corresponding_line: None,
-                        message: "escape the slash with \\/",
+        diagnostics: [
+            Diagnostic {
+                msg: "parser error: expected closing tag. If you meant to escape the slash, use '\\/'",
+                severity: Error,
+                helpers: [
+                    Helper {
+                        msg: "here",
+                        span: 0..1,
                     },
+                ],
+                offset: 0,
+                note: Some(
+                    "escape the slash with \\/",
                 ),
-                err_type: ExpectedClosingTag,
             },
         ],
     },

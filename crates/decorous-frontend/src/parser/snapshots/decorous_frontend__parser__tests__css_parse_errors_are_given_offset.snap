@@ -4,42 +4,23 @@ expression: parse(input.into())
 ---
 Err(
     Report {
-        errors: [
-            ParseError {
-                fragment: Location {
-                    offset: 32,
-                    length: 1,
-                    line: 1,
-                    column: 33,
-                },
-                help: Some(
-                    Help {
-                        corresponding_line: Some(
-                            1,
-                        ),
-                        message: "declaration needs a closing semicolon",
+        diagnostics: [
+            Diagnostic {
+                msg: "parser error: css parsing error: parse error: expected: ;",
+                severity: Error,
+                helpers: [
+                    Helper {
+                        msg: "from here",
+                        span: 10..11,
                     },
-                ),
-                err_type: CssParsingError(
-                    ParseError {
-                        fragment: Location {
-                            offset: 16,
-                            length: 1,
-                            line: 1,
-                            column: 16,
-                        },
-                        help: Some(
-                            Help {
-                                corresponding_line: Some(
-                                    1,
-                                ),
-                                message: "declaration needs a closing semicolon",
-                            },
-                        ),
-                        err_type: ExpectedCharacter(
-                            ';',
-                        ),
+                    Helper {
+                        msg: "here",
+                        span: 32..33,
                     },
+                ],
+                offset: 32,
+                note: Some(
+                    "declaration needs a closing semicolon",
                 ),
             },
         ],

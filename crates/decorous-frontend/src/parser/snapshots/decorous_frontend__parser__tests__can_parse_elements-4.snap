@@ -4,26 +4,25 @@ expression: element(input.into())
 ---
 Err(
     Failure(
-        Report {
-            errors: [
-                ParseError {
-                    fragment: LocatedSpan {
+        Report(
+            Report {
+                diagnostics: [
+                    Diagnostic {
+                        msg: "parser error: invalid character, expected \"",
+                        severity: Error,
+                        helpers: [
+                            Helper {
+                                msg: "here",
+                                span: 15..16,
+                            },
+                        ],
                         offset: 15,
-                        line: 1,
-                        fragment: "world    ] /div",
-                        extra: (),
+                        note: Some(
+                            "quote was never closed",
+                        ),
                     },
-                    help: Some(
-                        Help {
-                            corresponding_line: None,
-                            message: "quote was never closed",
-                        },
-                    ),
-                    err_type: ExpectedCharacter(
-                        '"',
-                    ),
-                },
-            ],
-        },
+                ],
+            },
+        ),
     ),
 )

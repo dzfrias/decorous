@@ -4,26 +4,25 @@ expression: attribute(input.into())
 ---
 Err(
     Failure(
-        Report {
-            errors: [
-                ParseError {
-                    fragment: LocatedSpan {
+        Report(
+            Report {
+                diagnostics: [
+                    Diagnostic {
+                        msg: "parser error: invalid character, expected :",
+                        severity: Error,
+                        helpers: [
+                            Helper {
+                                msg: "here",
+                                span: 8..9,
+                            },
+                        ],
                         offset: 8,
-                        line: 1,
-                        fragment: "",
-                        extra: (),
+                        note: Some(
+                            "expected because binding was started with \":\"",
+                        ),
                     },
-                    help: Some(
-                        Help {
-                            corresponding_line: None,
-                            message: "expected because binding was started with \":\"",
-                        },
-                    ),
-                    err_type: ExpectedCharacter(
-                        ':',
-                    ),
-                },
-            ],
-        },
+                ],
+            },
+        ),
     ),
 )
