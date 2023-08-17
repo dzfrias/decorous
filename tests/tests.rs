@@ -328,7 +328,7 @@ decor_test!(
         let go_path = dir.path().join("go.py");
         fs::write(&go_path, "print(\"hello\")").unwrap();
 
-        write!(config, r#"compilers.go = {{ script = "{}", features = [], deps = ["decorshouldneverbefoundonasystem"] }}"#, go_path.display()).expect("unable to write to config file");
+        write!(config, r#"compilers.go = {{ script = "{}", features = [], deps = ["decorshouldneverbefoundonasystem"] }}"#, go_path.to_string_lossy().escape_default()).expect("unable to write to config file");
         let assertion = cmd.assert().success();
         insta::assert_snapshot!(String::from_utf8_lossy(
             assertion.get_output().stderr.as_slice()
