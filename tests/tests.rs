@@ -282,3 +282,56 @@ decor_test_multiple!(
         metadata.len()
     }
 );
+
+decor_test!(
+    warns_on_unused_strip,
+    NO_JS,
+    |_dir: &mut TempDir, mut cmd: Command| {
+        cmd.arg("--strip");
+        let assertion = cmd.assert().success();
+        insta::assert_snapshot!(String::from_utf8_lossy(
+            assertion.get_output().stderr.as_slice()
+        ));
+    }
+);
+
+decor_test!(
+    warns_on_unused_optimize,
+    NO_JS,
+    |_dir: &mut TempDir, mut cmd: Command| {
+        cmd.arg("-Oz");
+        let assertion = cmd.assert().success();
+        insta::assert_snapshot!(String::from_utf8_lossy(
+            assertion.get_output().stderr.as_slice()
+        ));
+    }
+);
+
+decor_test!(
+    warns_on_unused_build_args,
+    NO_JS,
+    |_dir: &mut TempDir, mut cmd: Command| {
+        cmd.arg("-B rust=\"argument\"");
+        let assertion = cmd.assert().success();
+        insta::assert_snapshot!(String::from_utf8_lossy(
+            assertion.get_output().stderr.as_slice()
+        ));
+    }
+);
+
+decor_test!(
+    warn_on_deps_that_are_not_found,
+    GO,
+    |dir: &mut TempDir, mut cmd: Command| {
+        let mut config =
+            File::create(dir.path().join("decor.toml")).expect("unable to create config file");
+        let go_path = dir.path().join("go.py");
+        fs::write(&go_path, "print(\"hello\")").unwrap();
+
+        write!(config, "compilers.go = {{ script = \"{}\", features = [], deps = [\"decor-should-never-be-found-on-a-system\"] }}", go_path.display()).expect("unable to write to config file");
+        let assertion = cmd.assert().success();
+        insta::assert_snapshot!(String::from_utf8_lossy(
+            assertion.get_output().stderr.as_slice()
+        ));
+    }
+);

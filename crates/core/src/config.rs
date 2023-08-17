@@ -48,6 +48,7 @@ impl Default for Config {
                         ext_override: Some("rs".to_owned()),
                         script: ScriptOrFile::Script(include_str!("./compilers/rust.py")),
                         features: vec![],
+                        deps: vec!["wasm-pack".to_owned(), "cargo".to_owned()],
                     },
                 ),
                 (
@@ -56,6 +57,7 @@ impl Default for Config {
                         ext_override: Some("cpp".to_owned()),
                         script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
                         features: vec![],
+                        deps: vec!["emcc".to_owned()],
                     },
                 ),
                 (
@@ -64,6 +66,7 @@ impl Default for Config {
                         ext_override: None,
                         script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
                         features: vec![],
+                        deps: vec!["emcc".to_owned()],
                     },
                 ),
                 (
@@ -72,6 +75,7 @@ impl Default for Config {
                         ext_override: None,
                         script: ScriptOrFile::Script(include_str!("./compilers/zig.py")),
                         features: vec![],
+                        deps: vec!["zig".to_owned()],
                     },
                 ),
                 (
@@ -80,6 +84,7 @@ impl Default for Config {
                         ext_override: None,
                         script: ScriptOrFile::Script(include_str!("./compilers/go.py")),
                         features: vec![WasmFeature(wasm_opt::Feature::BulkMemory)],
+                        deps: vec!["go".to_owned()],
                     },
                 ),
                 (
@@ -88,6 +93,7 @@ impl Default for Config {
                         ext_override: Some("go".to_owned()),
                         script: ScriptOrFile::Script(include_str!("./compilers/tinygo.py")),
                         features: vec![],
+                        deps: vec!["tinygo".to_owned()],
                     },
                 ),
                 (
@@ -96,6 +102,7 @@ impl Default for Config {
                         ext_override: None,
                         script: ScriptOrFile::Script(include_str!("./compilers/wat.py")),
                         features: vec![],
+                        deps: vec!["wat2wasm".to_owned()],
                     },
                 ),
             ]),
@@ -109,6 +116,7 @@ pub struct CompilerConfig {
     #[serde(deserialize_with = "deserialize_script")]
     pub script: ScriptOrFile,
     pub features: Vec<WasmFeature>,
+    pub deps: Vec<String>,
 }
 
 #[derive(Debug)]

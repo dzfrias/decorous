@@ -83,6 +83,9 @@ Component {
         ,
     ],
     exports: [],
+    report: Report {
+        diagnostics: [],
+    },
     component_id: 0,
     current_id: 1,
     css: None,

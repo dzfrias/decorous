@@ -17,6 +17,14 @@ impl Report {
         self.diagnostics.as_ref()
     }
 
+    pub fn len(&self) -> usize {
+        self.diagnostics.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn add_diagnostic(&mut self, diagnostic: Diagnostic) {
         self.diagnostics.push(diagnostic);
     }

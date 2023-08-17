@@ -13,6 +13,7 @@ pub struct DepGraph {
     // Directed graph from variable declarations to their dependents (NOT dependencies)
     graph: Graph<Declaration, ()>,
     var_lookup: HashMap<SmolStr, NodeIndex>,
+    unbound: Vec<SmolStr>,
 }
 
 #[derive(Debug, Clone)]
@@ -59,7 +60,11 @@ impl DepGraph {
             }
         }
 
-        let mut s = Self { graph, var_lookup };
+        let mut s = Self {
+            graph,
+            var_lookup,
+            unbound: vec![],
+        };
         s.compute_edges();
         s
     }
@@ -67,6 +72,7 @@ impl DepGraph {
     pub fn mark_used(&mut self, ident: &str) -> bool {
         let target = self.var_lookup.get(ident);
         let Some(target) = target else {
+            self.unbound.push(SmolStr::new(ident));
             return false;
         };
         self.mark_neighbors_used(*target);
@@ -84,6 +90,7 @@ impl DepGraph {
     pub fn mark_mutated(&mut self, ident: &str) -> bool {
         let target = self.var_lookup.get(ident);
         let Some(target) = target else {
+            self.unbound.push(SmolStr::new(ident));
             return false;
         };
         self.mark_neighbors_mutated(*target);
@@ -119,6 +126,10 @@ impl DepGraph {
                 None
             }
         })
+    }
+
+    pub fn get_unbound(&self) -> &[SmolStr] {
+        &self.unbound
     }
 
     fn mark_neighbors_mutated(&mut self, target: NodeIndex) {

@@ -1,0 +1,6 @@
+---
+source: tests/tests.rs
+expression: "String::from_utf8_lossy(assertion.get_output().stderr.as_slice())"
+---
+[33mWarning:[0m no WebAssembly to compile - build args do nothing
+

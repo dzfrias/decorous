@@ -1,14 +1,9 @@
 from pathlib import Path
 import os
-import shutil
 import sys
-import subprocess
 
 
 def main():
-    if shutil.which("emcc") is None:
-        raise Exception("emscripten not installed")
-
     input = Path(os.environ["DECOR_INPUT"])
     outdir = Path(os.environ["DECOR_OUT"])
     name = input.stem

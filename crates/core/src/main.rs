@@ -8,6 +8,7 @@ use std::{
     env,
     fs::{self, File},
     io::{BufWriter, Write},
+    path::Path,
     time::Instant,
 };
 
@@ -21,6 +22,7 @@ use decorous_backend::{
     prerender::{HtmlPrerenderer, Prerenderer},
     render, render_with_wasm, Metadata,
 };
+use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use decorous_frontend::{parse_with_preprocessor, Component};
 use handlebars::{no_escape, Handlebars};
 use merge::Merge;
@@ -61,7 +63,7 @@ fn main() -> Result<()> {
         },
         modularize: args.modularize,
     };
-    let component = parse_component(&input, &config)?;
+    let component = parse_component(&input, &config, &args.input)?;
 
     let js_name = if args.modularize {
         format!("{}.mjs", args.out)
@@ -123,6 +125,32 @@ fn render_js(
     metadata: &Metadata<'_>,
     js_name: &str,
 ) -> Result<()> {
+    let mut report = Report::new();
+    if args.strip && component.wasm().is_none() {
+        report.add_diagnostic(
+            DiagnosticBuilder::new("no WebAssembly to strip", Severity::Warning, 0).build(),
+        );
+    }
+    if !args.build_args.is_empty() && component.wasm().is_none() {
+        report.add_diagnostic(
+            DiagnosticBuilder::new(
+                "no WebAssembly to compile - build args do nothing",
+                Severity::Warning,
+                0,
+            )
+            .build(),
+        );
+    }
+    if args.optimize.is_some() && component.wasm().is_none() {
+        report.add_diagnostic(
+            DiagnosticBuilder::new("no WebAssembly to optimize", Severity::Warning, 0).build(),
+        );
+    }
+    if !report.is_empty() {
+        let input_name = args.input.to_string_lossy();
+        decorous_errors::fmt::report(&report, &input_name, "...")?;
+    }
+
     let mut out = BufWriter::new(File::create(js_name).context("error creating out file")?);
     let mut wasm_compiler = MainCompiler::new(
         &config,
@@ -248,12 +276,23 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata, js_name: &str
     }
 }
 
-fn parse_component<'a>(input: &'a str, config: &Config) -> Result<Component<'a>> {
+fn parse_component<'a>(
+    input: &'a str,
+    config: &Config,
+    file: impl AsRef<Path>,
+) -> Result<Component<'a>> {
+    let file_name = file.as_ref().to_string_lossy();
     let preproc = Preproc::new(config);
     let component = match parse_with_preprocessor(input, &preproc) {
-        Ok(ast) => Ok(Component::new(ast)),
+        Ok(ast) => {
+            let c = Component::new(ast);
+            if !c.report().is_empty() {
+                decorous_errors::fmt::report(c.report(), &file_name, input)?;
+            }
+            Ok(c)
+        }
         Err(report) => {
-            decorous_errors::fmt::report(report, "hi", input)?;
+            decorous_errors::fmt::report(&report, &file_name, input)?;
             anyhow::bail!("\nthe decorous parser failed");
         }
     };

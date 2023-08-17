@@ -2,7 +2,7 @@ use std::io;
 
 use crate::Report;
 
-pub fn report(report: Report, src_name: &str, src: &str) -> io::Result<()> {
+pub fn report(report: &Report, src_name: &str, src: &str) -> io::Result<()> {
     for diagnostic in report.diagnostics() {
         let mut builder =
             ariadne::Report::build(diagnostic.severity.into(), src_name, diagnostic.offset)

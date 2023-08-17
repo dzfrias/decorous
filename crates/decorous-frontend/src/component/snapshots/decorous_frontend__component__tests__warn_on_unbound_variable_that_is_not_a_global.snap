@@ -1,0 +1,15 @@
+---
+source: crates/decorous-frontend/src/component/mod.rs
+expression: component.report()
+---
+Report {
+    diagnostics: [
+        Diagnostic {
+            msg: "possibly unbound variable: x",
+            severity: Warning,
+            helpers: [],
+            offset: 0,
+            note: None,
+        },
+    ],
+}

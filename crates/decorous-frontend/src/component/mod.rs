@@ -1,9 +1,11 @@
 mod declared_vars;
 mod dep_graph;
 mod fragment;
+mod globals;
 
 use std::borrow::Cow;
 
+use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use itertools::Itertools;
 #[cfg(not(debug_assertions))]
 use rand::Rng;
@@ -17,7 +19,7 @@ use crate::{
         traverse_mut, Attribute, AttributeValue, Code, DecorousAst, Node, NodeIter, NodeType,
         SpecialBlock,
     },
-    component::dep_graph::DepGraph,
+    component::{dep_graph::DepGraph, globals::GLOBALS},
     css::{self, ast::Css},
     location::Location,
     utils,
@@ -32,6 +34,7 @@ pub struct Component<'a> {
     toplevel_nodes: Vec<ToplevelNodeData>,
     hoist: Vec<SyntaxNode>,
     exports: Vec<SmolStr>,
+    report: Report,
 
     component_id: u8,
     current_id: u32,
@@ -54,6 +57,7 @@ impl<'a> Component<'a> {
             toplevel_nodes: vec![],
             hoist: vec![],
             exports: vec![],
+            report: Report::new(),
             current_id: 0,
             #[cfg(not(debug_assertions))]
             component_id: rand::thread_rng().gen(),
@@ -102,6 +106,10 @@ impl<'a> Component<'a> {
 
     pub fn exports(&self) -> &[SmolStr] {
         self.exports.as_ref()
+    }
+
+    pub fn report(&self) -> &Report {
+        &self.report
     }
 }
 
@@ -478,6 +486,21 @@ impl<'a> Component<'a> {
             self.toplevel_nodes.remove(pos);
             self.hoist.push(v.decl.syntax().clone());
         }
+
+        for unbound in graph
+            .get_unbound()
+            .iter()
+            .filter(|v| !GLOBALS.contains(&v.as_str()))
+        {
+            self.report.add_diagnostic(
+                DiagnosticBuilder::new(
+                    format!("possibly unbound variable: {unbound}"),
+                    Severity::Warning,
+                    0,
+                )
+                .build(),
+            )
+        }
     }
 
     fn generate_elem_id(&mut self) -> u32 {
@@ -681,5 +704,12 @@ mod tests {
         );
         assert!(component.toplevel_nodes().is_empty());
         insta::assert_debug_snapshot!(component.hoist());
+    }
+
+    #[test]
+    fn warn_on_unbound_variable_that_is_not_a_global() {
+        let component = make_component("#button[@click={() => console.log(x)}]:Hello");
+        assert!(component.toplevel_nodes().is_empty());
+        insta::assert_debug_snapshot!(component.report());
     }
 }

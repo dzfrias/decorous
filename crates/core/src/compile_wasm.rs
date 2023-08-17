@@ -1,3 +1,4 @@
+use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use indicatif::ProgressBar;
 use std::{
     borrow::Cow,
@@ -86,6 +87,7 @@ macro_rules! compile_for {
                     .compilers
                     .get(lang)
                     .with_context(|| format!("unsupported language: {lang}"))?;
+                warn_unused_deps(&config.deps)?;
                 let path: PathBuf = format!("__tmp.{}", config.ext_override.as_deref().unwrap_or(lang)).into();
 
                 let spinner = ProgressBar::new_spinner().with_message(format!("Building WebAssembly ({lang})..."));
@@ -203,6 +205,25 @@ fn strip(file: impl AsRef<Path>) -> Result<()> {
         module.customs.delete(id);
     }
     module.emit_wasm_file(file)?;
+
+    Ok(())
+}
+
+fn warn_unused_deps(deps: &[String]) -> Result<()> {
+    let mut report = Report::new();
+    for bin in deps.iter().filter(|b| which(b).is_err()) {
+        report.add_diagnostic(
+            DiagnosticBuilder::new(
+                format!("script dependency not found: {bin}"),
+                Severity::Warning,
+                0,
+            )
+            .build(),
+        )
+    }
+    if !report.is_empty() {
+        decorous_errors::fmt::report(&report, "", "")?;
+    }
 
     Ok(())
 }
