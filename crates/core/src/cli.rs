@@ -56,7 +56,6 @@ pub struct Cli {
     /// Generate an ES6 compliant module for the output.
     #[arg(short, long)]
     pub modularize: bool,
-
     /// Pass build argument(s) to a given WASM compiler.
     #[arg(
         short = 'B',
@@ -66,6 +65,10 @@ pub struct Cli {
         number_of_values = 1,
     )]
     pub build_args: Vec<(String, String)>,
+
+    /// Watch the input file for changes, recompiling if found.
+    #[arg(short, long)]
+    pub watch: bool,
 }
 
 /// Parse a single key-value pair

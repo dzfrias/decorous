@@ -26,6 +26,10 @@ use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use decorous_frontend::{parse_with_preprocessor, Component};
 use handlebars::{no_escape, Handlebars};
 use merge::Merge;
+use notify::{
+    event::{DataChange, ModifyKind},
+    EventKind, RecommendedWatcher, RecursiveMode, Watcher,
+};
 use serde_json::json;
 
 use crate::{compile_wasm::MainCompiler, preprocessor::Preproc};
@@ -38,8 +42,6 @@ static ALLOC: dhat::Alloc = dhat::Alloc;
 pub const FINISHED: &str = "\x1b[32;1mDONE\x1b[0m";
 
 fn main() -> Result<()> {
-    let start = Instant::now();
-
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
@@ -51,8 +53,46 @@ fn main() -> Result<()> {
     );
 
     let config = get_config()?;
-    let input = fs::read_to_string(&args.input).context("error reading provided input file")?;
 
+    compile(&args, &config)?;
+
+    if args.watch {
+        watch(args, config)?;
+    }
+
+    #[cfg(feature = "dhat-heap")]
+    println!();
+
+    Ok(())
+}
+
+fn watch(args: Cli, config: Config) -> Result<(), anyhow::Error> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut watcher = RecommendedWatcher::new(tx, notify::Config::default())
+        .context("error creating up watcher")?;
+    watcher
+        .watch(&args.input, RecursiveMode::NonRecursive)
+        .context("error watching input file")?;
+    Ok(for res in rx {
+        let event = res?;
+        debug_assert_eq!(1, event.paths.len(), "watching invalid targets!");
+        match event.kind {
+            EventKind::Modify(ModifyKind::Data(DataChange::Content)) => {
+                println!();
+                compile(&args, &config)?;
+            }
+            EventKind::Remove(_) => {
+                println!("Input file removed... exiting process");
+                break;
+            }
+            _ => {}
+        }
+    })
+}
+
+fn compile(args: &Cli, config: &Config) -> Result<(), anyhow::Error> {
+    let start = Instant::now();
+    let input = fs::read_to_string(&args.input).context("error reading provided input file")?;
     let metadata = Metadata {
         name: {
             &args
@@ -64,19 +104,16 @@ fn main() -> Result<()> {
         modularize: args.modularize,
     };
     let component = parse_component(&input, &config, &args.input)?;
-
     let js_name = if args.modularize {
         format!("{}.mjs", args.out)
     } else {
         format!("{}.js", args.out)
     };
-
-    render_js(&args, config, &component, &metadata, &js_name)?;
+    render_js(&args, &config, &component, &metadata, &js_name)?;
     render_html(&args, &component, &metadata, &js_name)?;
     if component.css().is_some() {
         render_css(&args, component, metadata)?;
     }
-
     let mods = {
         let mut mods = Vec::with_capacity(2);
         let opt = args
@@ -88,16 +125,11 @@ fn main() -> Result<()> {
         }
         mods
     };
-
     println!(
         "  {FINISHED} compiled in ~{:.2?} ({})",
         start.elapsed(),
         mods.join(" + ")
     );
-
-    #[cfg(feature = "dhat-heap")]
-    println!();
-
     Ok(())
 }
 
@@ -120,7 +152,7 @@ fn render_css(
 
 fn render_js(
     args: &Cli,
-    config: Config,
+    config: &Config,
     component: &Component<'_>,
     metadata: &Metadata<'_>,
     js_name: &str,
