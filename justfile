@@ -2,8 +2,8 @@ bt := '0'
 export RUST_BACKTRACE := bt
 default: test
 
-run FILE *ARGS:
-  cargo run {{FILE}} {{ARGS}}
+run *ARGS:
+  cargo run {{ARGS}}
 
 test:
   cargo nextest run --all
@@ -25,9 +25,9 @@ regression:
   ./scripts/bench_regression.sh ./old ./new
   rm ./old ./new
 
-bench FILE:
+bench *ARGS:
   cargo build --release
-  hyperfine "./target/release/decorous {{FILE}}" --warmup 5
+  hyperfine "./target/release/decorous {{ARGS}}" --warmup 5
   @echo Cleaning up!
   @rm out*
   @if [[ -d "./out" ]]; then rm -rf out; fi
