@@ -1,5 +1,4 @@
 use decorous_errors::{DiagnosticBuilder, Report, Severity};
-use indicatif::ProgressBar;
 use std::{
     borrow::Cow,
     ffi::OsStr,
@@ -7,7 +6,6 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     str,
-    time::Duration,
 };
 
 use anyhow::{bail, Context, Error, Result};
@@ -21,7 +19,7 @@ use which::which;
 use crate::{
     cli::OptimizationLevel,
     config::{Config, ScriptOrFile, WasmFeature},
-    FINISHED,
+    indicators::{FinishLog, Spinner},
 };
 
 #[derive(Debug)]
@@ -31,6 +29,7 @@ pub struct MainCompiler<'a> {
     out_name: &'a str,
     opt_level: Option<OptimizationLevel>,
     strip: bool,
+    enable_color: bool,
 }
 
 impl<'a> MainCompiler<'a> {
@@ -40,6 +39,7 @@ impl<'a> MainCompiler<'a> {
         build_args: &'a [(String, String)],
         opt_level: Option<OptimizationLevel>,
         strip: bool,
+        enable_color: bool,
     ) -> Self {
         Self {
             config,
@@ -47,6 +47,7 @@ impl<'a> MainCompiler<'a> {
             out_name,
             opt_level,
             strip,
+            enable_color,
         }
     }
 
@@ -90,8 +91,7 @@ macro_rules! compile_for {
                 warn_unused_deps(&config.deps)?;
                 let path: PathBuf = format!("__tmp.{}", config.ext_override.as_deref().unwrap_or(lang)).into();
 
-                let spinner = ProgressBar::new_spinner().with_message(format!("Building WebAssembly ({lang})..."));
-                spinner.enable_steady_tick(Duration::from_micros(100));
+                let spinner = Spinner::new(format!("Building WebAssembly ({lang})..."));
 
                 fs::write(&path, body)?;
 
@@ -149,14 +149,20 @@ macro_rules! compile_for {
 
                 out.write_all(&stdout)?;
 
-                spinner.finish_with_message(format!("{FINISHED} WebAssembly: {lang}{} (\x1b[34m{}/\x1b[0m)", {
-                    let mut args = self.build_args_for_lang(lang).join(" ");
-                    if !args.is_empty() {
-                        args.insert_str(0, " `");
-                        args.push('`')
-                    }
-                    args
-                }, self.out_name));
+                spinner.finish(FinishLog::default()
+                    .with_main_message("WebAssembly")
+                    .with_sub_message(format!("{lang}{}", {
+                        let mut args = self.build_args_for_lang(lang).join(" ");
+                        if !args.is_empty() {
+                            args.insert_str(0, " `");
+                            args.push('`')
+                        }
+                        args
+                    }))
+                    .with_file(self.out_name)
+                    .enable_color(self.enable_color)
+                    .to_string()
+                );
 
                 let wasm_files = fs::read_dir(self.out_name)?
                     .filter_map(|entry| entry.ok().map(|entry| entry.path()))
@@ -168,22 +174,29 @@ macro_rules! compile_for {
 
                 if let Some(opt) = self.opt_level {
                     for path in &wasm_files {
-                        let spinner = ProgressBar::new_spinner().with_message(format!("Optimizing WebAssembly ({opt})..."));
-                        spinner.enable_steady_tick(Duration::from_micros(100));
+                        let spinner = Spinner::new(format!("Optimizing WebAssembly ({opt})..."));
                         optimize(path, opt, &config.features).context("problem optimizing WebAssembly")?;
-                        spinner.finish_with_message(
-                            format!("{FINISHED} optimized WebAssembly: {opt} (\x1b[34m{}\x1b[0m)", path.display())
+                        spinner.finish(
+                            FinishLog::default()
+                               .with_main_message("optimized WebAssembly")
+                               .with_sub_message(opt.to_string())
+                               .with_file(path)
+                               .enable_color(self.enable_color)
+                               .to_string()
                         );
                     }
                 }
 
                 if self.strip {
                     for path in &wasm_files {
-                        let spinner = ProgressBar::new_spinner().with_message(format!("Stripping WebAssembly..."));
-                        spinner.enable_steady_tick(Duration::from_micros(100));
+                        let spinner = Spinner::new("Stripping WebAssembly...");
                         strip(&path).context("problem stripping WebAssembly binary")?;
-                        spinner.finish_with_message(
-                            format!("{FINISHED} stripped WebAssembly (\x1b[34m{}\x1b[0m)", path.display())
+                        spinner.finish(
+                            FinishLog::default()
+                               .with_main_message("stripped WebAssembly")
+                               .with_file(path)
+                               .enable_color(self.enable_color)
+                               .to_string()
                         );
                     }
                 }

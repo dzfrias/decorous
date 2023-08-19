@@ -1,12 +1,11 @@
 use duct::cmd;
-use indicatif::ProgressBar;
-use std::{borrow::Cow, time::Duration};
+use std::borrow::Cow;
 
 use decorous_frontend::{location::Location, Override, PreprocessError, Preprocessor};
 
 use crate::{
     config::{Config, PreprocTarget},
-    FINISHED,
+    indicators::{FinishLog, Spinner},
 };
 
 #[derive(Debug)]
@@ -29,8 +28,7 @@ impl Preprocessor for Preproc<'_> {
         let mut to_pipe = Cow::Borrowed(body);
         let len = cfg.pipeline.len();
         for (i, comp) in cfg.pipeline.iter().enumerate() {
-            let spinner = ProgressBar::new_spinner().with_message("Running preprocessor...");
-            spinner.enable_steady_tick(Duration::from_micros(100));
+            let spinner = Spinner::new("Running preprocessor");
             let out = cmd!("echo", to_pipe.as_ref())
                 .pipe(cmd!("sh", "-c", comp))
                 .read()
@@ -41,14 +39,19 @@ impl Preprocessor for Preproc<'_> {
                     )
                 })?;
             to_pipe = Cow::Owned(out);
-            spinner.finish_with_message(format!(
-                "{FINISHED} preprocessor: `{comp}` ({} [{}/{len}])",
-                match cfg.target {
-                    PreprocTarget::Js => "JavaScript",
-                    PreprocTarget::Css => "CSS",
-                },
-                i + 1,
-            ));
+            spinner.finish(
+                FinishLog::default()
+                    .with_main_message("preprocessor")
+                    .with_sub_message(format!(
+                        "{} `{comp}`",
+                        match cfg.target {
+                            PreprocTarget::Js => "JavaScript",
+                            PreprocTarget::Css => "CSS",
+                        }
+                    ))
+                    .with_mod(format!("{}/{len}", i + 1))
+                    .to_string(),
+            );
         }
 
         match to_pipe {

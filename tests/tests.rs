@@ -335,3 +335,15 @@ decor_test!(
         ));
     }
 );
+
+decor_test!(
+    can_disable_colorization,
+    NO_JS,
+    |_dir: &mut TempDir, mut cmd: Command| {
+        cmd.arg("--color=never");
+        let assertion = cmd.assert().success();
+        insta::assert_snapshot!(String::from_utf8_lossy(
+            assertion.get_output().stdout.as_slice()
+        ));
+    }
+);

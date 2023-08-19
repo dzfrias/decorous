@@ -3,6 +3,15 @@ use std::{fmt::Display, path::PathBuf};
 use anyhow::Context;
 use clap::{builder::ArgPredicate, Parser, ValueEnum};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+#[clap(rename_all = "kebab-case")]
+pub enum Color {
+    #[default]
+    Auto,
+    Always,
+    Never,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 #[clap(rename_all = "kebab-case")]
 pub enum RenderMethod {
@@ -69,6 +78,9 @@ pub struct Cli {
     /// Watch the input file for changes, recompiling if found.
     #[arg(short, long)]
     pub watch: bool,
+    /// Control output colorization.
+    #[arg(short, long, default_value = "auto")]
+    pub color: Color,
 }
 
 /// Parse a single key-value pair

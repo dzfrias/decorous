@@ -1,6 +1,7 @@
 mod cli;
 mod compile_wasm;
 mod config;
+mod indicators;
 mod preprocessor;
 
 use std::{
@@ -32,14 +33,11 @@ use notify::{
 };
 use serde_json::json;
 
-use crate::{compile_wasm::MainCompiler, preprocessor::Preproc};
+use crate::{cli::Color, compile_wasm::MainCompiler, indicators::FinishLog, preprocessor::Preproc};
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
-
-// ANSI green text
-pub const FINISHED: &str = "\x1b[32;1mDONE\x1b[0m";
 
 fn main() -> Result<()> {
     #[cfg(feature = "dhat-heap")]
@@ -53,11 +51,16 @@ fn main() -> Result<()> {
     );
 
     let config = get_config()?;
+    let enable_color = match args.color {
+        Color::Auto => atty::is(atty::Stream::Stdout),
+        Color::Never => false,
+        Color::Always => true,
+    };
 
-    compile(&args, &config)?;
+    compile(&args, &config, enable_color)?;
 
     if args.watch {
-        watch(args, config)?;
+        watch(args, config, enable_color)?;
     }
 
     #[cfg(feature = "dhat-heap")]
@@ -66,7 +69,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn watch(args: Cli, config: Config) -> Result<(), anyhow::Error> {
+fn watch(args: Cli, config: Config, enable_color: bool) -> Result<(), anyhow::Error> {
     let (tx, rx) = std::sync::mpsc::channel();
     let mut watcher = RecommendedWatcher::new(tx, notify::Config::default())
         .context("error creating up watcher")?;
@@ -79,7 +82,7 @@ fn watch(args: Cli, config: Config) -> Result<(), anyhow::Error> {
         match event.kind {
             EventKind::Modify(ModifyKind::Data(DataChange::Content)) => {
                 println!();
-                compile(&args, &config)?;
+                compile(&args, &config, enable_color)?;
             }
             EventKind::Remove(_) => {
                 println!("Input file removed... exiting process");
@@ -90,7 +93,7 @@ fn watch(args: Cli, config: Config) -> Result<(), anyhow::Error> {
     })
 }
 
-fn compile(args: &Cli, config: &Config) -> Result<(), anyhow::Error> {
+fn compile(args: &Cli, config: &Config, enable_color: bool) -> Result<(), anyhow::Error> {
     let start = Instant::now();
     let input = fs::read_to_string(&args.input).context("error reading provided input file")?;
     let metadata = Metadata {
@@ -103,33 +106,39 @@ fn compile(args: &Cli, config: &Config) -> Result<(), anyhow::Error> {
         },
         modularize: args.modularize,
     };
-    let component = parse_component(&input, &config, &args.input)?;
+    let component = parse_component(&input, &config, &args.input, enable_color)?;
     let js_name = if args.modularize {
         format!("{}.mjs", args.out)
     } else {
         format!("{}.js", args.out)
     };
-    render_js(&args, &config, &component, &metadata, &js_name)?;
-    render_html(&args, &component, &metadata, &js_name)?;
+    render_js(
+        &args,
+        &config,
+        &component,
+        &metadata,
+        &js_name,
+        enable_color,
+    )?;
+    render_html(&args, &component, &metadata, &js_name, enable_color)?;
     if component.css().is_some() {
-        render_css(&args, component, metadata)?;
+        render_css(&args, component, metadata, enable_color)?;
     }
-    let mods = {
-        let mut mods = Vec::with_capacity(2);
-        let opt = args
-            .optimize
-            .map_or(Cow::Borrowed("debug"), |opt| Cow::Owned(opt.to_string()));
-        mods.push(opt);
+
+    {
+        let mut log = FinishLog::default();
+        log.with_main_message(format!("compiled in ~{:.2?}", start.elapsed()))
+            .enable_color(enable_color)
+            .with_mod(
+                args.optimize
+                    .map_or(Cow::Borrowed("debug"), |opt| opt.to_string().into()),
+            );
         if args.modularize {
-            mods.push(Cow::Borrowed("modularized"));
+            log.with_mod("modularized");
         }
-        mods
-    };
-    println!(
-        "  {FINISHED} compiled in ~{:.2?} ({})",
-        start.elapsed(),
-        mods.join(" + ")
-    );
+        println!("{log}");
+    }
+
     Ok(())
 }
 
@@ -137,6 +146,7 @@ fn render_css(
     args: &Cli,
     component: Component<'_>,
     metadata: Metadata<'_>,
+    enable_color: bool,
 ) -> Result<(), anyhow::Error> {
     let name = format!("{}.css", args.out);
     render::<CssRenderer, _>(
@@ -146,7 +156,14 @@ fn render_css(
         ),
         &metadata,
     )?;
-    println!("  {FINISHED} CSS: (\x1b[34m{}.css\x1b[0m)", args.out);
+    println!(
+        "{}",
+        FinishLog::default()
+            .with_main_message("CSS")
+            .enable_color(enable_color)
+            .with_file(format!("{}.css", args.out))
+    );
+
     Ok(())
 }
 
@@ -156,6 +173,7 @@ fn render_js(
     component: &Component<'_>,
     metadata: &Metadata<'_>,
     js_name: &str,
+    enable_color: bool,
 ) -> Result<()> {
     let mut report = Report::new();
     if args.strip && component.wasm().is_none() {
@@ -190,6 +208,7 @@ fn render_js(
         &args.build_args,
         args.optimize,
         args.strip,
+        enable_color,
     );
     match args.render_method {
         RenderMethod::Csr => {
@@ -212,8 +231,12 @@ fn render_js(
         }
     }
     println!(
-        "  {FINISHED} JavaScript: {} (\x1b[34m{}.js\x1b[0m)",
-        args.render_method, args.out
+        "{}",
+        FinishLog::default()
+            .with_main_message("JavaScript")
+            .with_sub_message(args.render_method.to_string())
+            .enable_color(enable_color)
+            .with_file(js_name)
     );
     out.flush()
         .context("problem flushing buffered writer while rendering")?;
@@ -238,7 +261,13 @@ fn get_config() -> Result<Config> {
     }
 }
 
-fn render_html(args: &Cli, component: &Component, meta: &Metadata, js_name: &str) -> Result<()> {
+fn render_html(
+    args: &Cli,
+    component: &Component,
+    meta: &Metadata,
+    js_name: &str,
+    enable_color: bool,
+) -> Result<()> {
     let mut handlebars = Handlebars::new();
     handlebars.register_escape_fn(no_escape);
     handlebars.register_template_string("index", include_str!("./templates/template.html"))?;
@@ -262,7 +291,13 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata, js_name: &str
                 out,
             )?;
 
-            println!("  {FINISHED} HTML (\x1b[34mindex.html\x1b[0m)");
+            println!(
+                "{}",
+                FinishLog::default()
+                    .with_main_message("HTML")
+                    .with_file("index.html")
+                    .enable_color(enable_color)
+            );
 
             Ok(())
         }
@@ -288,7 +323,14 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata, js_name: &str
                     File::create("index.html").context("problem creating index.html")?,
                 )?;
 
-                println!("  {FINISHED} HTML: prerender (\x1b[34mindex.html\x1b[0m)");
+                println!(
+                    "{}",
+                    FinishLog::default()
+                        .with_main_message("HTML")
+                        .with_sub_message("prerender")
+                        .with_file("index.html")
+                        .enable_color(enable_color)
+                );
                 return Ok(());
             }
 
@@ -301,7 +343,14 @@ fn render_html(args: &Cli, component: &Component, meta: &Metadata, js_name: &str
                 ),
                 meta,
             )?;
-            println!("  {FINISHED} HTML: prerender (\x1b[34m{html}\x1b[0m)");
+            println!(
+                "{}",
+                FinishLog::default()
+                    .with_main_message("HTML")
+                    .with_sub_message("prerender")
+                    .with_file(html)
+                    .enable_color(enable_color)
+            );
 
             Ok(())
         }
@@ -312,6 +361,7 @@ fn parse_component<'a>(
     input: &'a str,
     config: &Config,
     file: impl AsRef<Path>,
+    enable_color: bool,
 ) -> Result<Component<'a>> {
     let file_name = file.as_ref().to_string_lossy();
     let preproc = Preproc::new(config);
@@ -328,6 +378,11 @@ fn parse_component<'a>(
             anyhow::bail!("\nthe decorous parser failed");
         }
     };
-    println!("  {FINISHED} parsed");
+    println!(
+        "{}",
+        FinishLog::default()
+            .with_main_message("parsed")
+            .enable_color(enable_color)
+    );
     component
 }
