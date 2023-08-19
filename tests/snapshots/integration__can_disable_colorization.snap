@@ -1,9 +1,7 @@
 ---
 source: tests/tests.rs
-expression: "String::from_utf8_lossy(assertion.get_output().stdout.as_slice())"
+expression: filtered_stdout
 ---
 DONE parsed
 DONE JavaScript: prerender (out.js)
 DONE HTML: prerender (out.html)
-DONE compiled in ~6.38ms [debug]
-

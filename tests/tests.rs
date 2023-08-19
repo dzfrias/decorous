@@ -342,8 +342,12 @@ decor_test!(
     |_dir: &mut TempDir, mut cmd: Command| {
         cmd.arg("--color=never");
         let assertion = cmd.assert().success();
-        insta::assert_snapshot!(String::from_utf8_lossy(
-            assertion.get_output().stdout.as_slice()
-        ));
+        let stdout = String::from_utf8_lossy(assertion.get_output().stdout.as_slice());
+        let filtered_stdout = stdout
+            .lines()
+            .filter(|line| !line.starts_with("DONE compiled in"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        insta::assert_snapshot!(filtered_stdout);
     }
 );
