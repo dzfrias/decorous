@@ -544,9 +544,10 @@ WASM_EXEC = """// Copyright 2018 The Go Authors. All rights reserved.
 def main():
     input = os.environ["DECOR_INPUT"]
     outdir = os.environ["DECOR_OUT"]
+    outdir_abs = os.environ["DECOR_OUT_DIR"]
     exports = os.environ["DECOR_EXPORTS"]
 
-    with open(os.path.join(outdir, "wasm_exec.js"), "w") as f:
+    with open(os.path.join(outdir_abs, "wasm_exec.js"), "w") as f:
         f.write(WASM_EXEC)
     shutil.copy(input, "main.go")
     subprocess.run(
@@ -554,14 +555,13 @@ def main():
             "tinygo",
             "build",
             "-o",
-            os.path.join(outdir, "out.wasm"),
+            os.path.join(outdir_abs, "out.wasm"),
             "-target",
             "wasm",
             "main.go",
         ],
         check=True,
     )
-    os.remove("main.go")
 
     print(f'import "./{outdir}/wasm_exec.js";\nconst go = new Go();')
     if exports:

@@ -6,8 +6,9 @@ import sys
 def main():
     input = Path(os.environ["DECOR_INPUT"])
     outdir = Path(os.environ["DECOR_OUT"])
+    outdir_abs = Path(os.environ["DECOR_OUT_DIR"])
     name = input.stem
-    pre = outdir / "__pre.js"
+    pre = "__pre.js"
 
     # The contents of this file will run before the JavaScript glue
     try:
@@ -22,7 +23,7 @@ def main():
     except:
         raise Exception("problem writing __pre.js")
 
-    out_name = (outdir / name).with_suffix(".js")
+    out_name = (outdir_abs / name).with_suffix(".js")
     status = os.system(
         f'emcc \
             --pre-js "{pre}" \
@@ -36,11 +37,6 @@ def main():
     )
     if status != 0:
         raise Exception("error compiling emscripten")
-    try:
-        # Clean up __pre.js file
-        os.remove(pre)
-    except:
-        raise Exception("problem removing __pre.js")
 
     print(
         f"""import init from "./{outdir}/{name}.js";

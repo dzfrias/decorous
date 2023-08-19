@@ -3,39 +3,6 @@ source: tests/tests.rs
 expression: all
 ---
 
----.git---
-IGNORED
-
----.gitignore---
-IGNORED
-
----Cargo.lock---
-IGNORED
-
----Cargo.toml---
-[package]
-name = "decor-out"
-version = "0.1.0"
-edition = "2021"
-
-[lib]
-crate-type = ["cdylib"]
-
-[dependencies]
-wasm-bindgen = "0.2"
-
----lib.rs---
-
-use wasm_bindgen::prelude::*;
-
-#[wasm_bindgen]
-pub fn add(x: i32, y: i32) -> i32 {
-    x + y
-}
-
----target---
-IGNORED
-
 ---input.decor---
 ---rust
 use wasm_bindgen::prelude::*;
@@ -218,7 +185,7 @@ export function add(a: number, b: number): number;
 <button id="0">Hello!</button>
 
 ---out.js---
-import init, * as wasm from "/out/decor_out.js";
+import init, * as wasm from "/out/__tmp.js";
 await init();
 const elems = {"0":document.getElementById("0"),};
 function replace(node) {

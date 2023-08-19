@@ -7,6 +7,7 @@ import sys
 def main():
     input = Path(os.environ["DECOR_INPUT"])
     outdir = os.environ["DECOR_OUT"]
+    outdir_abs = os.environ["DECOR_OUT_DIR"]
     exports = os.environ["DECOR_EXPORTS"]
     name = input.stem
 
@@ -15,7 +16,7 @@ def main():
             "wat2wasm",
             input,
             "-o",
-            os.path.join(outdir, f"{name}.wasm"),
+            os.path.join(outdir_abs, f"{name}.wasm"),
             *sys.argv[1:],
         ],
         check=True,

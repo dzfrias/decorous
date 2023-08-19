@@ -1,4 +1,3 @@
-use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use std::{
     borrow::Cow,
     ffi::OsStr,
@@ -10,9 +9,11 @@ use std::{
 
 use anyhow::{bail, Context, Error, Result};
 use decorous_backend::{dom_render::DomRenderer, prerender::Prerenderer, CodeInfo, WasmCompiler};
+use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use itertools::Itertools;
 use scopeguard::defer;
 use shlex::Shlex;
+use tempdir::TempDir;
 use wasm_opt::OptimizationOptions;
 use which::which;
 
@@ -89,7 +90,8 @@ macro_rules! compile_for {
                     .get(lang)
                     .with_context(|| format!("unsupported language: {lang}"))?;
                 warn_unused_deps(&config.deps)?;
-                let path: PathBuf = format!("__tmp.{}", config.ext_override.as_deref().unwrap_or(lang)).into();
+                let dir = TempDir::new(lang).context("error creating temp dir for compiler")?;
+                let path: PathBuf = dir.path().join(format!("__tmp.{}", config.ext_override.as_deref().unwrap_or(lang)));
 
                 let spinner = Spinner::new(format!("Building WebAssembly ({lang})..."));
 
@@ -107,6 +109,7 @@ macro_rules! compile_for {
                     Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
                     Err(err) => bail!(err),
                 }
+                let outdir = fs::canonicalize(self.out_name).unwrap();
 
                 let python = self.get_python().context("python not found in $PATH! Make sure to install it!")?;
                 let mut build_args = self.build_args_for_lang(lang);
@@ -114,7 +117,7 @@ macro_rules! compile_for {
                 let file_loc = match &config.script {
                     ScriptOrFile::File(file) => file.as_path(),
                     ScriptOrFile::Script(script) => {
-                        fs::write("__tmp.py", script)?;
+                        fs::write(dir.path().join("__tmp.py"), script)?;
                         Path::new("__tmp.py")
                     },
                 };
@@ -122,7 +125,7 @@ macro_rules! compile_for {
                 // scope ends, and match arms have individual scopes
                 defer! {
                     if matches!(&config.script, ScriptOrFile::Script(_)) {
-                        fs::remove_file("__tmp.py").expect("error removing \"__tmp.py\"! Remove it manually!");
+                        fs::remove_file(dir.path().join("__tmp.py")).expect("error removing \"__tmp.py\"! Remove it manually!");
                     }
                 }
 
@@ -130,7 +133,9 @@ macro_rules! compile_for {
                     .arg(file_loc)
                     .env("DECOR_INPUT", &path)
                     .env("DECOR_OUT", self.out_name)
+                    .env("DECOR_OUT_DIR", outdir)
                     .env("DECOR_EXPORTS", exports.iter().join(" "))
+                    .current_dir(dir.path())
                     .args(&mut build_args)
                     .output()?;
                 let (status, stdout, stderr) = (script_out.status, script_out.stdout, script_out.stderr);

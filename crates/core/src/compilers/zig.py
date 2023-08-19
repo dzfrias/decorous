@@ -8,6 +8,7 @@ import sys
 def main():
     input = Path(os.environ["DECOR_INPUT"])
     outdir = Path(os.environ["DECOR_OUT"])
+    outdir_abs = Path(os.environ["DECOR_OUT_DIR"])
     exports = os.environ["DECOR_EXPORTS"]
     name = input.stem
 
@@ -25,8 +26,7 @@ def main():
         ],
         check=True,
     )
-    shutil.move(f"{name}.wasm", outdir)
-    os.remove(f"{name}.wasm.o")
+    shutil.move(f"{name}.wasm", outdir_abs)
 
     if not exports:
         print(

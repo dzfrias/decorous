@@ -7,6 +7,7 @@ from pathlib import Path
 def main():
     input = Path(os.environ["DECOR_INPUT"])
     outdir = os.environ["DECOR_OUT"]
+    outdir_abs = os.environ["DECOR_OUT_DIR"]
     name = input.stem
 
     PROJECT_NAME = "decor-out"
@@ -14,7 +15,7 @@ def main():
     if not os.path.isdir(PROJECT_NAME):
         create_wasm_bindgen_project(PROJECT_NAME)
 
-    lib_path = Path(PROJECT_NAME) / "src" / "lib.rs"
+    lib_path = os.path.join("src", "lib.rs")
     with open(input, "r") as file:
         contents = file.read()
     with open(lib_path, "w") as f:
@@ -24,13 +25,12 @@ def main():
         [
             "wasm-pack",
             "build",
-            PROJECT_NAME,
             "--target",
             "web",
             "--out-name",
             name,
             "--out-dir",
-            Path("..") / outdir,
+            outdir_abs,
             "--color",
             "always",
             *sys.argv[1:],
@@ -38,17 +38,15 @@ def main():
         check=True,
     )
 
-    os.environ["DECOR_WASM"] = os.path.join(outdir, f"{name}_bg.wasm")
-
     print(
-        f"""import init, * as wasm from "/{outdir}/decor_out.js";
+        f"""import init, * as wasm from "/{outdir}/__tmp.js";
 await init();"""
     )
 
 
 def create_wasm_bindgen_project(name: str):
-    subprocess.run(["cargo", "new", "--lib", name], check=True)
-    with open(f"{name}/Cargo.toml", "w") as f:
+    subprocess.run(["cargo", "init", "--lib", "--name", name], check=True)
+    with open(f"Cargo.toml", "w") as f:
         contents = f"""[package]
 name = "{name}"
 version = "0.1.0"

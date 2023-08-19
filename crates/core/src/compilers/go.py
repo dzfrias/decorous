@@ -6,6 +6,7 @@ import shutil
 def main():
     input = os.environ["DECOR_INPUT"]
     outdir = os.environ["DECOR_OUT"]
+    outdir_abs = os.environ["DECOR_OUT_DIR"]
     exports = os.environ["DECOR_EXPORTS"]
 
     os.environ["GOOS"] = "js"
@@ -14,12 +15,12 @@ def main():
         ["go", "env", "GOROOT"], capture_output=True
     ).stdout.strip()
     wasm_exec = os.path.join(go_root.decode(), "misc", "wasm", "wasm_exec.js")
-    shutil.copy(wasm_exec, outdir)
+    shutil.copy(wasm_exec, outdir_abs)
     shutil.copy(input, "main.go")
     subprocess.run(["go", "mod", "init", "github.com/dzfrias/decorous"], check=True)
-    subprocess.run(["go", "build", "-o", os.path.join(outdir, "out.wasm")], check=True)
-    os.remove("main.go")
-    os.remove("go.mod")
+    subprocess.run(
+        ["go", "build", "-o", os.path.join(outdir_abs, "out.wasm")], check=True
+    )
 
     print(f'import "./{outdir}/wasm_exec.js";\nconst go = new Go();')
     if exports:
