@@ -359,7 +359,7 @@ fn parse_component<'a>(
     enable_color: bool,
 ) -> Result<Component<'a>> {
     let file_name = file.as_ref().to_string_lossy();
-    let preproc = Preproc::new(config);
+    let preproc = Preproc::new(config, enable_color);
     let component = match parse_with_preprocessor(input, &preproc) {
         Ok(ast) => {
             let c = Component::new(ast);

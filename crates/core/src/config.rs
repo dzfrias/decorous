@@ -39,6 +39,16 @@ impl Default for Config {
                         target: PreprocTarget::Css,
                     },
                 ),
+                (
+                    "ts".to_owned(),
+                    PreprocessPipeline {
+                        pipeline: vec![
+                            "set -e; cat - > __tmp.ts; tsc __tmp.ts --pretty; cat __tmp.js"
+                                .to_owned(),
+                        ],
+                        target: PreprocTarget::Js,
+                    },
+                ),
             ]),
 
             compilers: HashMap::from_iter([

@@ -4,7 +4,7 @@ use thiserror::Error;
 use crate::location::Location;
 
 #[derive(Debug, Error, Clone, PartialEq)]
-#[error("preprocessing error: {msg}")]
+#[error("{msg}")]
 #[non_exhaustive]
 pub struct PreprocessError {
     pub loc: Location,

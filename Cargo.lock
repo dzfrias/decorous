@@ -527,6 +527,7 @@ dependencies = [
  "serde_json",
  "shlex",
  "superfmt",
+ "tempdir",
  "toml",
  "walrus",
  "wasm-opt",
