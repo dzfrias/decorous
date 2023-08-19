@@ -33,7 +33,12 @@ use notify::{
 };
 use serde_json::json;
 
-use crate::{cli::Color, compile_wasm::MainCompiler, indicators::FinishLog, preprocessor::Preproc};
+use crate::{
+    cli::{Build, Color, Command},
+    compile_wasm::MainCompiler,
+    indicators::FinishLog,
+    preprocessor::Preproc,
+};
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -45,22 +50,26 @@ fn main() -> Result<()> {
 
     let args = Cli::parse();
 
-    ensure!(
-        !(args.render_method == RenderMethod::Prerender && args.modularize),
-        "component cannot be both modularized and prerendered!"
-    );
+    match args.command {
+        Command::Build(args) => {
+            ensure!(
+                !(args.render_method == RenderMethod::Prerender && args.modularize),
+                "component cannot be both modularized and prerendered!"
+            );
 
-    let config = get_config()?;
-    let enable_color = match args.color {
-        Color::Auto => atty::is(atty::Stream::Stdout),
-        Color::Never => false,
-        Color::Always => true,
-    };
+            let config = get_config()?;
+            let enable_color = match args.color {
+                Color::Auto => atty::is(atty::Stream::Stdout),
+                Color::Never => false,
+                Color::Always => true,
+            };
 
-    compile(&args, &config, enable_color)?;
+            compile(&args, &config, enable_color)?;
 
-    if args.watch {
-        watch(args, config, enable_color)?;
+            if args.watch {
+                watch(&args, config, enable_color)?;
+            }
+        }
     }
 
     #[cfg(feature = "dhat-heap")]
@@ -69,7 +78,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn watch(args: Cli, config: Config, enable_color: bool) -> Result<(), anyhow::Error> {
+fn watch(args: &Build, config: Config, enable_color: bool) -> Result<(), anyhow::Error> {
     let (tx, rx) = std::sync::mpsc::channel();
     let mut watcher = RecommendedWatcher::new(tx, notify::Config::default())
         .context("error creating up watcher")?;
@@ -95,7 +104,7 @@ fn watch(args: Cli, config: Config, enable_color: bool) -> Result<(), anyhow::Er
     Ok(())
 }
 
-fn compile(args: &Cli, config: &Config, enable_color: bool) -> Result<(), anyhow::Error> {
+fn compile(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyhow::Error> {
     let start = Instant::now();
     let input = fs::read_to_string(&args.input).context("error reading provided input file")?;
     let metadata = Metadata {
@@ -138,7 +147,7 @@ fn compile(args: &Cli, config: &Config, enable_color: bool) -> Result<(), anyhow
 }
 
 fn render_css(
-    args: &Cli,
+    args: &Build,
     component: Component<'_>,
     metadata: Metadata<'_>,
     enable_color: bool,
@@ -163,7 +172,7 @@ fn render_css(
 }
 
 fn render_js(
-    args: &Cli,
+    args: &Build,
     config: &Config,
     component: &Component<'_>,
     metadata: &Metadata<'_>,
@@ -259,7 +268,7 @@ fn get_config() -> Result<Config> {
 }
 
 fn render_html(
-    args: &Cli,
+    args: &Build,
     component: &Component,
     meta: &Metadata,
     js_name: &str,

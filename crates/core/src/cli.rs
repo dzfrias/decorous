@@ -1,43 +1,22 @@
 use std::{fmt::Display, path::PathBuf};
 
 use anyhow::Context;
-use clap::{builder::ArgPredicate, Parser, ValueEnum};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
-#[clap(rename_all = "kebab-case")]
-pub enum Color {
-    #[default]
-    Auto,
-    Always,
-    Never,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-#[clap(rename_all = "kebab-case")]
-pub enum RenderMethod {
-    Csr,
-    Prerender,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum OptimizationLevel {
-    #[clap(name = "1")]
-    SpeedMinor,
-    #[clap(name = "2")]
-    SpeedMedium,
-    #[clap(name = "3")]
-    SpeedMajor,
-    #[clap(name = "4")]
-    SpeedAggressive,
-    #[clap(name = "s")]
-    Size,
-    #[clap(name = "z")]
-    SizeAggressive,
-}
+use clap::{builder::ArgPredicate, Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
+    #[command(subcommand)]
+    pub command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    Build(Build),
+}
+
+#[derive(Debug, Args)]
+pub struct Build {
     /// The decor file to compile.
     #[arg(value_name = "PATH")]
     pub input: PathBuf,
@@ -81,6 +60,38 @@ pub struct Cli {
     /// Control output colorization.
     #[arg(short, long, default_value = "auto")]
     pub color: Color,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+#[clap(rename_all = "kebab-case")]
+pub enum Color {
+    #[default]
+    Auto,
+    Always,
+    Never,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+#[clap(rename_all = "kebab-case")]
+pub enum RenderMethod {
+    Csr,
+    Prerender,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum OptimizationLevel {
+    #[clap(name = "1")]
+    SpeedMinor,
+    #[clap(name = "2")]
+    SpeedMedium,
+    #[clap(name = "3")]
+    SpeedMajor,
+    #[clap(name = "4")]
+    SpeedAggressive,
+    #[clap(name = "s")]
+    Size,
+    #[clap(name = "z")]
+    SizeAggressive,
 }
 
 /// Parse a single key-value pair
