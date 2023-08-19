@@ -499,7 +499,7 @@ impl<'a> Component<'a> {
                     0,
                 )
                 .build(),
-            )
+            );
         }
     }
 

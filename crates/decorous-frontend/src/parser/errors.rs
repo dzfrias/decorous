@@ -81,7 +81,7 @@ impl From<ParseError<LocatedSpan<&str>>> for Report {
                 diagnostic.helpers.push(decorous_errors::Helper {
                     msg: Cow::Borrowed("from here"),
                     span: span.clone(),
-                })
+                });
             }
         }
         diagnostic.helpers.push(decorous_errors::Helper {

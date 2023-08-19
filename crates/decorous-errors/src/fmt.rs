@@ -15,7 +15,7 @@ pub fn report(report: &Report, src_name: &str, src: &str) -> io::Result<()> {
         for helper in &diagnostic.helpers {
             builder.add_label(
                 ariadne::Label::new((src_name, helper.span.clone())).with_message(&helper.msg),
-            )
+            );
         }
 
         let report = builder.finish();

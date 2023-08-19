@@ -232,7 +232,7 @@ fn warn_unused_deps(deps: &[String]) -> Result<()> {
                 0,
             )
             .build(),
-        )
+        );
     }
     if !report.is_empty() {
         decorous_errors::fmt::report(&report, "", "")?;

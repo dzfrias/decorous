@@ -76,7 +76,7 @@ fn watch(args: Cli, config: Config, enable_color: bool) -> Result<(), anyhow::Er
     watcher
         .watch(&args.input, RecursiveMode::NonRecursive)
         .context("error watching input file")?;
-    Ok(for res in rx {
+    for res in rx {
         let event = res?;
         debug_assert_eq!(1, event.paths.len(), "watching invalid targets!");
         match event.kind {
@@ -90,7 +90,9 @@ fn watch(args: Cli, config: Config, enable_color: bool) -> Result<(), anyhow::Er
             }
             _ => {}
         }
-    })
+    }
+
+    Ok(())
 }
 
 fn compile(args: &Cli, config: &Config, enable_color: bool) -> Result<(), anyhow::Error> {
@@ -106,23 +108,16 @@ fn compile(args: &Cli, config: &Config, enable_color: bool) -> Result<(), anyhow
         },
         modularize: args.modularize,
     };
-    let component = parse_component(&input, &config, &args.input, enable_color)?;
+    let component = parse_component(&input, config, &args.input, enable_color)?;
     let js_name = if args.modularize {
         format!("{}.mjs", args.out)
     } else {
         format!("{}.js", args.out)
     };
-    render_js(
-        &args,
-        &config,
-        &component,
-        &metadata,
-        &js_name,
-        enable_color,
-    )?;
-    render_html(&args, &component, &metadata, &js_name, enable_color)?;
+    render_js(args, config, &component, &metadata, &js_name, enable_color)?;
+    render_html(args, &component, &metadata, &js_name, enable_color)?;
     if component.css().is_some() {
-        render_css(&args, component, metadata, enable_color)?;
+        render_css(args, component, metadata, enable_color)?;
     }
 
     {
@@ -203,7 +198,7 @@ fn render_js(
 
     let mut out = BufWriter::new(File::create(js_name).context("error creating out file")?);
     let mut wasm_compiler = MainCompiler::new(
-        &config,
+        config,
         &args.out,
         &args.build_args,
         args.optimize,

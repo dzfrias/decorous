@@ -127,6 +127,7 @@ impl<'de> Deserialize<'de> for WasmFeature {
     where
         D: Deserializer<'de>,
     {
+        #[allow(clippy::enum_glob_use)]
         use wasm_opt::Feature::*;
 
         let feature_str = <&str>::deserialize(deserializer)?;

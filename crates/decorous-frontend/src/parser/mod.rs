@@ -189,10 +189,10 @@ fn parse_code_blocks<'a, P: Preprocessor>(
     Ok((input, ()))
 }
 
-fn parse_css_block<'a>(
+fn parse_css_block(
     code: &str,
     offset: usize,
-    src: LocatedSpan<&'a str>,
+    src: LocatedSpan<&str>,
 ) -> std::result::Result<Css, nom::Err<Report>> {
     let p = css::Parser::new(code);
     let ast = p.parse().map_err(|err| {
@@ -208,10 +208,10 @@ fn parse_css_block<'a>(
     Ok(ast)
 }
 
-fn parse_js_block<'a>(
+fn parse_js_block(
     code: &str,
     offset: usize,
-    src: LocatedSpan<&'a str>,
+    src: LocatedSpan<&str>,
 ) -> std::result::Result<SyntaxNode, nom::Err<Report>> {
     parse_js(code).map_err(|(title, span)| {
         let pos = src.slice(offset + span.start..);
