@@ -7,6 +7,7 @@ from pathlib import Path
 def main():
     input = Path(os.environ["DECOR_INPUT"])
     outdir = os.environ["DECOR_OUT"]
+    cache = os.environ["DECOR_CACHE"]
     outdir_abs = os.environ["DECOR_OUT_DIR"]
     name = input.stem
 
@@ -33,6 +34,8 @@ def main():
             outdir_abs,
             "--color",
             "always",
+            "--target-dir",
+            cache,
             *sys.argv[1:],
         ],
         check=True,

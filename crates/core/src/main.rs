@@ -197,6 +197,7 @@ fn render_js(
     }
 
     let mut out = BufWriter::new(File::create(js_name).context("error creating out file")?);
+    let abs_input = fs::canonicalize(&args.input)?;
     let mut wasm_compiler = MainCompiler::new(
         config,
         &args.out,
@@ -204,6 +205,7 @@ fn render_js(
         args.optimize,
         args.strip,
         enable_color,
+        &abs_input,
     );
     match args.render_method {
         RenderMethod::Csr => {

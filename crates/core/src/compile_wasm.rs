@@ -28,6 +28,7 @@ pub struct MainCompiler<'a> {
     config: &'a Config,
     build_args: &'a [(String, String)],
     out_name: &'a str,
+    input_path: &'a Path,
     opt_level: Option<OptimizationLevel>,
     strip: bool,
     enable_color: bool,
@@ -41,6 +42,7 @@ impl<'a> MainCompiler<'a> {
         opt_level: Option<OptimizationLevel>,
         strip: bool,
         enable_color: bool,
+        input_path: &'a Path,
     ) -> Self {
         Self {
             config,
@@ -49,6 +51,7 @@ impl<'a> MainCompiler<'a> {
             opt_level,
             strip,
             enable_color,
+            input_path,
         }
     }
 
@@ -129,12 +132,18 @@ macro_rules! compile_for {
                     }
                 }
 
+                let cache_path = if config.use_cache {
+                    gen_cache(self.input_path)?
+                } else {
+                    PathBuf::new()
+                };
                 let script_out = Command::new(python.as_ref())
                     .arg(file_loc)
                     .env("DECOR_INPUT", &path)
                     .env("DECOR_OUT", self.out_name)
                     .env("DECOR_OUT_DIR", outdir)
                     .env("DECOR_EXPORTS", exports.iter().join(" "))
+                    .env("DECOR_CACHE", cache_path)
                     .current_dir(dir.path())
                     .args(&mut build_args)
                     .output()?;
@@ -268,4 +277,26 @@ fn optimize(
     opts.run(path, path)?;
 
     Ok(())
+}
+
+fn gen_cache(path: impl AsRef<Path>) -> Result<PathBuf> {
+    #[cfg(not(target_os = "macos"))]
+    let base = dirs_next::cache_dir()
+        .context("no cache dir found")?
+        .join("decorous");
+    #[cfg(target_os = "macos")]
+    let base = dirs_next::home_dir()
+        .context("no home dir found")?
+        .join(".cache/decorous");
+
+    let hash = match path.as_ref().to_string_lossy() {
+        Cow::Owned(path) => sha256::digest(path),
+        Cow::Borrowed(path) => sha256::digest(path),
+    };
+    let cache_dir = base.join(hash);
+    if !cache_dir.exists() {
+        fs::create_dir_all(&cache_dir)?;
+    }
+
+    Ok(cache_dir)
 }

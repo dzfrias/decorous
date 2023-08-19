@@ -59,6 +59,7 @@ impl Default for Config {
                         script: ScriptOrFile::Script(include_str!("./compilers/rust.py")),
                         features: vec![],
                         deps: vec!["wasm-pack".to_owned(), "cargo".to_owned()],
+                        use_cache: true,
                     },
                 ),
                 (
@@ -68,6 +69,7 @@ impl Default for Config {
                         script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
                         features: vec![],
                         deps: vec!["emcc".to_owned()],
+                        use_cache: false,
                     },
                 ),
                 (
@@ -77,6 +79,7 @@ impl Default for Config {
                         script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
                         features: vec![],
                         deps: vec!["emcc".to_owned()],
+                        use_cache: false,
                     },
                 ),
                 (
@@ -86,6 +89,7 @@ impl Default for Config {
                         script: ScriptOrFile::Script(include_str!("./compilers/zig.py")),
                         features: vec![],
                         deps: vec!["zig".to_owned()],
+                        use_cache: false,
                     },
                 ),
                 (
@@ -95,6 +99,7 @@ impl Default for Config {
                         script: ScriptOrFile::Script(include_str!("./compilers/go.py")),
                         features: vec![WasmFeature(wasm_opt::Feature::BulkMemory)],
                         deps: vec!["go".to_owned()],
+                        use_cache: false,
                     },
                 ),
                 (
@@ -104,6 +109,7 @@ impl Default for Config {
                         script: ScriptOrFile::Script(include_str!("./compilers/tinygo.py")),
                         features: vec![],
                         deps: vec!["tinygo".to_owned()],
+                        use_cache: false,
                     },
                 ),
                 (
@@ -113,6 +119,7 @@ impl Default for Config {
                         script: ScriptOrFile::Script(include_str!("./compilers/wat.py")),
                         features: vec![],
                         deps: vec!["wat2wasm".to_owned()],
+                        use_cache: false,
                     },
                 ),
             ]),
@@ -125,8 +132,11 @@ pub struct CompilerConfig {
     pub ext_override: Option<String>,
     #[serde(deserialize_with = "deserialize_script")]
     pub script: ScriptOrFile,
+    #[serde(default)]
     pub features: Vec<WasmFeature>,
     pub deps: Vec<String>,
+    #[serde(default)]
+    pub use_cache: bool,
 }
 
 #[derive(Debug)]
