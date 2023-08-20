@@ -56,7 +56,7 @@ impl Default for Config {
                     "rust".to_owned(),
                     CompilerConfig {
                         ext_override: Some("rs".to_owned()),
-                        script: ScriptOrFile::Script(include_str!("./compilers/rust.py")),
+                        script: ScriptOrFile::Script(include_str!("./build/compilers/rust.py")),
                         features: vec![],
                         deps: vec!["wasm-pack".to_owned(), "cargo".to_owned()],
                         use_cache: true,
@@ -66,7 +66,9 @@ impl Default for Config {
                     "c++".to_owned(),
                     CompilerConfig {
                         ext_override: Some("cpp".to_owned()),
-                        script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
+                        script: ScriptOrFile::Script(include_str!(
+                            "./build/compilers/emscripten.py"
+                        )),
                         features: vec![],
                         deps: vec!["emcc".to_owned()],
                         use_cache: false,
@@ -76,7 +78,9 @@ impl Default for Config {
                     "c".to_owned(),
                     CompilerConfig {
                         ext_override: None,
-                        script: ScriptOrFile::Script(include_str!("./compilers/emscripten.py")),
+                        script: ScriptOrFile::Script(include_str!(
+                            "./build/compilers/emscripten.py"
+                        )),
                         features: vec![],
                         deps: vec!["emcc".to_owned()],
                         use_cache: false,
@@ -86,7 +90,7 @@ impl Default for Config {
                     "zig".to_owned(),
                     CompilerConfig {
                         ext_override: None,
-                        script: ScriptOrFile::Script(include_str!("./compilers/zig.py")),
+                        script: ScriptOrFile::Script(include_str!("./build/compilers/zig.py")),
                         features: vec![],
                         deps: vec!["zig".to_owned()],
                         use_cache: false,
@@ -96,7 +100,7 @@ impl Default for Config {
                     "go".to_owned(),
                     CompilerConfig {
                         ext_override: None,
-                        script: ScriptOrFile::Script(include_str!("./compilers/go.py")),
+                        script: ScriptOrFile::Script(include_str!("./build/compilers/go.py")),
                         features: vec![WasmFeature(wasm_opt::Feature::BulkMemory)],
                         deps: vec!["go".to_owned()],
                         use_cache: false,
@@ -106,7 +110,7 @@ impl Default for Config {
                     "tinygo".to_owned(),
                     CompilerConfig {
                         ext_override: Some("go".to_owned()),
-                        script: ScriptOrFile::Script(include_str!("./compilers/tinygo.py")),
+                        script: ScriptOrFile::Script(include_str!("./build/compilers/tinygo.py")),
                         features: vec![],
                         deps: vec!["tinygo".to_owned()],
                         use_cache: false,
@@ -116,7 +120,7 @@ impl Default for Config {
                     "wat".to_owned(),
                     CompilerConfig {
                         ext_override: None,
-                        script: ScriptOrFile::Script(include_str!("./compilers/wat.py")),
+                        script: ScriptOrFile::Script(include_str!("./build/compilers/wat.py")),
                         features: vec![],
                         deps: vec!["wat2wasm".to_owned()],
                         use_cache: false,

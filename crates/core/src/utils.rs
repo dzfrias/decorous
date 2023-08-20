@@ -1,7 +1,12 @@
 use std::{
-    fs, io,
+    env, fs, io,
     path::{Path, PathBuf},
 };
+
+use anyhow::{Context, Result};
+use merge::Merge;
+
+use crate::config::Config;
 
 pub fn get_cache_base() -> Option<PathBuf> {
     #[cfg(not(target_os = "macos"))]
@@ -37,4 +42,21 @@ where
     }
 
     Ok(size_in_bytes)
+}
+
+pub fn get_config() -> Result<Config> {
+    let source = env::current_dir().context("error reading current dir")?;
+    let config_path = source.ancestors().find_map(|p| {
+        let joined = p.join("decor.toml");
+        joined.exists().then_some(joined)
+    });
+    if let Some(p) = config_path {
+        let contents = fs::read_to_string(p).context("error reading config file")?;
+        let cfg = toml::from_str::<Config>(&contents).context("error parsing config")?;
+        let mut default = Config::default();
+        default.merge(cfg);
+        Ok(default)
+    } else {
+        Ok(Config::default())
+    }
 }
