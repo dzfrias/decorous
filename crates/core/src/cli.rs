@@ -12,7 +12,9 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Build a decorous file.
     Build(Build),
+    /// Interact with the decorous cache. Run with no args to print information.
     Cache(Cache),
 }
 
