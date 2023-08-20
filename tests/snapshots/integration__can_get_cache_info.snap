@@ -1,0 +1,10 @@
+---
+source: tests/tests.rs
+expression: stdout
+---
+decorous cache info
+
+location: [VALUE]
+size: [VALUE]
+number of entries: [VALUE]
+

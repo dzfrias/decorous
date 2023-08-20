@@ -2,7 +2,7 @@
 /// cleaned up.
 #[allow(unused_macros)]
 macro_rules! decor_test {
-    ($name:ident, $input:expr, $func:expr, $subcmd:ident) => {
+    ($name:ident, $input:expr, $func:expr, $subcmd:expr) => {
         #[test]
         fn $name() {
             use ::std::{fs::File, io::Write};
@@ -15,13 +15,16 @@ macro_rules! decor_test {
             drop(f);
             let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
             cmd.current_dir(dir.path());
-            cmd.arg(stringify!($subcmd)).arg("input.decor");
+            cmd.arg($subcmd);
+            if $subcmd == "build" {
+                cmd.arg("input.decor");
+            }
             $func(&mut dir, cmd);
             dir.close().expect("could not close temp dir");
         }
     };
     ($name:ident, $input:expr, $func:expr) => {
-        decor_test!($name, $input, $func, build);
+        decor_test!($name, $input, $func, "build");
     };
 }
 

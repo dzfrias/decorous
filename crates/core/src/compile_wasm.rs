@@ -21,6 +21,7 @@ use crate::{
     cli::OptimizationLevel,
     config::{Config, ScriptOrFile, WasmFeature},
     indicators::{FinishLog, Spinner},
+    utils,
 };
 
 #[derive(Debug)]
@@ -280,14 +281,7 @@ fn optimize(
 }
 
 fn gen_cache(path: impl AsRef<Path>) -> Result<PathBuf> {
-    #[cfg(not(target_os = "macos"))]
-    let base = dirs_next::cache_dir()
-        .context("no cache dir found")?
-        .join("decorous");
-    #[cfg(target_os = "macos")]
-    let base = dirs_next::home_dir()
-        .context("no home dir found")?
-        .join(".cache/decorous");
+    let base = utils::get_cache_base().context("could not get cache base")?;
 
     let hash = match path.as_ref().to_string_lossy() {
         Cow::Owned(path) => sha256::digest(path),

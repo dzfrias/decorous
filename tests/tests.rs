@@ -351,3 +351,18 @@ decor_test!(
         insta::assert_snapshot!(filtered_stdout);
     }
 );
+
+decor_test!(
+    can_get_cache_info,
+    NO_JS,
+    |_dir: &mut TempDir, mut cmd: Command| {
+        let assertion = cmd.assert().success();
+        let stdout = String::from_utf8_lossy(assertion.get_output().stdout.as_slice());
+        insta::with_settings!({filters => vec![
+            (r"(.*:).*", "$1 [VALUE]"),
+        ]}, {
+            insta::assert_snapshot!(stdout);
+        });
+    },
+    "cache"
+);

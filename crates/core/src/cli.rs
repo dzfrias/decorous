@@ -13,6 +13,7 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     Build(Build),
+    Cache(Cache),
 }
 
 #[derive(Debug, Args)]
@@ -60,6 +61,13 @@ pub struct Build {
     /// Control output colorization.
     #[arg(short, long, default_value = "auto")]
     pub color: Color,
+}
+
+#[derive(Debug, Args)]
+pub struct Cache {
+    /// Clean the cache.
+    #[arg(short = 'x', long)]
+    pub clean: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]

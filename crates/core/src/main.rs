@@ -3,6 +3,7 @@ mod compile_wasm;
 mod config;
 mod indicators;
 mod preprocessor;
+mod utils;
 
 use std::{
     borrow::Cow,
@@ -26,6 +27,7 @@ use decorous_backend::{
 use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use decorous_frontend::{parse_with_preprocessor, Component};
 use handlebars::{no_escape, Handlebars};
+use indicatif::HumanBytes;
 use merge::Merge;
 use notify::{
     event::{DataChange, ModifyKind},
@@ -69,6 +71,30 @@ fn main() -> Result<()> {
             if args.watch {
                 watch(&args, config, enable_color)?;
             }
+        }
+        Command::Cache(args) => {
+            let loc = utils::get_cache_base().context("could get cache base")?;
+            let size = utils::dir_size(&loc).context("error getting size of dir")?;
+
+            if args.clean {
+                if !loc.exists() {
+                    anyhow::bail!("cache does not exist yet!");
+                }
+                fs::remove_dir_all(&loc).context("problem removing cache")?;
+                fs::create_dir(&loc).context("problem re-creating cache dir after clean")?;
+                println!("Cleaned cache! {} bytes saved!", HumanBytes(size));
+                return Ok(());
+            }
+
+            let items = fs::read_dir(&loc)
+                .context("error reading directory")?
+                .count();
+            let size = utils::dir_size(&loc).context("error getting size of dir")?;
+            println!(
+                "decorous cache info\n\nlocation: {}\nsize: {}\nnumber of entries: {items}",
+                loc.display(),
+                HumanBytes(size),
+            );
         }
     }
 
