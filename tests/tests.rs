@@ -311,7 +311,7 @@ decor_test!(
     warns_on_unused_build_args,
     NO_JS,
     |_dir: &mut TempDir, mut cmd: Command| {
-        cmd.arg("-B rust=\"argument\"");
+        cmd.arg("-B").arg(r#""argument""#);
         let assertion = cmd.assert().success();
         insta::assert_snapshot!(String::from_utf8_lossy(
             assertion.get_output().stderr.as_slice()

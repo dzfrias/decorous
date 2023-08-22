@@ -27,7 +27,7 @@ use crate::{
 #[derive(Debug)]
 pub struct MainCompiler<'a> {
     config: &'a Config,
-    build_args: &'a [(String, String)],
+    build_args: &'a str,
     out_name: &'a str,
     input_path: &'a Path,
     opt_level: Option<OptimizationLevel>,
@@ -39,7 +39,7 @@ impl<'a> MainCompiler<'a> {
     pub fn new(
         config: &'a Config,
         out_name: &'a str,
-        build_args: &'a [(String, String)],
+        build_args: &'a str,
         opt_level: Option<OptimizationLevel>,
         strip: bool,
         enable_color: bool,
@@ -54,14 +54,6 @@ impl<'a> MainCompiler<'a> {
             enable_color,
             input_path,
         }
-    }
-
-    fn build_args_for_lang(&self, lang: &str) -> Shlex {
-        let args =
-            self.build_args
-                .iter()
-                .find_map(|(l, args)| if l == lang { Some(args.as_str()) } else { None });
-        args.map_or_else(|| Shlex::new(""), Shlex::new)
     }
 
     fn get_python(&self) -> Option<Cow<'_, Path>> {
@@ -116,7 +108,7 @@ macro_rules! compile_for {
                 let outdir = fs::canonicalize(self.out_name).unwrap();
 
                 let python = self.get_python().context("python not found in $PATH! Make sure to install it!")?;
-                let mut build_args = self.build_args_for_lang(lang);
+                let mut build_args = Shlex::new(self.build_args);
 
                 let file_loc = match &config.script {
                     ScriptOrFile::File(file) => Cow::Owned(fs::canonicalize(file.as_path()).context("error getting absolute path of script")?),
@@ -170,7 +162,7 @@ macro_rules! compile_for {
                 spinner.finish(FinishLog::default()
                     .with_main_message("WebAssembly")
                     .with_sub_message(format!("{lang}{}", {
-                        let mut args = self.build_args_for_lang(lang).join(" ");
+                        let mut args = Shlex::new(self.build_args).join(" ");
                         if !args.is_empty() {
                             args.insert_str(0, " `");
                             args.push('`')

@@ -1,6 +1,5 @@
 use std::{fmt::Display, path::PathBuf, time::Duration};
 
-use anyhow::Context;
 use clap::{builder::ArgPredicate, Args, Parser, Subcommand, ValueEnum};
 use humantime::parse_duration;
 
@@ -48,15 +47,9 @@ pub struct Build {
     /// Generate an ES6 compliant module for the output.
     #[arg(short, long)]
     pub modularize: bool,
-    /// Pass build argument(s) to a given WASM compiler.
-    #[arg(
-        short = 'B',
-        long,
-        value_name = "LANG>=<ARGS", // HACK
-        value_parser = parse_key_val,
-        number_of_values = 1,
-    )]
-    pub build_args: Vec<(String, String)>,
+    /// Pass build argument(s) the detected WASM compiler.
+    #[arg(short = 'B', long, default_value = "")]
+    pub build_args: String,
 
     /// Watch the input file for changes, recompiling if found.
     #[arg(short, long)]
@@ -110,14 +103,6 @@ pub enum OptimizationLevel {
     Size,
     #[clap(name = "z")]
     SizeAggressive,
-}
-
-/// Parse a single key-value pair
-fn parse_key_val(s: &str) -> Result<(String, String), anyhow::Error> {
-    let pos = s
-        .find('=')
-        .with_context(|| format!("invalid LANG=ARGS: no `=` found in `{s}`"))?;
-    Ok((s[..pos].to_owned(), s[pos + 1..].to_owned()))
 }
 
 impl Display for RenderMethod {
