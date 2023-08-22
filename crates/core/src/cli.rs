@@ -1,7 +1,8 @@
-use std::{fmt::Display, path::PathBuf};
+use std::{fmt::Display, path::PathBuf, time::Duration};
 
 use anyhow::Context;
 use clap::{builder::ArgPredicate, Args, Parser, Subcommand, ValueEnum};
+use humantime::parse_duration;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -70,6 +71,13 @@ pub struct Cache {
     /// Clean the cache.
     #[arg(short = 'x', long)]
     pub clean: bool,
+    /// Evict cache entries that are older than the given time.
+    #[arg(long,
+          value_name = "TIME",
+          value_parser = parse_duration,
+          conflicts_with = "clean"
+    )]
+    pub evict: Option<Duration>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
