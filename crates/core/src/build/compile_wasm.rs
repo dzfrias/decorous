@@ -119,10 +119,10 @@ macro_rules! compile_for {
                 let mut build_args = self.build_args_for_lang(lang);
 
                 let file_loc = match &config.script {
-                    ScriptOrFile::File(file) => file.as_path(),
+                    ScriptOrFile::File(file) => Cow::Owned(fs::canonicalize(file.as_path()).context("error getting absolute path of script")?),
                     ScriptOrFile::Script(script) => {
                         fs::write(dir.path().join("__tmp.py"), script)?;
-                        Path::new("__tmp.py")
+                        Cow::Borrowed(Path::new("__tmp.py"))
                     },
                 };
                 // This defer! cannot be used in the above match statement, as it executes when a
@@ -139,16 +139,19 @@ macro_rules! compile_for {
                     PathBuf::new()
                 };
                 let script_out = Command::new(python.as_ref())
-                    .arg(file_loc)
+                    .arg(file_loc.as_ref())
                     .env("DECOR_INPUT", &path)
                     .env("DECOR_OUT", self.out_name)
                     .env("DECOR_OUT_DIR", outdir)
                     .env("DECOR_EXPORTS", exports.iter().join(" "))
-                    .env("DECOR_CACHE", cache_path)
+                    .env("DECOR_CACHE", &cache_path)
                     .current_dir(dir.path())
                     .args(&mut build_args)
                     .output()?;
                 let (status, stdout, stderr) = (script_out.status, script_out.stdout, script_out.stderr);
+                if cache_path != Path::new("") && fs::read_dir(&cache_path).context("error reading cache dir")?.count() == 0 {
+                    fs::remove_dir(&cache_path).context("error removing cache dir - should be empty")?;
+                }
 
                 if build_args.had_error {
                     bail!("error parsing build args for language: {lang}");
