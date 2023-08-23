@@ -102,7 +102,9 @@ macro_rules! compile_for {
 
                 match fs::create_dir(self.out_name) {
                     Ok(()) => {}
-                    Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
+                    Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
+                        fs::remove_dir_all(self.out_name).context("error removing previous outdir")?;
+                    }
                     Err(err) => bail!(err),
                 }
                 let outdir = fs::canonicalize(self.out_name).unwrap();
