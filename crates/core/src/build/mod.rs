@@ -69,15 +69,12 @@ fn compile(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyh
                 .to_string_lossy()
         },
         modularize: args.modularize,
-        wasm_compiler: MainCompiler::new(
+        wasm_compiler: MainCompiler {
             config,
-            &args.out,
-            &args.build_args,
-            args.optimize,
-            args.strip,
+            args,
+            input_path: &abs_input,
             enable_color,
-            &abs_input,
-        ),
+        },
         use_resolver: NullResolver,
     };
     let component = parse_component(&input, config, &args.input, enable_color)?;

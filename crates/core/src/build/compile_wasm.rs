@@ -12,13 +12,12 @@ use decorous_backend::{dom_render::DomRenderer, prerender::Prerenderer, CodeInfo
 use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use itertools::Itertools;
 use scopeguard::defer;
-use shlex::Shlex;
 use tempdir::TempDir;
 use wasm_opt::OptimizationOptions;
 use which::which;
 
 use crate::{
-    cli::OptimizationLevel,
+    cli::{Build, OptimizationLevel},
     config::{Config, ScriptOrFile, WasmFeature},
     indicators::{FinishLog, Spinner},
     utils,
@@ -26,36 +25,13 @@ use crate::{
 
 #[derive(Debug)]
 pub struct MainCompiler<'a> {
-    config: &'a Config,
-    build_args: &'a str,
-    out_name: &'a str,
-    input_path: &'a Path,
-    opt_level: Option<OptimizationLevel>,
-    strip: bool,
-    enable_color: bool,
+    pub config: &'a Config,
+    pub args: &'a Build,
+    pub input_path: &'a Path,
+    pub enable_color: bool,
 }
 
 impl<'a> MainCompiler<'a> {
-    pub fn new(
-        config: &'a Config,
-        out_name: &'a str,
-        build_args: &'a str,
-        opt_level: Option<OptimizationLevel>,
-        strip: bool,
-        enable_color: bool,
-        input_path: &'a Path,
-    ) -> Self {
-        Self {
-            config,
-            build_args,
-            out_name,
-            opt_level,
-            strip,
-            enable_color,
-            input_path,
-        }
-    }
-
     fn get_python(&self) -> Option<Cow<'_, Path>> {
         if let Some(py) = &self.config.python {
             return Some(Cow::Borrowed(py));
@@ -100,18 +76,16 @@ macro_rules! compile_for {
                     });
                 }
 
-                match fs::create_dir(self.out_name) {
+                match fs::create_dir(&self.args.out) {
                     Ok(()) => {}
                     Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
-                        fs::remove_dir_all(self.out_name).context("error removing previous outdir")?;
+                        fs::remove_dir_all(&self.args.out).context("error removing previous outdir")?;
                     }
                     Err(err) => bail!(err),
                 }
-                let outdir = fs::canonicalize(self.out_name).unwrap();
+                let outdir = fs::canonicalize(&self.args.out).unwrap();
 
                 let python = self.get_python().context("python not found in $PATH! Make sure to install it!")?;
-                let mut build_args = Shlex::new(self.build_args);
-
                 let file_loc = match &config.script {
                     ScriptOrFile::File(file) => Cow::Owned(fs::canonicalize(file.as_path()).context("error getting absolute path of script")?),
                     ScriptOrFile::Script(script) => {
@@ -135,20 +109,16 @@ macro_rules! compile_for {
                 let script_out = Command::new(python.as_ref())
                     .arg(file_loc.as_ref())
                     .env("DECOR_INPUT", &path)
-                    .env("DECOR_OUT", self.out_name)
+                    .env("DECOR_OUT", &self.args.out)
                     .env("DECOR_OUT_DIR", outdir)
                     .env("DECOR_EXPORTS", exports.iter().join(" "))
                     .env("DECOR_CACHE", &cache_path)
                     .current_dir(dir.path())
-                    .args(&mut build_args)
+                    .args(&self.args.build_args)
                     .output()?;
                 let (status, stdout, stderr) = (script_out.status, script_out.stdout, script_out.stderr);
                 if cache_path != Path::new("") && fs::read_dir(&cache_path).context("error reading cache dir")?.count() == 0 {
                     fs::remove_dir(&cache_path).context("error removing cache dir - should be empty")?;
-                }
-
-                if build_args.had_error {
-                    bail!("error parsing build args for language: {lang}");
                 }
 
                 if !status.success() {
@@ -164,19 +134,21 @@ macro_rules! compile_for {
                 spinner.finish(FinishLog::default()
                     .with_main_message("WebAssembly")
                     .with_sub_message(format!("{lang}{}", {
-                        let mut args = Shlex::new(self.build_args).join(" ");
-                        if !args.is_empty() {
+                        let mut args = String::new();
+                        if !self.args.build_args.is_empty() {
+                            args.push('`');
+                            args.push_str(&self.args.build_args.join(" "));
                             args.insert_str(0, " `");
                             args.push('`')
                         }
                         args
                     }))
-                    .with_file(self.out_name)
+                    .with_file(&self.args.out)
                     .enable_color(self.enable_color)
                     .to_string()
                 );
 
-                let wasm_files = fs::read_dir(self.out_name)?
+                let wasm_files = fs::read_dir(&self.args.out)?
                     .filter_map(|entry| entry.ok().map(|entry| entry.path()))
                     .filter(|path| match path.extension() {
                         Some(ext) if ext == OsStr::new("wasm") => true,
@@ -184,7 +156,7 @@ macro_rules! compile_for {
                     })
                     .collect_vec();
 
-                if let Some(opt) = self.opt_level {
+                if let Some(opt) = self.args.optimize {
                     for path in &wasm_files {
                         let spinner = Spinner::new(format!("Optimizing WebAssembly ({opt})..."));
                         optimize(path, opt, &config.features).context("problem optimizing WebAssembly")?;
@@ -199,7 +171,7 @@ macro_rules! compile_for {
                     }
                 }
 
-                if self.strip {
+                if self.args.strip {
                     for path in &wasm_files {
                         let spinner = Spinner::new("Stripping WebAssembly...");
                         strip(&path).context("problem stripping WebAssembly binary")?;

@@ -48,14 +48,19 @@ pub struct Build {
     #[arg(short, long)]
     pub modularize: bool,
     /// Pass build argument(s) the detected WASM compiler.
-    #[arg(short = 'B', long, default_value = "")]
-    pub build_args: String,
+    #[arg(short = 'B',
+          long,
+          default_value = "",
+          value_parser = parse_build_args,
+          value_name = "ARGS"
+    )]
+    pub build_args: Vec<String>,
 
     /// Watch the input file for changes, recompiling if found.
     #[arg(short, long)]
     pub watch: bool,
     /// Control output colorization.
-    #[arg(short, long, default_value = "auto")]
+    #[arg(short, long, default_value = "auto", value_name = "WHEN")]
     pub color: Color,
 }
 
@@ -103,6 +108,10 @@ pub enum OptimizationLevel {
     Size,
     #[clap(name = "z")]
     SizeAggressive,
+}
+
+fn parse_build_args(s: &str) -> Result<Vec<String>, String> {
+    shlex::split(s).ok_or_else(|| "could not parse build args".to_owned())
 }
 
 impl Display for RenderMethod {
