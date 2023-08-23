@@ -6,6 +6,7 @@ run *ARGS:
   cargo run {{ARGS}}
 
 test:
+  cargo build
   cargo nextest run --all
 
 itest:
