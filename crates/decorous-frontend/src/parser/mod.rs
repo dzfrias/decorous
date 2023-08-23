@@ -23,7 +23,7 @@ use self::errors::{Help, ParseError, ParseErrorType, Report};
 use crate::{
     ast::{
         Attribute, AttributeValue, Code, Comment, DecorousAst, Element, EventHandler, ForBlock,
-        IfBlock, Mustache, Node, NodeType, SpecialBlock, Text,
+        IfBlock, Mustache, Node, NodeType, SpecialBlock, Text, UseBlock,
     },
     css::{self, ast::Css},
     location::Location,
@@ -364,31 +364,34 @@ fn parse_attr(input: LocatedSpan<&str>) -> Result<Attribute> {
         map(mustache, |node| {
             Attribute::KeyValue(&attr, Some(AttributeValue::JavaScript(node)))
         }),
-        map(
-            preceded(
-                alt((
-                    char('\"'),
-                    failure_case(bad_char, |_| {
-                        (
-                            ParseErrorType::ExpectedCharacter('"'),
-                            Some(Help::with_message("expected either { or \"")),
-                        )
-                    }),
-                )),
-                alt((
-                    terminated(parse_str, char('\"')),
-                    failure_case(bad_char, |_| {
-                        (
-                            ParseErrorType::ExpectedCharacter('"'),
-                            Some(Help::with_message("quote was never closed")),
-                        )
-                    }),
-                )),
-            ),
-            |t| Attribute::KeyValue(&attr, Some(AttributeValue::Literal(Cow::Borrowed(&t)))),
-        ),
+        map(parse_quoted, |t| {
+            Attribute::KeyValue(&attr, Some(AttributeValue::Literal(Cow::Borrowed(&t))))
+        }),
     ))(input)?;
     Ok((input, attribute))
+}
+
+fn parse_quoted(input: NomSpan) -> Result<LocatedSpan<&str>> {
+    preceded(
+        alt((
+            char('\"'),
+            failure_case(bad_char, |_| {
+                (
+                    ParseErrorType::ExpectedCharacter('"'),
+                    Some(Help::with_message("expected either { or \"")),
+                )
+            }),
+        )),
+        alt((
+            terminated(parse_str, char('\"')),
+            failure_case(bad_char, |_| {
+                (
+                    ParseErrorType::ExpectedCharacter('"'),
+                    Some(Help::with_message("quote was never closed")),
+                )
+            }),
+        )),
+    )(input)
 }
 
 fn parse_binding(input: LocatedSpan<&str>) -> Result<Attribute> {
@@ -494,6 +497,11 @@ fn special_block(input: NomSpan) -> Result<SpecialBlock<'_, Location>> {
                 input,
                 SpecialBlock::If(IfBlock::new(expr, inner, else_block)),
             ))
+        }
+        "use" => {
+            let (input, path) = delimited(multispace1, parse_quoted, multispace0)(input)?;
+            let (input, _) = char('}')(input)?;
+            Ok((input, SpecialBlock::Use(UseBlock::new(path.fragment()))))
         }
         "each" => nom_err_res!(
             input,
@@ -884,5 +892,10 @@ mod tests {
         let input = "---sass hello --- ---sass sass ---";
         let ast = parse_with_preprocessor(input, &Preproc);
         insta::assert_debug_snapshot!(ast);
+    }
+
+    #[test]
+    fn can_parse_use_decls() {
+        nom_test_all_insta!(parse, ["{#use \"path\"} #p hello /p"]);
     }
 }

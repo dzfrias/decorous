@@ -4,25 +4,15 @@ use decorous_frontend::{
     ast::{
         Attribute, AttributeValue, Comment, Element, Mustache, Node, NodeType, SpecialBlock, Text,
     },
-    DeclaredVariables, FragmentMetadata,
+    Component, DeclaredVariables, FragmentMetadata,
 };
 
-use crate::{Metadata, RenderBackend};
-
-pub struct HtmlPrerenderer;
-
-impl RenderBackend for HtmlPrerenderer {
-    fn render<T: io::Write>(
-        out: &mut T,
-        component: &decorous_frontend::Component,
-        _metadata: &Metadata,
-    ) -> io::Result<()> {
-        for node in component.fragment_tree() {
-            node.html_fmt(out, &(), component.declared_vars())?;
-        }
-
-        Ok(())
+pub fn render_html<W: io::Write>(out: &mut W, component: &Component) -> io::Result<()> {
+    for node in component.fragment_tree() {
+        node.html_fmt(out, &(), component.declared_vars())?;
     }
+
+    Ok(())
 }
 
 trait HtmlFmt<T: io::Write> {

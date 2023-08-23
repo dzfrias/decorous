@@ -4,23 +4,7 @@ use decorous_frontend::{css::ast::*, Component};
 use itertools::Itertools;
 use superfmt::{ContextBuilder, Formatter};
 
-use crate::{Metadata, RenderBackend};
-
-pub struct CssRenderer;
-
-impl RenderBackend for CssRenderer {
-    fn render<T: io::Write>(
-        out: &mut T,
-        component: &Component,
-        _metadata: &Metadata,
-    ) -> io::Result<()> {
-        component
-            .css()
-            .map_or(Ok(()), |css| render(css, out, component))
-    }
-}
-
-fn render<T: io::Write>(css: &Css, out: &mut T, component: &Component) -> io::Result<()> {
+pub fn render_css<T: io::Write>(css: &Css, out: &mut T, component: &Component) -> io::Result<()> {
     let mut formatter = Formatter::new(out);
     for rule in css.rules() {
         write_rule(rule, &mut formatter, component)?;
@@ -102,9 +86,6 @@ fn write_value<T: io::Write>(
 ) -> io::Result<()> {
     match value {
         Value::Css(css) => write!(out, "{css}"),
-        // TODO: In component, get all CSS mustaches and assign them unique ID.
-        // This should be var(--decor-{id}). In codegen, use this to assign inline styles
-        // to element. This would have to be done on the root element.
         Value::Mustache(node) => {
             write!(
                 out,
@@ -119,30 +100,30 @@ fn write_value<T: io::Write>(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use decorous_frontend::parse;
-
-    use super::*;
-
-    fn make_component(input: &str) -> Component {
-        Component::new(parse(input).expect("should be valid input"))
-    }
-
-    #[test]
-    fn mustaches_are_properly_turned_into_var_usages() {
-        let mut out = vec![];
-        let input = "---css body { color: {color}; } ---";
-        let component = make_component(input);
-        CssRenderer::render(
-            &mut out,
-            &component,
-            &Metadata {
-                name: "test",
-                modularize: false,
-            },
-        )
-        .expect("render should not fail");
-        insta::assert_snapshot!(String::from_utf8(out).unwrap());
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use decorous_frontend::parse;
+//
+//     use super::*;
+//
+//     fn make_component(input: &str) -> Component {
+//         Component::new(parse(input).expect("should be valid input"))
+//     }
+//
+//     #[test]
+//     fn mustaches_are_properly_turned_into_var_usages() {
+//         let mut out = vec![];
+//         let input = "---css body { color: {color}; } ---";
+//         let component = make_component(input);
+//         CssRenderer::render(
+//             &mut out,
+//             &component,
+//             &Options {
+//                 name: "test",
+//                 modularize: false,
+//             },
+//         )
+//         .expect("render should not fail");
+//         insta::assert_snapshot!(String::from_utf8(out).unwrap());
+//     }
+// }

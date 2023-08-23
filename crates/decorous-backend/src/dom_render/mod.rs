@@ -5,26 +5,45 @@ use itertools::Itertools;
 use rslint_parser::AstNode;
 use std::{borrow::Cow, io};
 
-use crate::{codegen_utils, Metadata, RenderBackend};
+use crate::{codegen_utils, Options, RenderBackend, UseResolver, WasmCompiler};
 pub(crate) use render_fragment::render_fragment;
 
 pub struct DomRenderer;
 
 impl RenderBackend for DomRenderer {
-    fn render<T: io::Write>(
+    fn render<T: io::Write, C, R>(
         out: &mut T,
         component: &Component,
-        metadata: &Metadata,
-    ) -> io::Result<()> {
+        metadata: &Options<C, R>,
+    ) -> io::Result<()>
+    where
+        C: WasmCompiler<DomRenderer>,
+        R: UseResolver,
+    {
         render(component, out, metadata)
     }
 }
 
-fn render<T: io::Write>(
+fn render<T: io::Write, C, R>(
     component: &Component,
     render_to: &mut T,
-    metadata: &Metadata,
-) -> io::Result<()> {
+    metadata: &Options<C, R>,
+) -> io::Result<()>
+where
+    C: WasmCompiler<DomRenderer>,
+    R: UseResolver
+{
+    if let Some(wasm) = component.wasm() {
+        let _ = metadata.wasm_compiler.compile(
+            crate::CodeInfo {
+                lang: wasm.lang(),
+                body: wasm.body(),
+                exports: component.exports(),
+            },
+            render_to,
+        );
+    }
+
     // Hoisted syntax nodes should come first
     for hoist in component.hoist() {
         writeln!(render_to, "{hoist}")?;
@@ -158,6 +177,7 @@ fn render_init_ctx<W: io::Write>(out: &mut W, component: &Component<'_>) -> io::
 
 #[cfg(test)]
 mod tests {
+    use crate::{NullCompiler, NullResolver};
     use decorous_frontend::parse;
 
     use super::*;
@@ -171,7 +191,7 @@ mod tests {
             let component = make_component($input);
             let mut out = vec![];
             #[allow(unused)]
-            let mut metadata = Metadata { name: "test", modularize: false };
+            let mut metadata = Options { name: "test", modularize: false, use_resolver: NullResolver, wasm_compiler: NullCompiler };
             $(
                 metadata = $metadata;
              )?
@@ -284,9 +304,11 @@ mod tests {
     fn can_render_modularize() {
         test_render!(
             "---js let x = 0; --- #p {x} /p",
-            Metadata {
+            Options {
                 name: "test",
                 modularize: true,
+                wasm_compiler: NullCompiler,
+                use_resolver: NullResolver
             }
         );
     }

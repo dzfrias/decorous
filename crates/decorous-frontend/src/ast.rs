@@ -98,6 +98,7 @@ pub struct Element<'a, T> {
 pub enum SpecialBlock<'a, T> {
     For(ForBlock<'a, T>),
     If(IfBlock<'a, T>),
+    Use(UseBlock<'a>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -113,6 +114,11 @@ pub struct IfBlock<'a, T> {
     expr: SyntaxNode,
     inner: Vec<Node<'a, T>>,
     else_block: Option<Vec<Node<'a, T>>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UseBlock<'a> {
+    path: &'a str,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -281,6 +287,7 @@ impl<'a, T> Node<'a, T> {
                         index: for_block.index,
                         expr: for_block.expr,
                     }),
+                    SpecialBlock::Use(_) => todo!(),
                 }),
             },
             NodeType::Element(elem) => Node {
@@ -340,6 +347,16 @@ impl<'a, T> ForBlock<'a, T> {
 
     pub fn inner_mut(&mut self) -> &mut Vec<Node<'a, T>> {
         &mut self.inner
+    }
+}
+
+impl<'a> UseBlock<'a> {
+    pub fn new(path: &'a str) -> Self {
+        Self { path }
+    }
+
+    pub fn path(&self) -> &str {
+        self.path
     }
 }
 
@@ -569,6 +586,7 @@ impl<'a, T> fmt::Display for SpecialBlock<'a, T> {
         match self {
             SpecialBlock::If(if_block) => write!(f, "{if_block}"),
             SpecialBlock::For(for_block) => write!(f, "{for_block}"),
+            SpecialBlock::Use(use_block) => write!(f, "{use_block}"),
         }
     }
 }
@@ -596,5 +614,11 @@ impl<'a, T> fmt::Display for ForBlock<'a, T> {
             self.expr(),
             self.inner().iter().map(|elem| format!("  {elem}")).join(""),
         )
+    }
+}
+
+impl<'a> fmt::Display for UseBlock<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{#use \"{}\"}}", self.path())
     }
 }

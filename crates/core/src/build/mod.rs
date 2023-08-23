@@ -11,10 +11,10 @@ use std::{
 
 use anyhow::{ensure, Context, Result};
 use decorous_backend::{
-    css_render::CssRenderer,
+    css_render::render_css as render_css_backend,
     dom_render::DomRenderer,
-    prerender::{HtmlPrerenderer, Prerenderer},
-    render, render_with_wasm, Metadata,
+    prerender::{render_html as prerender_html, Prerenderer},
+    render, NullResolver, Options,
 };
 use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use decorous_frontend::{parse_with_preprocessor, Component};
@@ -59,7 +59,8 @@ pub fn build(args: &Build) -> Result<()> {
 fn compile(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyhow::Error> {
     let start = Instant::now();
     let input = fs::read_to_string(&args.input).context("error reading provided input file")?;
-    let metadata = Metadata {
+    let abs_input = fs::canonicalize(&args.input)?;
+    let metadata = Options {
         name: {
             &args
                 .input
@@ -68,6 +69,16 @@ fn compile(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyh
                 .to_string_lossy()
         },
         modularize: args.modularize,
+        wasm_compiler: MainCompiler::new(
+            config,
+            &args.out,
+            &args.build_args,
+            args.optimize,
+            args.strip,
+            enable_color,
+            &abs_input,
+        ),
+        use_resolver: NullResolver,
     };
     let component = parse_component(&input, config, &args.input, enable_color)?;
     let js_name = if args.modularize {
@@ -75,10 +86,10 @@ fn compile(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyh
     } else {
         format!("{}.js", args.out)
     };
-    render_js(args, config, &component, &metadata, &js_name, enable_color)?;
+    render_js(args, &component, &metadata, &js_name, enable_color)?;
     render_html(args, &component, &metadata, &js_name, enable_color)?;
     if component.css().is_some() {
-        render_css(args, component, metadata, enable_color)?;
+        render_css(args, &component, enable_color)?;
     }
 
     {
@@ -126,18 +137,21 @@ fn watch(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyhow
 
 fn render_css(
     args: &Build,
-    component: Component<'_>,
-    metadata: Metadata<'_>,
+    component: &Component<'_>,
     enable_color: bool,
 ) -> Result<(), anyhow::Error> {
+    let Some(css) = component.css() else {
+        return Ok(());
+    };
     let name = format!("{}.css", args.out);
-    render::<CssRenderer, _>(
-        &component,
+    render_css_backend(
+        css,
         &mut BufWriter::new(
             File::create(&name).with_context(|| format!("problem creating {name}"))?,
         ),
-        &metadata,
-    )?;
+        component,
+    )
+    .context("problem rendering css")?;
     println!(
         "{}",
         FinishLog::default()
@@ -151,9 +165,8 @@ fn render_css(
 
 fn render_js(
     args: &Build,
-    config: &Config,
     component: &Component<'_>,
-    metadata: &Metadata<'_>,
+    metadata: &Options<'_, MainCompiler, NullResolver>,
     js_name: &str,
     enable_color: bool,
 ) -> Result<()> {
@@ -184,34 +197,14 @@ fn render_js(
     }
 
     let mut out = BufWriter::new(File::create(js_name).context("error creating out file")?);
-    let abs_input = fs::canonicalize(&args.input)?;
-    let mut wasm_compiler = MainCompiler::new(
-        config,
-        &args.out,
-        &args.build_args,
-        args.optimize,
-        args.strip,
-        enable_color,
-        &abs_input,
-    );
     match args.render_method {
         RenderMethod::Csr => {
-            render_with_wasm::<DomRenderer, _, _>(
-                component,
-                &mut out,
-                metadata,
-                &mut wasm_compiler,
-            )
-            .context("error during rendering")?;
+            render::<DomRenderer, _, _, _>(component, &mut out, metadata)
+                .context("error during rendering")?;
         }
         RenderMethod::Prerender => {
-            render_with_wasm::<Prerenderer, _, _>(
-                component,
-                &mut out,
-                metadata,
-                &mut wasm_compiler,
-            )
-            .context("error during rendering")?;
+            render::<Prerenderer, _, _, _>(component, &mut out, metadata)
+                .context("error during rendering")?;
         }
     }
     println!(
@@ -231,7 +224,7 @@ fn render_js(
 fn render_html(
     args: &Build,
     component: &Component,
-    meta: &Metadata,
+    meta: &Options<'_, MainCompiler, NullResolver>,
     js_name: &str,
     enable_color: bool,
 ) -> Result<()> {
@@ -271,8 +264,7 @@ fn render_html(
         RenderMethod::Prerender => {
             if args.html {
                 let mut out = vec![];
-                render::<HtmlPrerenderer, _>(component, &mut out, meta)
-                    .context("error when rendering HTML")?;
+                prerender_html(&mut out, component).context("error prerendering html")?;
 
                 let body = json!({
                     "script": js_name,
@@ -303,13 +295,13 @@ fn render_html(
 
             let html = format!("{}.html", args.out);
 
-            render::<HtmlPrerenderer, _>(
-                component,
+            prerender_html(
                 &mut BufWriter::new(
                     File::create(&html).with_context(|| format!("problem creating {}", html))?,
                 ),
-                meta,
-            )?;
+                component,
+            )
+            .context("error prerendering html")?;
             println!(
                 "{}",
                 FinishLog::default()

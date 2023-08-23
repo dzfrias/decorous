@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    fmt::Debug,
     io::{self, Write},
 };
 
@@ -12,10 +13,11 @@ use lazy_format::lazy_format;
 use rslint_parser::AstNode;
 use superfmt::{ContextBuilder, Formatter};
 
-pub use self::html_render::HtmlPrerenderer;
+pub use self::html_render::render_html;
 use self::node_analyzer::analyzers::Analysis;
 use crate::{
-    codegen_utils, dom_render::render_fragment as dom_render_fragment, Metadata, RenderBackend,
+    codegen_utils, dom_render::render_fragment as dom_render_fragment, Options, RenderBackend,
+    UseResolver, WasmCompiler,
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -34,11 +36,25 @@ impl WriteStatus {
 pub struct Prerenderer;
 
 impl RenderBackend for Prerenderer {
-    fn render<T: io::Write>(
+    fn render<T: io::Write, C, R>(
         out: &mut T,
         component: &Component,
-        _metadata: &Metadata,
-    ) -> io::Result<()> {
+        opts: &Options<C, R>,
+    ) -> io::Result<()>
+    where
+        C: WasmCompiler<Prerenderer>,
+        R: UseResolver,
+    {
+        if let Some(wasm) = component.wasm() {
+            let _ = opts.wasm_compiler.compile(
+                crate::CodeInfo {
+                    lang: wasm.lang(),
+                    body: wasm.body(),
+                    exports: component.exports(),
+                },
+                out,
+            );
+        }
         render(component, out)
     }
 }
@@ -129,6 +145,7 @@ fn render_hoists<'a, T: io::Write>(
                     out,
                 )?;
             }
+            SpecialBlock::Use(_) => todo!(),
         }
     }
 
@@ -215,6 +232,7 @@ fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result
                     "\"{id}\":replace(document.getElementById(\"{id}\")),\"{id}_block\":[],"
                 )?;
             }
+            SpecialBlock::Use(_) => todo!(),
         }
     }
 
@@ -452,6 +470,7 @@ fn render_update_body<T: io::Write>(
                 let id = meta.id();
                 writeln!(formatter, "let i = 0; for (const v of ({replaced})) {{ ctx[{var_idx}] = v; if (i >= elems[\"{id}_block\"].length) {{ elems[\"{id}_block\"][i] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} elems[\"{id}_block\"][i].u(dirty); i += 1; }} elems[\"{id}_block\"].slice(i).forEach((b) => b.d()); elems[\"{id}_block\"].length = i;")?;
             }
+            SpecialBlock::Use(_) => todo!(),
         }
     }
 
@@ -482,7 +501,7 @@ fn render_update_body<T: io::Write>(
 
 #[cfg(test)]
 mod tests {
-    use crate::css_render::CssRenderer;
+    use crate::css_render::render_css;
     use decorous_frontend::{parse, Component};
     use std::fmt::Write;
 
@@ -500,8 +519,10 @@ mod tests {
                 let mut html_out = Vec::new();
                 let mut css_out = Vec::new();
                 render(&component, &mut js_out).unwrap();
-                <HtmlPrerenderer as RenderBackend>::render(&mut html_out, &component, &Metadata { name: "test", modularize: false }).unwrap();
-                <CssRenderer as RenderBackend>::render(&mut css_out, &component, &Metadata { name: "test", modularize: false }).unwrap();
+                render_html(&mut html_out, &component).unwrap();
+                if let Some(css) = component.css() {
+                    render_css(css, &mut css_out, &component).unwrap();
+                }
                 let mut output = format!("{}\n---\n{}", String::from_utf8(js_out).unwrap(), String::from_utf8(html_out).unwrap());
                 if component.css().is_some() {
                     write!(output, "\n---\n{}", String::from_utf8(css_out).unwrap()).unwrap();

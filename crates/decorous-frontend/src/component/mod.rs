@@ -400,6 +400,7 @@ impl<'a> Component<'a> {
                     let scope = scope_stack.pop().unwrap();
                     self.declared_vars.insert_scope(id, scope);
                 }
+                SpecialBlock::Use(_) => todo!(),
             },
 
             _ => {}
@@ -448,7 +449,9 @@ impl<'a> Component<'a> {
                     graph.mark_used_from_node(js);
                     graph.mark_mutated_from_node(js);
                 }
-                NodeType::Text(_) | NodeType::Comment(_) => {}
+                NodeType::Text(_)
+                | NodeType::Comment(_)
+                | NodeType::SpecialBlock(SpecialBlock::Use(_)) => {}
             }
         }
 

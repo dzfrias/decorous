@@ -76,7 +76,7 @@ macro_rules! compile_for {
         impl WasmCompiler<$backend> for MainCompiler<'_> {
             type Err = Error;
 
-            fn compile<W>(&mut self, CodeInfo { lang, body, exports }: CodeInfo, out: &mut W) -> Result<(), Error>
+            fn compile<W>(&self, CodeInfo { lang, body, exports }: CodeInfo, out: &mut W) -> Result<(), Error>
             where
                 W: io::Write,
             {
