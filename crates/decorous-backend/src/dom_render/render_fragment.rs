@@ -273,6 +273,17 @@ fn render_mount(
             "let e{id}_blocks = [];\nlet i = 0;\nfor (const v of ({expr})) {{ ctx[{var_idx}] = v; e{id}_blocks[i] = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); i += 1; }}");
         }
 
+        NodeType::SpecialBlock(SpecialBlock::Use(use_block)) => {
+            let Some(stem) = use_block.path().file_stem() else {
+                return;
+            };
+            force_writeln!(
+                f,
+                "__decor_{}(target, e{id}_anchor)",
+                stem.to_string_lossy()
+            )
+        }
+
         _ => {
             if node.metadata().parent_id() == root {
                 force_writeln!(f, "mount(target, e{id}, anchor);");

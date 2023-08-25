@@ -1,5 +1,6 @@
 mod compile_wasm;
 mod preprocessor;
+mod resolver;
 
 use std::{
     borrow::Cow,
@@ -14,7 +15,7 @@ use decorous_backend::{
     css_render::render_css as render_css_backend,
     dom_render::DomRenderer,
     prerender::{render_html as prerender_html, Prerenderer},
-    render, NullResolver, Options,
+    render, Options,
 };
 use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use decorous_frontend::{parse_with_preprocessor, Component};
@@ -26,6 +27,7 @@ use notify::{
 use serde_json::json;
 
 use crate::{
+    build::resolver::Resolver,
     cli::{Build, Color, RenderMethod},
     config::Config,
     indicators::FinishLog,
@@ -60,6 +62,12 @@ fn compile(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyh
     let start = Instant::now();
     let input = fs::read_to_string(&args.input).context("error reading provided input file")?;
     let abs_input = fs::canonicalize(&args.input)?;
+    let compiler = MainCompiler {
+        config,
+        args,
+        input_path: &abs_input,
+        enable_color,
+    };
     let metadata = Options {
         name: {
             &args
@@ -69,13 +77,13 @@ fn compile(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyh
                 .to_string_lossy()
         },
         modularize: args.modularize,
-        wasm_compiler: MainCompiler {
+        wasm_compiler: &compiler,
+        use_resolver: Resolver {
             config,
             args,
-            input_path: &abs_input,
             enable_color,
+            compiler: &compiler,
         },
-        use_resolver: NullResolver,
     };
     let component = parse_component(&input, config, &args.input, enable_color)?;
     let js_name = if args.modularize {
@@ -163,7 +171,7 @@ fn render_css(
 fn render_js(
     args: &Build,
     component: &Component<'_>,
-    metadata: &Options<'_, MainCompiler, NullResolver>,
+    metadata: &Options<'_, &MainCompiler, Resolver>,
     js_name: &str,
     enable_color: bool,
 ) -> Result<()> {
@@ -221,7 +229,7 @@ fn render_js(
 fn render_html(
     args: &Build,
     component: &Component,
-    meta: &Options<'_, MainCompiler, NullResolver>,
+    meta: &Options<'_, &MainCompiler, Resolver>,
     js_name: &str,
     enable_color: bool,
 ) -> Result<()> {

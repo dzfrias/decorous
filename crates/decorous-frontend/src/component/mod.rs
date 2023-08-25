@@ -3,7 +3,7 @@ mod dep_graph;
 mod fragment;
 mod globals;
 
-use std::borrow::Cow;
+use std::{borrow::Cow, path::Path};
 
 use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use itertools::Itertools;
@@ -35,6 +35,7 @@ pub struct Component<'a> {
     hoist: Vec<SyntaxNode>,
     exports: Vec<SmolStr>,
     report: Report,
+    uses: Vec<&'a Path>,
 
     component_id: u8,
     current_id: u32,
@@ -63,6 +64,7 @@ impl<'a> Component<'a> {
             component_id: rand::thread_rng().gen(),
             #[cfg(debug_assertions)]
             component_id: 0,
+            uses: vec![],
 
             css: None,
             wasm: None,
@@ -110,6 +112,10 @@ impl<'a> Component<'a> {
 
     pub fn report(&self) -> &Report {
         &self.report
+    }
+
+    pub fn uses(&self) -> &[&Path] {
+        self.uses.as_ref()
     }
 }
 
@@ -343,7 +349,7 @@ impl<'a> Component<'a> {
 
     fn get_special_vars(
         &mut self,
-        node: &mut Node<'_, FragmentMetadata>,
+        node: &mut Node<'a, FragmentMetadata>,
         parent_id: Option<u32>,
         scope_stack: &mut Vec<Scope>,
     ) {
@@ -400,7 +406,7 @@ impl<'a> Component<'a> {
                     let scope = scope_stack.pop().unwrap();
                     self.declared_vars.insert_scope(id, scope);
                 }
-                SpecialBlock::Use(_) => todo!(),
+                SpecialBlock::Use(use_block) => self.uses.push(use_block.path()),
             },
 
             _ => {}

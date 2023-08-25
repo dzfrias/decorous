@@ -31,7 +31,7 @@ fn render<T: io::Write, C, R>(
 ) -> io::Result<()>
 where
     C: WasmCompiler<DomRenderer>,
-    R: UseResolver
+    R: UseResolver,
 {
     if let Some(wasm) = component.wasm() {
         let _ = metadata.wasm_compiler.compile(
@@ -44,6 +44,19 @@ where
         );
     }
 
+    for use_decl in component.uses() {
+        let Some(stem) = use_decl.file_stem() else {
+            continue;
+        };
+        let use_info = metadata.use_resolver.resolve(use_decl)?;
+        writeln!(
+            render_to,
+            "import __decor_{} from \"./{}\";",
+            // FIX: Make sure it is a valid JavaScript ident
+            stem.to_string_lossy(),
+            use_info.loc.display(),
+        )?;
+    }
     // Hoisted syntax nodes should come first
     for hoist in component.hoist() {
         writeln!(render_to, "{hoist}")?;
@@ -311,5 +324,10 @@ mod tests {
                 use_resolver: NullResolver
             }
         );
+    }
+
+    #[test]
+    fn can_have_resolver_for_use_path() {
+        test_render!("{#use \"./hello.decor\"} #p:Hello");
     }
 }

@@ -43,3 +43,18 @@ where
         Ok(())
     }
 }
+
+impl<B, T> WasmCompiler<B> for &T
+where
+    T: WasmCompiler<B>,
+    B: RenderBackend,
+{
+    type Err = T::Err;
+
+    fn compile<W>(&self, info: CodeInfo, out: &mut W) -> Result<(), Self::Err>
+    where
+        W: io::Write,
+    {
+        (*self).compile(info, out)
+    }
+}

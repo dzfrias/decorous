@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt};
+use std::{borrow::Cow, fmt, path::Path};
 
 use itertools::Itertools;
 use rslint_parser::SyntaxNode;
@@ -287,7 +287,7 @@ impl<'a, T> Node<'a, T> {
                         index: for_block.index,
                         expr: for_block.expr,
                     }),
-                    SpecialBlock::Use(_) => todo!(),
+                    SpecialBlock::Use(use_block) => SpecialBlock::Use(use_block),
                 }),
             },
             NodeType::Element(elem) => Node {
@@ -355,8 +355,8 @@ impl<'a> UseBlock<'a> {
         Self { path }
     }
 
-    pub fn path(&self) -> &str {
-        self.path
+    pub fn path(&self) -> &'a Path {
+        Path::new(self.path)
     }
 }
 
@@ -619,6 +619,6 @@ impl<'a, T> fmt::Display for ForBlock<'a, T> {
 
 impl<'a> fmt::Display for UseBlock<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{#use \"{}\"}}", self.path())
+        write!(f, "{{#use \"{}\"}}", self.path().display())
     }
 }
