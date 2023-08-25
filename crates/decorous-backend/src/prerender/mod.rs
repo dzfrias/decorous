@@ -16,8 +16,9 @@ use superfmt::{ContextBuilder, Formatter};
 pub use self::html_render::render_html;
 use self::node_analyzer::analyzers::Analysis;
 use crate::{
-    codegen_utils, dom_render::render_fragment as dom_render_fragment, Options, RenderBackend,
-    UseResolver, WasmCompiler,
+    codegen_utils,
+    dom_render::{render_fragment as dom_render_fragment, State},
+    Options, RenderBackend, UseResolver, WasmCompiler,
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -119,31 +120,28 @@ fn render_hoists<'a, T: io::Write>(
     for (meta, block) in analysis.reactive_data().special_blocks() {
         match block {
             SpecialBlock::If(if_block) => {
-                dom_render_fragment(
-                    if_block.inner(),
-                    Some(meta.id()),
-                    component.declared_vars(),
-                    &meta.id().to_string(),
-                    out,
-                )?;
+                let state = State {
+                    component,
+                    name: meta.id().to_string().into(),
+                    root: Some(meta.id()),
+                };
+                dom_render_fragment(if_block.inner(), state, out)?;
                 if let Some(else_block) = if_block.else_block() {
-                    dom_render_fragment(
-                        else_block,
-                        Some(meta.id()),
-                        component.declared_vars(),
-                        &format!("{}_else", meta.id()),
-                        out,
-                    )?;
+                    let state = State {
+                        component,
+                        name: format!("{}_else", meta.id()).into(),
+                        root: Some(meta.id()),
+                    };
+                    dom_render_fragment(else_block, state, out)?;
                 }
             }
             SpecialBlock::For(for_block) => {
-                dom_render_fragment(
-                    for_block.inner(),
-                    Some(meta.id()),
-                    component.declared_vars(),
-                    &meta.id().to_string(),
-                    out,
-                )?;
+                let state = State {
+                    component,
+                    name: meta.id().to_string().into(),
+                    root: Some(meta.id()),
+                };
+                dom_render_fragment(for_block.inner(), state, out)?;
             }
             SpecialBlock::Use(_) => todo!(),
         }

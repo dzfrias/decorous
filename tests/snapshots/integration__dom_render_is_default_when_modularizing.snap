@@ -31,9 +31,9 @@ const e4 = document.createElement("button");
 e4.textContent = "Click me!";
 e4.addEventListener("click", ctx[1])
 const e6 = document.createTextNode(" ");
-mount(target, e0, anchor);
 e0.appendChild(e1);
 e0.appendChild(e2);
+mount(target, e0, anchor);
 mount(target, e3, anchor);
 mount(target, e4, anchor);
 mount(target, e6, anchor);

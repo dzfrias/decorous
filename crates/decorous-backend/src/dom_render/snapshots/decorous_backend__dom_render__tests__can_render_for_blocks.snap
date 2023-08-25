@@ -11,7 +11,6 @@ function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
-const e0_anchor = document.createTextNode("");
 function create_0_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
@@ -29,6 +28,7 @@ e2.parentNode.removeChild(e2);
 }
 };
 }
+const e0_anchor = document.createTextNode("");
 mount(target, e0_anchor, anchor);
 let e0_blocks = [];
 let i = 0;

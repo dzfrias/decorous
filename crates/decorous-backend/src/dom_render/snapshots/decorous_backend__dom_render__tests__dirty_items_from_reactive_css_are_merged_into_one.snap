@@ -16,6 +16,7 @@ target.insertBefore(newNode, anchor || null);
 const e0 = document.createElement("button");
 e0.textContent = "Click";
 e0.addEventListener("click", ctx[2])
+e0.setAttribute("class", "decor-0")
 mount(target, e0, anchor);
 target.setAttribute("style", `--decor-0: ${ctx[0]}; --decor-1: ${ctx[1]}; `);
 return {

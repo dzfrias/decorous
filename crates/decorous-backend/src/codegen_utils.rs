@@ -28,6 +28,8 @@ pub(crate) use force_writeln;
 
 macro_rules! sort_if_testing {
     ($to_sort:expr, $by:expr) => {{
+        #[allow(unused)]
+        use ::itertools::Itertools;
         #[cfg(test)]
         let iter = $to_sort.sorted_by($by);
         #[cfg(not(test))]

@@ -17,8 +17,8 @@ const e1 = document.createTextNode(`${ctx[0]}hello`);
 const e2 = document.createElement("button");
 e2.textContent = "Click me";
 e2.addEventListener("click", ctx[1])
-mount(target, e0, anchor);
 e0.appendChild(e1);
+mount(target, e0, anchor);
 mount(target, e2, anchor);
 return {
 u(dirty) {

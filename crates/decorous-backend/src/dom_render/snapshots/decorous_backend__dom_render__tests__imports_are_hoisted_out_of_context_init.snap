@@ -15,8 +15,8 @@ target.insertBefore(newNode, anchor || null);
 }
 const e0 = document.createElement("p");
 const e1 = document.createTextNode(x);
-mount(target, e0, anchor);
 e0.appendChild(e1);
+mount(target, e0, anchor);
 return {
 u(dirty) {
 },
