@@ -55,8 +55,14 @@ pub struct Build {
     #[arg(short, long)]
     pub watch: bool,
     /// Control output colorization.
-    #[arg(short, long, default_value = "auto", value_name = "WHEN")]
-    pub color: Color,
+    #[arg(short,
+          long,
+          default_value = "auto",
+          value_name = "WHEN",
+          value_parser = determine_color,
+          action = clap::ArgAction::Set
+    )]
+    pub color: bool,
 }
 
 #[derive(Debug, Args)]
@@ -103,6 +109,15 @@ pub enum OptimizationLevel {
     Size,
     #[clap(name = "z")]
     SizeAggressive,
+}
+
+fn determine_color(input: &str) -> Result<bool, String> {
+    let color = Color::from_str(input, false)?;
+    Ok(match color {
+        Color::Auto => atty::is(atty::Stream::Stdout),
+        Color::Never => false,
+        Color::Always => true,
+    })
 }
 
 impl Display for RenderMethod {

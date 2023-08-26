@@ -6,7 +6,6 @@ use std::{
     borrow::Cow,
     fs::{self, File},
     io::{BufWriter, Write},
-    path::Path,
     time::Instant,
 };
 
@@ -28,7 +27,7 @@ use serde_json::json;
 
 use crate::{
     build::resolver::Resolver,
-    cli::{Build, Color, RenderMethod},
+    cli::{Build, RenderMethod},
     config::Config,
     indicators::FinishLog,
     utils,
@@ -43,22 +42,16 @@ pub fn build(args: &Build) -> Result<()> {
     );
 
     let config = utils::get_config()?;
-    let enable_color = match args.color {
-        Color::Auto => atty::is(atty::Stream::Stdout),
-        Color::Never => false,
-        Color::Always => true,
-    };
-
-    compile(&args, &config, enable_color)?;
+    compile(&args, &config)?;
 
     if args.watch {
-        watch(&args, &config, enable_color)?;
+        watch(&args, &config)?;
     }
 
     Ok(())
 }
 
-fn compile(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyhow::Error> {
+fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
     let start = Instant::now();
     let input = fs::read_to_string(&args.input).context("error reading provided input file")?;
     let abs_input = fs::canonicalize(&args.input)?;
@@ -66,7 +59,7 @@ fn compile(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyh
         config,
         args,
         input_path: &abs_input,
-        enable_color,
+        enable_color: args.color,
     };
     let metadata = Options {
         name: {
@@ -81,26 +74,26 @@ fn compile(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyh
         use_resolver: Resolver {
             config,
             args,
-            enable_color,
+            enable_color: args.color,
             compiler: &compiler,
         },
     };
-    let component = parse_component(&input, config, &args.input, enable_color)?;
+    let component = parse_component(&input, config, args)?;
     let js_name = if args.modularize {
         format!("{}.mjs", args.out)
     } else {
         format!("{}.js", args.out)
     };
-    render_js(args, &component, &metadata, &js_name, enable_color)?;
-    render_html(args, &component, &metadata, &js_name, enable_color)?;
+    render_js(args, &component, &metadata, &js_name)?;
+    render_html(args, &component, &metadata, &js_name)?;
     if component.css().is_some() {
-        render_css(args, &component, enable_color)?;
+        render_css(args, &component)?;
     }
 
     {
         let mut log = FinishLog::default();
         log.with_main_message(format!("compiled in ~{:.2?}", start.elapsed()))
-            .enable_color(enable_color)
+            .enable_color(args.color)
             .with_mod(
                 args.optimize
                     .map_or(Cow::Borrowed("debug"), |opt| opt.to_string().into()),
@@ -114,7 +107,7 @@ fn compile(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyh
     Ok(())
 }
 
-fn watch(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyhow::Error> {
+fn watch(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
     let (tx, rx) = std::sync::mpsc::channel();
     let mut watcher = RecommendedWatcher::new(tx, notify::Config::default())
         .context("error creating up watcher")?;
@@ -127,7 +120,7 @@ fn watch(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyhow
         match event.kind {
             EventKind::Modify(ModifyKind::Data(DataChange::Content)) => {
                 println!();
-                compile(&args, &config, enable_color)?;
+                compile(&args, &config)?;
             }
             EventKind::Remove(_) => {
                 println!("Input file removed... exiting process");
@@ -140,11 +133,7 @@ fn watch(args: &Build, config: &Config, enable_color: bool) -> Result<(), anyhow
     Ok(())
 }
 
-fn render_css(
-    args: &Build,
-    component: &Component<'_>,
-    enable_color: bool,
-) -> Result<(), anyhow::Error> {
+fn render_css(args: &Build, component: &Component<'_>) -> Result<(), anyhow::Error> {
     let Some(css) = component.css() else {
         return Ok(());
     };
@@ -161,7 +150,7 @@ fn render_css(
         "{}",
         FinishLog::default()
             .with_main_message("CSS")
-            .enable_color(enable_color)
+            .enable_color(args.color)
             .with_file(format!("{}.css", args.out))
     );
 
@@ -173,7 +162,6 @@ fn render_js(
     component: &Component<'_>,
     metadata: &Options<'_, &MainCompiler, Resolver>,
     js_name: &str,
-    enable_color: bool,
 ) -> Result<()> {
     let mut report = Report::new();
     if args.strip && component.wasm().is_none() {
@@ -217,7 +205,7 @@ fn render_js(
         FinishLog::default()
             .with_main_message("JavaScript")
             .with_sub_message(args.render_method.to_string())
-            .enable_color(enable_color)
+            .enable_color(args.color)
             .with_file(js_name)
     );
     out.flush()
@@ -231,7 +219,6 @@ fn render_html(
     component: &Component,
     meta: &Options<'_, &MainCompiler, Resolver>,
     js_name: &str,
-    enable_color: bool,
 ) -> Result<()> {
     let mut handlebars = Handlebars::new();
     handlebars.register_escape_fn(no_escape);
@@ -261,7 +248,7 @@ fn render_html(
                 FinishLog::default()
                     .with_main_message("HTML")
                     .with_file("index.html")
-                    .enable_color(enable_color)
+                    .enable_color(args.color)
             );
 
             Ok(())
@@ -293,7 +280,7 @@ fn render_html(
                         .with_main_message("HTML")
                         .with_sub_message("prerender")
                         .with_file("index.html")
-                        .enable_color(enable_color)
+                        .enable_color(args.color)
                 );
                 return Ok(());
             }
@@ -313,7 +300,7 @@ fn render_html(
                     .with_main_message("HTML")
                     .with_sub_message("prerender")
                     .with_file(html)
-                    .enable_color(enable_color)
+                    .enable_color(args.color)
             );
 
             Ok(())
@@ -321,14 +308,9 @@ fn render_html(
     }
 }
 
-fn parse_component<'a>(
-    input: &'a str,
-    config: &Config,
-    file: impl AsRef<Path>,
-    enable_color: bool,
-) -> Result<Component<'a>> {
-    let file_name = file.as_ref().to_string_lossy();
-    let preproc = Preproc::new(config, enable_color);
+fn parse_component<'a>(input: &'a str, config: &Config, args: &Build) -> Result<Component<'a>> {
+    let file_name = args.input.to_string_lossy();
+    let preproc = Preproc::new(config, args.color);
     let component = match parse_with_preprocessor(input, &preproc) {
         Ok(ast) => {
             let c = Component::new(ast);
@@ -346,7 +328,7 @@ fn parse_component<'a>(
         "{}",
         FinishLog::default()
             .with_main_message("parsed")
-            .enable_color(enable_color)
+            .enable_color(args.color)
     );
     component
 }
