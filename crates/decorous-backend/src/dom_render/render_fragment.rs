@@ -15,6 +15,29 @@ use std::{
 
 use crate::codegen_utils::{self, force_write, force_writeln, replace_namerefs, sort_if_testing};
 
+macro_rules! default_mount_and_detach {
+    () => {
+        fn render_detach(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
+            if state.root != meta.parent_id() {
+                return;
+            }
+            force_writeln!(out, "e{}.parentNode.removeChild(e{0});", meta.id());
+        }
+
+        fn render_mount(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
+            let id = meta.id();
+
+            if meta.parent_id() == state.root {
+                force_writeln!(out, "mount(target, e{id}, anchor);");
+            } else if let Some(parent_id) = meta.parent_id() {
+                force_writeln!(out, "e{parent_id}.appendChild(e{id});");
+            } else {
+                panic!("BUG: node's parent should never be None while root is Some");
+            }
+        }
+    };
+}
+
 pub(crate) fn render_fragment<W>(
     nodes: &[Node<'_, FragmentMetadata>],
     mut state: State<'_>,
@@ -145,13 +168,7 @@ impl Render for Text<'_> {
         );
     }
 
-    fn render_mount(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        default_mount(meta, state, out);
-    }
-
-    fn render_detach(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        default_detach(meta, state, out);
-    }
+    default_mount_and_detach!();
 }
 
 impl Render for Mustache {
@@ -186,13 +203,7 @@ impl Render for Mustache {
         self.render_detach(state, &mut out.detaches, meta);
     }
 
-    fn render_mount(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        default_mount(meta, state, out);
-    }
-
-    fn render_detach(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        default_detach(meta, state, out);
-    }
+    default_mount_and_detach!();
 }
 
 impl Render for Element<'_, FragmentMetadata> {
@@ -255,19 +266,13 @@ impl Render for Element<'_, FragmentMetadata> {
         self.render_detach(state, &mut out.detaches, meta);
     }
 
-    fn render_mount(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        default_mount(meta, state, out);
-    }
-
     fn render_update(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
         for attr in self.attrs() {
             attr.render_update(state, out, meta);
         }
     }
 
-    fn render_detach(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        default_detach(meta, state, out);
-    }
+    default_mount_and_detach!();
 }
 
 impl Render for SpecialBlock<'_, FragmentMetadata> {
@@ -562,26 +567,6 @@ impl Render for Attribute<'_> {
             _ => return,
         }
     }
-}
-
-fn default_mount(meta: &FragmentMetadata, state: &mut State<'_>, out: &mut Vec<u8>) {
-    let id = meta.id();
-
-    if meta.parent_id() == state.root {
-        force_writeln!(out, "mount(target, e{id}, anchor);");
-    } else if let Some(parent_id) = meta.parent_id() {
-        force_writeln!(out, "e{parent_id}.appendChild(e{id});");
-    } else {
-        panic!("BUG: node's parent should never be None while root is Some");
-    }
-}
-
-fn default_detach(meta: &FragmentMetadata, state: &mut State<'_>, out: &mut Vec<u8>) {
-    if state.root != meta.parent_id() {
-        return;
-    }
-
-    force_writeln!(out, "e{}.parentNode.removeChild(e{0});", meta.id());
 }
 
 fn render_reactive_css(state: &mut State, output: &mut Output) {
