@@ -79,6 +79,7 @@ where
         name: "main".into(),
         component,
         root: None,
+        uses: vec![],
     };
     render_fragment(component.fragment_tree(), state, render_to)?;
 
@@ -325,8 +326,8 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn can_have_resolver_for_use_path() {
-    //     test_render!("{#use \"./hello.decor\"} #p:Hello");
-    // }
+    #[test]
+    fn can_have_resolver_for_use_path() {
+        test_render!("{#use \"./hello.decor\"} #p:Hello #hello /hello");
+    }
 }

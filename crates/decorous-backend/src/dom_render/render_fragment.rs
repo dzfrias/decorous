@@ -1,7 +1,7 @@
 use decorous_frontend::{
     ast::{
         Attribute, AttributeValue, CollapsedChildrenType, Element, ForBlock, IfBlock, Mustache,
-        Node, NodeType, SpecialBlock, Text,
+        Node, NodeType, SpecialBlock, Text, UseBlock,
     },
     utils, Component, FragmentMetadata,
 };
@@ -64,6 +64,7 @@ pub(crate) struct State<'ast> {
     #[allow(unused)]
     pub name: Cow<'static, str>,
     pub root: Option<u32>,
+    pub uses: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -95,6 +96,10 @@ impl Output {
 
     fn write_updateln(&mut self, b: impl Display) {
         let _ = write!(self.updates, "{b}\n");
+    }
+
+    fn write_detachln(&mut self, b: impl Display) {
+        let _ = write!(self.detaches, "{b}\n");
     }
 }
 
@@ -196,6 +201,30 @@ impl Render for Element<'_, FragmentMetadata> {
     fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
 
+        if state.uses.contains(&self.tag().into()) {
+            out.write_declln(format_args!(
+                "const e{id}_anchor = document.createTextNode(\"\");"
+            ));
+            if meta.parent_id() == state.root {
+                out.write_mountln(format_args!("mount(target, e{id}_anchor, anchor);"));
+            } else if let Some(parent_id) = meta.parent_id() {
+                out.write_mountln(format_args!("e{parent_id}.appendChild(e{id}_anchor);"));
+            } else {
+                panic!("BUG: node's parent should never be None while root is Some");
+            }
+            out.write_mountln(format_args!(
+                "__decor_{}(target, e{id}_anchor);",
+                self.tag()
+            ));
+            if state.root != meta.parent_id() {
+                out.write_detachln(format_args!(
+                    "e{id}_anchor.parentNode.removeChild(e{id}_anchor);"
+                ));
+            }
+
+            return;
+        }
+
         // Decl
         out.write_declln(format_args!(
             "const e{id} = document.createElement(\"{}\");",
@@ -248,7 +277,7 @@ impl Render for SpecialBlock<'_, FragmentMetadata> {
         match self {
             Self::If(if_block) => if_block.render(state, out, meta),
             Self::For(for_block) => for_block.render(state, out, meta),
-            Self::Use(_) => todo!("use block"),
+            Self::Use(use_block) => use_block.render(state, out, meta),
         }
     }
 }
@@ -264,6 +293,7 @@ impl Render for ForBlock<'_, FragmentMetadata> {
             State {
                 name: id.to_string().into(),
                 root: Some(id),
+                uses: vec![],
                 ..*state
             },
             out,
@@ -310,6 +340,18 @@ impl Render for ForBlock<'_, FragmentMetadata> {
     }
 }
 
+impl Render for UseBlock<'_> {
+    type Metadata = FragmentMetadata;
+
+    fn render(&self, state: &mut State, _out: &mut Output, _meta: &Self::Metadata) {
+        let Some(name) = self.path().file_stem() else {
+            return;
+        };
+
+        state.uses.push(name.to_string_lossy().to_string());
+    }
+}
+
 impl Render for IfBlock<'_, FragmentMetadata> {
     type Metadata = FragmentMetadata;
 
@@ -328,6 +370,7 @@ impl Render for IfBlock<'_, FragmentMetadata> {
             State {
                 name: id.to_string().into(),
                 root: Some(id),
+                uses: vec![],
                 ..*state
             },
             out,
@@ -338,6 +381,7 @@ impl Render for IfBlock<'_, FragmentMetadata> {
                 State {
                     name: format!("{id}_else").into(),
                     root: Some(id),
+                    uses: vec![],
                     ..*state
                 },
                 out,

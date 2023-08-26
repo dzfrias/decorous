@@ -12,18 +12,18 @@ function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
-const e0_anchor = document.createTextNode("");
 const e1 = document.createTextNode(" ");
 const e2 = document.createElement("p");
-e2.textContent = "Hello";
-__decor_hello(target, e0_anchor)
+e2.textContent = "Hello ";
+const e4_anchor = document.createTextNode("");
 mount(target, e1, anchor);
 mount(target, e2, anchor);
+mount(target, e4_anchor, anchor);
+__decor_hello(target, e4_anchor);
 return {
 u(dirty) {
 },
 d() {
-e0.parentNode.removeChild(e0);
 e1.parentNode.removeChild(e1);
 e2.parentNode.removeChild(e2);
 }

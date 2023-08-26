@@ -124,6 +124,7 @@ fn render_hoists<'a, T: io::Write>(
                     component,
                     name: meta.id().to_string().into(),
                     root: Some(meta.id()),
+                    uses: vec![],
                 };
                 dom_render_fragment(if_block.inner(), state, out)?;
                 if let Some(else_block) = if_block.else_block() {
@@ -131,6 +132,7 @@ fn render_hoists<'a, T: io::Write>(
                         component,
                         name: format!("{}_else", meta.id()).into(),
                         root: Some(meta.id()),
+                        uses: vec![],
                     };
                     dom_render_fragment(else_block, state, out)?;
                 }
@@ -140,6 +142,7 @@ fn render_hoists<'a, T: io::Write>(
                     component,
                     name: meta.id().to_string().into(),
                     root: Some(meta.id()),
+                    uses: vec![],
                 };
                 dom_render_fragment(for_block.inner(), state, out)?;
             }
