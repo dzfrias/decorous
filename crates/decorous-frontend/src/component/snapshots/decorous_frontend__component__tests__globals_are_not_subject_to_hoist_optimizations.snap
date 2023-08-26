@@ -86,6 +86,7 @@ Component {
     report: Report {
         diagnostics: [],
     },
+    uses: [],
     component_id: 0,
     current_id: 1,
     css: None,
