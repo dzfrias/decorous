@@ -1,6 +1,6 @@
-use std::{convert::Infallible, io};
+use std::io::Write;
 
-use crate::RenderBackend;
+use anyhow::Error;
 use rslint_parser::SmolStr;
 
 #[derive(Debug, Clone, Hash)]
@@ -11,50 +11,23 @@ pub struct CodeInfo<'a> {
 }
 
 /// The trait for anything that takes WebAssembly input and compiles it to JavaScript.
-///
-/// After implementing it on a type, use the [`render_with_wasm`](super::render_with_wasm)
-/// function to hook the compiler into the renderer.
-///
-/// It is generic over a [`RenderBackend`], which allows for different written code depending on
-/// the backend.
-pub trait WasmCompiler<B>
-where
-    B: RenderBackend + ?Sized,
-{
-    type Err;
-
-    fn compile<W>(&self, info: CodeInfo, out: &mut W) -> Result<(), Self::Err>
-    where
-        W: io::Write;
+pub trait WasmCompiler {
+    fn compile(&self, info: CodeInfo, out: &mut dyn Write) -> Result<(), Error>;
 }
 
 pub struct NullCompiler;
 
-impl<B> WasmCompiler<B> for NullCompiler
-where
-    B: RenderBackend,
-{
-    type Err = Infallible;
-
-    fn compile<W>(&self, _info: CodeInfo, _out: &mut W) -> Result<(), Self::Err>
-    where
-        W: io::Write,
-    {
+impl WasmCompiler for NullCompiler {
+    fn compile(&self, _info: CodeInfo, _out: &mut dyn Write) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<B, T> WasmCompiler<B> for &T
+impl<T> WasmCompiler for &T
 where
-    T: WasmCompiler<B>,
-    B: RenderBackend,
+    T: WasmCompiler,
 {
-    type Err = T::Err;
-
-    fn compile<W>(&self, info: CodeInfo, out: &mut W) -> Result<(), Self::Err>
-    where
-        W: io::Write,
-    {
+    fn compile(&self, info: CodeInfo, out: &mut dyn Write) -> Result<(), Error> {
         (*self).compile(info, out)
     }
 }

@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Error, Result};
-use decorous_backend::{dom_render::DomRenderer, prerender::Prerenderer, CodeInfo, WasmCompiler};
+use decorous_backend::{CodeInfo, WasmCompiler};
 use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use itertools::Itertools;
 use scopeguard::defer;
@@ -47,153 +47,162 @@ impl<'a> MainCompiler<'a> {
     }
 }
 
-macro_rules! compile_for {
-    ($backend:ty) => {
-        impl WasmCompiler<$backend> for MainCompiler<'_> {
-            type Err = Error;
+impl WasmCompiler for MainCompiler<'_> {
+    fn compile(
+        &self,
+        CodeInfo {
+            lang,
+            body,
+            exports,
+        }: CodeInfo,
+        out: &mut dyn io::Write,
+    ) -> Result<(), Error> {
+        let config = self
+            .config
+            .compilers
+            .get(lang)
+            .with_context(|| format!("unsupported language: {lang}"))?;
+        warn_unused_deps(&config.deps)?;
+        let dir = TempDir::new(lang).context("error creating temp dir for compiler")?;
+        let path: PathBuf = dir.path().join(format!(
+            "__tmp.{}",
+            config.ext_override.as_deref().unwrap_or(lang)
+        ));
 
-            fn compile<W>(&self, CodeInfo { lang, body, exports }: CodeInfo, out: &mut W) -> Result<(), Error>
-            where
-                W: io::Write,
-            {
-                let config = self
-                    .config
-                    .compilers
-                    .get(lang)
-                    .with_context(|| format!("unsupported language: {lang}"))?;
-                warn_unused_deps(&config.deps)?;
-                let dir = TempDir::new(lang).context("error creating temp dir for compiler")?;
-                let path: PathBuf = dir.path().join(format!("__tmp.{}", config.ext_override.as_deref().unwrap_or(lang)));
+        let spinner = Spinner::new(format!("Building WebAssembly ({lang})..."));
 
-                let spinner = Spinner::new(format!("Building WebAssembly ({lang})..."));
+        fs::write(&path, body)?;
 
-                fs::write(&path, body)?;
+        defer! {
+            // No .expect() to save on format! call
+            fs::remove_file(&path).unwrap_or_else(|_| {
+                panic!("error removing \"{}\"! Remove it manually!", path.display())
+            });
+        }
 
-                defer! {
-                    // No .expect() to save on format! call
-                    fs::remove_file(&path).unwrap_or_else(|_| {
-                        panic!("error removing \"{}\"! Remove it manually!", path.display())
-                    });
-                }
+        match fs::create_dir(&self.args.out) {
+            Ok(()) => {}
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
+                fs::remove_dir_all(&self.args.out).context("error removing previous outdir")?;
+            }
+            Err(err) => bail!(err),
+        }
+        let outdir = fs::canonicalize(&self.args.out).unwrap();
 
-                match fs::create_dir(&self.args.out) {
-                    Ok(()) => {}
-                    Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
-                        fs::remove_dir_all(&self.args.out).context("error removing previous outdir")?;
-                    }
-                    Err(err) => bail!(err),
-                }
-                let outdir = fs::canonicalize(&self.args.out).unwrap();
-
-                let python = self.get_python().context("python not found in $PATH! Make sure to install it!")?;
-                let file_loc = match &config.script {
-                    ScriptOrFile::File(file) => Cow::Owned(fs::canonicalize(file.as_path()).context("error getting absolute path of script")?),
-                    ScriptOrFile::Script(script) => {
-                        fs::write(dir.path().join("__tmp.py"), script)?;
-                        Cow::Borrowed(Path::new("__tmp.py"))
-                    },
-                };
-                // This defer! cannot be used in the above match statement, as it executes when a
-                // scope ends, and match arms have individual scopes
-                defer! {
-                    if matches!(&config.script, ScriptOrFile::Script(_)) {
-                        fs::remove_file(dir.path().join("__tmp.py")).expect("error removing \"__tmp.py\"! Remove it manually!");
-                    }
-                }
-
-                let cache_path = if config.use_cache {
-                    gen_cache(self.input_path)?
-                } else {
-                    PathBuf::new()
-                };
-                let script_out = Command::new(python.as_ref())
-                    .arg(file_loc.as_ref())
-                    .env("DECOR_INPUT", &path)
-                    .env("DECOR_OUT", &self.args.out)
-                    .env("DECOR_OUT_DIR", outdir)
-                    .env("DECOR_EXPORTS", exports.iter().join(" "))
-                    .env("DECOR_CACHE", &cache_path)
-                    .current_dir(dir.path())
-                    .args(&self.args.build_args)
-                    .output()?;
-                let (status, stdout, stderr) = (script_out.status, script_out.stdout, script_out.stderr);
-                if cache_path != Path::new("") && fs::read_dir(&cache_path).context("error reading cache dir")?.count() == 0 {
-                    fs::remove_dir(&cache_path).context("error removing cache dir - should be empty")?;
-                }
-
-                if !status.success() {
-                    bail!(
-                        "failed to compile to WebAssembly:\n{}\nwith stdout:\n{}",
-                        str::from_utf8(&stderr)?,
-                        str::from_utf8(&stdout)?,
-                    );
-                }
-
-                out.write_all(&stdout)?;
-
-                spinner.finish(FinishLog::default()
-                    .with_main_message("WebAssembly")
-                    .with_sub_message(format!("{lang}{}", {
-                        let mut args = String::new();
-                        if !self.args.build_args.is_empty() {
-                            args.push('`');
-                            args.push_str(&self.args.build_args.join(" "));
-                            args.insert_str(0, " `");
-                            args.push('`')
-                        }
-                        args
-                    }))
-                    .with_file(&self.args.out)
-                    .enable_color(self.enable_color)
-                    .to_string()
-                );
-
-                let wasm_files = fs::read_dir(&self.args.out)?
-                    .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-                    .filter(|path| match path.extension() {
-                        Some(ext) if ext == OsStr::new("wasm") => true,
-                        _ => false,
-                    })
-                    .collect_vec();
-
-                if let Some(opt) = self.args.optimize {
-                    for path in &wasm_files {
-                        let spinner = Spinner::new(format!("Optimizing WebAssembly ({opt})..."));
-                        optimize(path, opt, &config.features).context("problem optimizing WebAssembly")?;
-                        spinner.finish(
-                            FinishLog::default()
-                               .with_main_message("optimized WebAssembly")
-                               .with_sub_message(opt.to_string())
-                               .with_file(path)
-                               .enable_color(self.enable_color)
-                               .to_string()
-                        );
-                    }
-                }
-
-                if self.args.strip {
-                    for path in &wasm_files {
-                        let spinner = Spinner::new("Stripping WebAssembly...");
-                        strip(&path).context("problem stripping WebAssembly binary")?;
-                        spinner.finish(
-                            FinishLog::default()
-                               .with_main_message("stripped WebAssembly")
-                               .with_file(path)
-                               .enable_color(self.enable_color)
-                               .to_string()
-                        );
-                    }
-                }
-
-
-                Ok(())
+        let python = self
+            .get_python()
+            .context("python not found in $PATH! Make sure to install it!")?;
+        let file_loc = match &config.script {
+            ScriptOrFile::File(file) => Cow::Owned(
+                fs::canonicalize(file.as_path())
+                    .context("error getting absolute path of script")?,
+            ),
+            ScriptOrFile::Script(script) => {
+                fs::write(dir.path().join("__tmp.py"), script)?;
+                Cow::Borrowed(Path::new("__tmp.py"))
+            }
+        };
+        // This defer! cannot be used in the above match statement, as it executes when a
+        // scope ends, and match arms have individual scopes
+        defer! {
+            if matches!(&config.script, ScriptOrFile::Script(_)) {
+                fs::remove_file(dir.path().join("__tmp.py")).expect("error removing \"__tmp.py\"! Remove it manually!");
             }
         }
-    };
-}
 
-compile_for!(DomRenderer);
-compile_for!(Prerenderer);
+        let cache_path = if config.use_cache {
+            gen_cache(self.input_path)?
+        } else {
+            PathBuf::new()
+        };
+        let script_out = Command::new(python.as_ref())
+            .arg(file_loc.as_ref())
+            .env("DECOR_INPUT", &path)
+            .env("DECOR_OUT", &self.args.out)
+            .env("DECOR_OUT_DIR", outdir)
+            .env("DECOR_EXPORTS", exports.iter().join(" "))
+            .env("DECOR_CACHE", &cache_path)
+            .current_dir(dir.path())
+            .args(&self.args.build_args)
+            .output()?;
+        let (status, stdout, stderr) = (script_out.status, script_out.stdout, script_out.stderr);
+        if cache_path != Path::new("")
+            && fs::read_dir(&cache_path)
+                .context("error reading cache dir")?
+                .count()
+                == 0
+        {
+            fs::remove_dir(&cache_path).context("error removing cache dir - should be empty")?;
+        }
+
+        if !status.success() {
+            bail!(
+                "failed to compile to WebAssembly:\n{}\nwith stdout:\n{}",
+                str::from_utf8(&stderr)?,
+                str::from_utf8(&stdout)?,
+            );
+        }
+
+        out.write_all(&stdout)?;
+
+        spinner.finish(
+            FinishLog::default()
+                .with_main_message("WebAssembly")
+                .with_sub_message(format!("{lang}{}", {
+                    let mut args = String::new();
+                    if !self.args.build_args.is_empty() {
+                        args.push('`');
+                        args.push_str(&self.args.build_args.join(" "));
+                        args.insert_str(0, " `");
+                        args.push('`')
+                    }
+                    args
+                }))
+                .with_file(&self.args.out)
+                .enable_color(self.enable_color)
+                .to_string(),
+        );
+
+        let wasm_files = fs::read_dir(&self.args.out)?
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| match path.extension() {
+                Some(ext) if ext == OsStr::new("wasm") => true,
+                _ => false,
+            })
+            .collect_vec();
+
+        if let Some(opt) = self.args.optimize {
+            for path in &wasm_files {
+                let spinner = Spinner::new(format!("Optimizing WebAssembly ({opt})..."));
+                optimize(path, opt, &config.features).context("problem optimizing WebAssembly")?;
+                spinner.finish(
+                    FinishLog::default()
+                        .with_main_message("optimized WebAssembly")
+                        .with_sub_message(opt.to_string())
+                        .with_file(path)
+                        .enable_color(self.enable_color)
+                        .to_string(),
+                );
+            }
+        }
+
+        if self.args.strip {
+            for path in &wasm_files {
+                let spinner = Spinner::new("Stripping WebAssembly...");
+                strip(&path).context("problem stripping WebAssembly binary")?;
+                spinner.finish(
+                    FinishLog::default()
+                        .with_main_message("stripped WebAssembly")
+                        .with_file(path)
+                        .enable_color(self.enable_color)
+                        .to_string(),
+                );
+            }
+        }
+
+        Ok(())
+    }
+}
 
 fn strip(file: impl AsRef<Path>) -> Result<()> {
     let mut module = walrus::Module::from_file(&file)?;

@@ -9,15 +9,15 @@ pub struct UseInfo {
 }
 
 pub trait UseResolver {
-    fn resolve(&self, path: impl AsRef<Path>) -> io::Result<UseInfo>;
+    fn resolve(&self, path: &Path) -> io::Result<UseInfo>;
 }
 
 pub struct NullResolver;
 
 impl UseResolver for NullResolver {
-    fn resolve(&self, path: impl AsRef<Path>) -> io::Result<UseInfo> {
+    fn resolve(&self, path: &Path) -> io::Result<UseInfo> {
         Ok(UseInfo {
-            loc: path.as_ref().to_path_buf(),
+            loc: path.to_path_buf(),
         })
     }
 }
@@ -26,7 +26,7 @@ impl<T> UseResolver for &T
 where
     T: UseResolver,
 {
-    fn resolve(&self, path: impl AsRef<Path>) -> io::Result<UseInfo> {
+    fn resolve(&self, path: &Path) -> io::Result<UseInfo> {
         (*self).resolve(path)
     }
 }

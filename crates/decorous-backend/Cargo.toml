@@ -6,11 +6,13 @@ edition = "2021"
 [dependencies]
 rslint_parser = { workspace = true }
 decorous-frontend = { path = "../decorous-frontend" }
+decorous-errors = { path = "../decorous-errors" }
 superfmt = { path = "../superfmt" }
 rslint_text_edit = "0.1.0"
 itertools = { workspace = true }
 thiserror = { workspace = true }
 lazy_format = "2.0.0"
+anyhow = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

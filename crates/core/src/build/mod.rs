@@ -71,7 +71,7 @@ fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
         },
         modularize: args.modularize,
         wasm_compiler: &compiler,
-        use_resolver: Resolver {
+        use_resolver: &Resolver {
             config,
             args,
             enable_color: args.color,
@@ -160,7 +160,7 @@ fn render_css(args: &Build, component: &Component<'_>) -> Result<(), anyhow::Err
 fn render_js(
     args: &Build,
     component: &Component<'_>,
-    metadata: &Options<'_, &MainCompiler, Resolver>,
+    metadata: &Options<'_>,
     js_name: &str,
 ) -> Result<()> {
     let mut report = Report::new();
@@ -192,11 +192,11 @@ fn render_js(
     let mut out = BufWriter::new(File::create(js_name).context("error creating out file")?);
     match args.render_method {
         RenderMethod::Csr => {
-            render::<DomRenderer, _, _, _>(component, &mut out, metadata)
+            render::<DomRenderer, _>(component, &mut out, metadata)
                 .context("error during rendering")?;
         }
         RenderMethod::Prerender => {
-            render::<Prerenderer, _, _, _>(component, &mut out, metadata)
+            render::<Prerenderer, _>(component, &mut out, metadata)
                 .context("error during rendering")?;
         }
     }
@@ -217,7 +217,7 @@ fn render_js(
 fn render_html(
     args: &Build,
     component: &Component,
-    meta: &Options<'_, &MainCompiler, Resolver>,
+    meta: &Options<'_>,
     js_name: &str,
 ) -> Result<()> {
     let mut handlebars = Handlebars::new();

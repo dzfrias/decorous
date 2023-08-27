@@ -5,34 +5,26 @@ use itertools::Itertools;
 use rslint_parser::AstNode;
 use std::{borrow::Cow, io};
 
-use crate::{codegen_utils, Options, RenderBackend, UseResolver, WasmCompiler};
+use crate::{codegen_utils, Options, RenderBackend};
 pub(crate) use render_fragment::{render_fragment, State};
 
 pub struct DomRenderer;
 
 impl RenderBackend for DomRenderer {
-    fn render<T: io::Write, C, R>(
+    fn render<T: io::Write>(
         out: &mut T,
         component: &Component,
-        metadata: &Options<C, R>,
-    ) -> io::Result<()>
-    where
-        C: WasmCompiler<DomRenderer>,
-        R: UseResolver,
-    {
+        metadata: &Options,
+    ) -> io::Result<()> {
         render(component, out, metadata)
     }
 }
 
-fn render<T: io::Write, C, R>(
+fn render<T: io::Write>(
     component: &Component,
     render_to: &mut T,
-    metadata: &Options<C, R>,
-) -> io::Result<()>
-where
-    C: WasmCompiler<DomRenderer>,
-    R: UseResolver,
-{
+    metadata: &Options,
+) -> io::Result<()> {
     if let Some(wasm) = component.wasm() {
         let _ = metadata.wasm_compiler.compile(
             crate::CodeInfo {
@@ -204,7 +196,7 @@ mod tests {
             let component = make_component($input);
             let mut out = vec![];
             #[allow(unused)]
-            let mut metadata = Options { name: "test", modularize: false, use_resolver: NullResolver, wasm_compiler: NullCompiler };
+            let mut metadata = Options { name: "test", modularize: false, use_resolver: &NullResolver, wasm_compiler: &NullCompiler };
             $(
                 metadata = $metadata;
              )?
@@ -320,8 +312,8 @@ mod tests {
             Options {
                 name: "test",
                 modularize: true,
-                wasm_compiler: NullCompiler,
-                use_resolver: NullResolver
+                wasm_compiler: &NullCompiler,
+                use_resolver: &NullResolver
             }
         );
     }

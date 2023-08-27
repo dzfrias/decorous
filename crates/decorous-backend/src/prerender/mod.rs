@@ -18,7 +18,7 @@ use self::node_analyzer::analyzers::Analysis;
 use crate::{
     codegen_utils,
     dom_render::{render_fragment as dom_render_fragment, State},
-    Options, RenderBackend, UseResolver, WasmCompiler,
+    Options, RenderBackend,
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -37,15 +37,7 @@ impl WriteStatus {
 pub struct Prerenderer;
 
 impl RenderBackend for Prerenderer {
-    fn render<T: io::Write, C, R>(
-        out: &mut T,
-        component: &Component,
-        opts: &Options<C, R>,
-    ) -> io::Result<()>
-    where
-        C: WasmCompiler<Prerenderer>,
-        R: UseResolver,
-    {
+    fn render<T: io::Write>(out: &mut T, component: &Component, opts: &Options) -> io::Result<()> {
         if let Some(wasm) = component.wasm() {
             let _ = opts.wasm_compiler.compile(
                 crate::CodeInfo {

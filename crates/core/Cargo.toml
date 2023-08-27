@@ -16,7 +16,7 @@ decorous-frontend = { path = "../decorous-frontend" }
 decorous-backend = { path = "../decorous-backend" }
 decorous-errors = { path = "../decorous-errors" }
 superfmt = { path = "../superfmt" }
-anyhow = "1.0.71"
+anyhow = { workspace = true }
 dhat = { version = "0.3", optional = true }
 serde = { version = "1.0.177", features = ["derive"] }
 handlebars = "4.3"

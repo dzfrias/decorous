@@ -512,6 +512,8 @@ dependencies = [
 name = "decorous-backend"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "decorous-errors",
  "decorous-frontend",
  "insta",
  "itertools 0.11.0",
