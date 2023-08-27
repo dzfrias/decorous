@@ -13,27 +13,22 @@ use std::{
     str,
 };
 
-use crate::codegen_utils::{self, force_write, force_writeln, replace_namerefs, sort_if_testing};
+use crate::codegen_utils::{self, force_write, replace_namerefs, sort_if_testing};
 
 macro_rules! default_mount_and_detach {
-    () => {
-        fn render_detach(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-            if state.root != meta.parent_id() {
-                return;
-            }
-            force_writeln!(out, "e{}.parentNode.removeChild(e{0});", meta.id());
+    ($state:expr, $out:expr, $meta:expr) => {
+        let id = $meta.id();
+
+        if $state.root == $meta.parent_id() {
+            $out.write_detachln(format_args!("e{id}.parentNode.removeChild(e{id});"));
         }
 
-        fn render_mount(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-            let id = meta.id();
-
-            if meta.parent_id() == state.root {
-                force_writeln!(out, "mount(target, e{id}, anchor);");
-            } else if let Some(parent_id) = meta.parent_id() {
-                force_writeln!(out, "e{parent_id}.appendChild(e{id});");
-            } else {
-                panic!("BUG: node's parent should never be None while root is Some");
-            }
+        if $meta.parent_id() == $state.root {
+            $out.write_mountln(format_args!("mount(target, e{id}, anchor);"));
+        } else if let Some(parent_id) = $meta.parent_id() {
+            $out.write_mountln(format_args!("e{parent_id}.appendChild(e{id});"));
+        } else {
+            panic!("BUG: node's parent should never be None while root is Some");
         }
     };
 }
@@ -129,17 +124,7 @@ impl Output {
 trait Render {
     type Metadata;
 
-    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
-        self.render_decl(state, &mut out.decls, meta);
-        self.render_mount(state, &mut out.mounts, meta);
-        self.render_update(state, &mut out.updates, meta);
-        self.render_detach(state, &mut out.detaches, meta);
-    }
-
-    fn render_decl(&self, _state: &mut State, _out: &mut Vec<u8>, _meta: &Self::Metadata) {}
-    fn render_mount(&self, _state: &mut State, _out: &mut Vec<u8>, _meta: &Self::Metadata) {}
-    fn render_update(&self, _state: &mut State, _out: &mut Vec<u8>, _meta: &Self::Metadata) {}
-    fn render_detach(&self, _state: &mut State, _out: &mut Vec<u8>, _meta: &Self::Metadata) {}
+    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata);
 }
 
 impl Render for Node<'_, FragmentMetadata> {
@@ -159,16 +144,15 @@ impl Render for Node<'_, FragmentMetadata> {
 impl Render for Text<'_> {
     type Metadata = FragmentMetadata;
 
-    fn render_decl(&self, _state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        force_writeln!(
-            out,
+    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+        out.write_declln(format_args!(
             "const e{} = document.createTextNode(\"{}\");",
             meta.id(),
             collapse_whitespace(self.0)
-        );
-    }
+        ));
 
-    default_mount_and_detach!();
+        default_mount_and_detach!(state, out, meta);
+    }
 }
 
 impl Render for Mustache {
@@ -189,9 +173,6 @@ impl Render for Mustache {
             "const e{id} = document.createTextNode({replaced});"
         ));
 
-        // Mount
-        self.render_mount(state, &mut out.mounts, meta);
-
         // Update
         let dirty =
             codegen_utils::calc_dirty(&unbound, state.component.declared_vars(), meta.scope());
@@ -199,11 +180,8 @@ impl Render for Mustache {
             out.write_updateln(format_args!("if ({dirty}) e{id}.data = {replaced};"));
         }
 
-        // Detach
-        self.render_detach(state, &mut out.detaches, meta);
+        default_mount_and_detach!(state, out, meta);
     }
-
-    default_mount_and_detach!();
 }
 
 impl Render for Element<'_, FragmentMetadata> {
@@ -258,21 +236,11 @@ impl Render for Element<'_, FragmentMetadata> {
             }
         }
         for attr in self.attrs() {
-            attr.render_decl(state, &mut out.decls, meta);
+            attr.render(state, out, meta);
         }
 
-        self.render_mount(state, &mut out.mounts, meta);
-        self.render_update(state, &mut out.updates, meta);
-        self.render_detach(state, &mut out.detaches, meta);
+        default_mount_and_detach!(state, out, meta);
     }
-
-    fn render_update(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        for attr in self.attrs() {
-            attr.render_update(state, out, meta);
-        }
-    }
-
-    default_mount_and_detach!();
 }
 
 impl Render for SpecialBlock<'_, FragmentMetadata> {
@@ -304,7 +272,10 @@ impl Render for ForBlock<'_, FragmentMetadata> {
             out,
         );
 
-        self.render_decl(state, &mut out.decls, meta);
+        // Decl
+        out.write_declln(format_args!(
+            "const e{id}_anchor = document.createTextNode(\"\");"
+        ));
 
         // Mount
         let unbound = utils::get_unbound_refs(self.expr());
@@ -328,20 +299,8 @@ impl Render for ForBlock<'_, FragmentMetadata> {
         // Update
         out.write_updateln(format_args!("let i = 0; for (const v of ({expr})) {{ if (i >= e{id}_blocks.length) {{ e{id}_blocks[i] = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor) }}; ctx[{var_idx}] = v; e{id}_blocks[i].u(dirty); i += 1; }} e{id}_blocks.slice(i).forEach(b => b.d()); e{id}_blocks.length = i;"));
 
-        self.render_detach(state, &mut out.detaches, meta);
-    }
-
-    fn render_decl(&self, _state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        force_writeln!(
-            out,
-            "const e{}_anchor = document.createTextNode(\"\");",
-            meta.id()
-        );
-    }
-
-    fn render_detach(&self, _state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        let id = meta.id();
-        force_writeln!(out, "for (let i = 0; i < e{id}_blocks.length; i++) {{ e{id}_blocks[i].d() }}\ne{id}_anchor.parentNode.removeChild(e{id}_anchor);");
+        // Detach
+        out.write_detachln(format_args!("for (let i = 0; i < e{id}_blocks.length; i++) {{ e{id}_blocks[i].d() }}\ne{id}_anchor.parentNode.removeChild(e{id}_anchor);"));
     }
 }
 
@@ -393,7 +352,10 @@ impl Render for IfBlock<'_, FragmentMetadata> {
             );
         }
 
-        self.render_decl(state, &mut out.decls, meta);
+        // Decl
+        out.write_declln(format_args!(
+            "const e{id}_anchor = document.createTextNode(\"\");"
+        ));
 
         // Mount
         out.write_mountln(format_args!("mount(target, e{id}_anchor, anchor);"));
@@ -406,51 +368,48 @@ impl Render for IfBlock<'_, FragmentMetadata> {
             out.write_updateln(format_args!("if ({replacement}) {{ if (e{id}) {{ e{id}.u(dirty); }} else {{ e{id} = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); }} }} else if (e{id}) {{ e{id}.d(); e{id} = null; }}"));
         }
 
-        self.render_detach(state, &mut out.detaches, meta);
-    }
-
-    fn render_decl(&self, _state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        force_writeln!(
-            out,
-            "const e{}_anchor = document.createTextNode(\"\");",
-            meta.id()
-        );
-    }
-
-    fn render_detach(&self, _state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        let id = meta.id();
-        force_writeln!(
-            out,
+        // Detach
+        out.write_detachln(format_args!(
             "if (e{id}) e{id}.d();\ne{id}_anchor.parentNode.removeChild(e{id}_anchor);"
-        );
+        ))
     }
 }
 
 impl Render for Attribute<'_> {
     type Metadata = FragmentMetadata;
 
-    fn render_decl(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
+    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
 
         match self {
             Self::KeyValue(key, Some(AttributeValue::JavaScript(js))) => {
+                let unbound = utils::get_unbound_refs(js);
                 let replacement = codegen_utils::replace_namerefs(
                     js,
-                    &utils::get_unbound_refs(js),
+                    &unbound,
                     state.component.declared_vars(),
                     meta.scope(),
                 );
-                force_writeln!(out, "e{id}.setAttribute(\"{key}\", {replacement});");
+                out.write_declln(format_args!(
+                    "e{id}.setAttribute(\"{key}\", {replacement});"
+                ));
+                let dirty = codegen_utils::calc_dirty(
+                    &unbound,
+                    state.component.declared_vars(),
+                    meta.scope(),
+                );
+                out.write_updateln(format_args!(
+                    "if ({dirty}) e{id}.setAttribute(\"{key}\", {replacement});"
+                ));
             }
             Self::KeyValue(key, None) => {
-                force_writeln!(out, "e{id}.setAttribute(\"{key}\", \"\")");
+                out.write_declln(format_args!("e{id}.setAttribute(\"{key}\", \"\")"));
             }
             Self::KeyValue(key, Some(AttributeValue::Literal(literal))) => {
-                force_writeln!(
-                    out,
+                out.write_declln(format_args!(
                     "e{id}.setAttribute(\"{key}\", \"{}\")",
                     collapse_whitespace(literal)
-                );
+                ));
             }
 
             Self::EventHandler(event_handler) => {
@@ -486,12 +445,10 @@ impl Render for Attribute<'_> {
 
                 // In the case scope_args is empty, attach the event handler as normal
                 if scope_args.is_empty() {
-                    force_writeln!(
-                        out,
-                        "e{id}.addEventListener(\"{}\", {})",
-                        event_handler.event(),
-                        replaced
-                    );
+                    out.write_declln(format_args!(
+                        "e{id}.addEventListener(\"{}\", {replaced})",
+                        event_handler.event()
+                    ));
 
                     return;
                 }
@@ -499,72 +456,34 @@ impl Render for Attribute<'_> {
                 const ARG_LEN: usize = "arg0".len();
                 let mut added_args = String::with_capacity(scope_args.len() * ARG_LEN);
                 for (i, arg_idx) in scope_args.iter().enumerate() {
-                    force_writeln!(out, "const arg{i} = ctx[{arg_idx}];");
+                    out.write_declln(format_args!("const arg{i} = ctx[{arg_idx}];"));
                     force_write!(added_args, "arg{i},");
                 }
-                force_writeln!(
-                    out,
-                    "e{id}.addEventListener(\"{}\", (...args) => {}({added_args} ...args));",
-                    event_handler.event(),
-                    replaced
-                );
+                out.write_declln(format_args!("e{id}.addEventListener(\"{}\", (...args) => {replaced}({added_args} ...args));", event_handler.event()));
             }
 
             Self::Binding(binding) => {
-                match state
-                    .component
-                    .declared_vars()
-                    .get_var(*binding, meta.scope())
-                {
-                    Some(var_id) => force_writeln!(out, "e{id}.value = ctx[{var_id}];"),
-                    None => force_writeln!(out, "e{id}.value = {binding};"),
+                match state.component.declared_vars().get_var(*binding, None) {
+                    Some(var_id) => {
+                        out.write_declln(format_args!("e{id}.value = ctx[{var_id}];"));
+
+                        let dirty_idx = ((var_id + 7) / 8).saturating_sub(1) as usize;
+                        let bitmask = 1 << (var_id % 8);
+                        out.write_updateln(format_args!(
+                            "if (dirty[{dirty_idx}] & {bitmask}) e{id}.value = ctx[{var_id}];"
+                        ));
+                    }
+                    None => todo!("unbound var lint"),
                 }
-                let binding = state
+                let binding_idx = state
                     .component
                     .declared_vars()
                     .get_binding(*binding)
                     .expect("BUG: every binding should have a entry in declared vars");
-                force_writeln!(out, "e{id}.addEventListener(\"input\", ctx[{}]);", binding);
+                out.write_declln(format_args!(
+                    "e{id}.addEventListener(\"input\", ctx[{binding_idx}]);"
+                ));
             }
-        }
-    }
-
-    fn render_update(&self, state: &mut State, out: &mut Vec<u8>, meta: &Self::Metadata) {
-        let id = meta.id();
-
-        match self {
-            Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) => {
-                let unbound = utils::get_unbound_refs(js);
-                let dirty_indices = codegen_utils::calc_dirty(
-                    &unbound,
-                    state.component.declared_vars(),
-                    meta.scope(),
-                );
-                let replacement = codegen_utils::replace_namerefs(
-                    js,
-                    &unbound,
-                    state.component.declared_vars(),
-                    meta.scope(),
-                );
-                if !dirty_indices.is_empty() {
-                    force_writeln!(
-                        out,
-                        "if ({dirty_indices}) e{id}.setAttribute(\"{key}\", {replacement});"
-                    );
-                }
-            }
-            Attribute::Binding(binding) => {
-                let Some(var_id) = state.component.declared_vars().get_var(*binding, None) else {
-                    todo!("unbound var lint");
-                };
-                let dirty_idx = ((var_id + 7) / 8).saturating_sub(1) as usize;
-                let bitmask = 1 << (var_id % 8);
-                force_writeln!(
-                    out,
-                    "if (dirty[{dirty_idx}] & {bitmask}) e{id}.value = ctx[{var_id}];"
-                );
-            }
-            _ => return,
         }
     }
 }

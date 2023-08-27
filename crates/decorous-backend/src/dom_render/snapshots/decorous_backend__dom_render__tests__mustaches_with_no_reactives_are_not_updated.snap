@@ -21,6 +21,7 @@ mount(target, e1, anchor);
 mount(target, e2, anchor);
 return {
 u(dirty) {
+if (true) e2.setAttribute("class", 11);
 },
 d() {
 e0.parentNode.removeChild(e0);
