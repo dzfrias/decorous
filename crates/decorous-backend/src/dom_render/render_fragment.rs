@@ -58,7 +58,7 @@ where
 
 fn render_fragment_to_out(
     nodes: &[Node<'_, FragmentMetadata>],
-    mut state: &mut State<'_>,
+    state: &mut State<'_>,
     out: &mut Output,
 ) {
     for (block, id) in state.component.declared_vars().all_reactive_blocks() {
@@ -68,11 +68,11 @@ fn render_fragment_to_out(
     }
 
     for node in nodes {
-        node.render(&mut state, out, &());
+        node.render(state, out, &());
     }
 
     if state.root.is_none() {
-        render_reactive_css(&mut state, out);
+        render_reactive_css(state, out);
     }
 }
 
@@ -105,19 +105,19 @@ impl io::Write for Output {
 
 impl Output {
     fn write_declln(&mut self, b: impl Display) {
-        let _ = write!(self.decls, "{b}\n");
+        let _ = writeln!(self.decls, "{b}");
     }
 
     fn write_mountln(&mut self, b: impl Display) {
-        let _ = write!(self.mounts, "{b}\n");
+        let _ = writeln!(self.mounts, "{b}");
     }
 
     fn write_updateln(&mut self, b: impl Display) {
-        let _ = write!(self.updates, "{b}\n");
+        let _ = writeln!(self.updates, "{b}");
     }
 
     fn write_detachln(&mut self, b: impl Display) {
-        let _ = write!(self.detaches, "{b}\n");
+        let _ = writeln!(self.detaches, "{b}");
     }
 }
 
@@ -371,7 +371,7 @@ impl Render for IfBlock<'_, FragmentMetadata> {
         // Detach
         out.write_detachln(format_args!(
             "if (e{id}) e{id}.d();\ne{id}_anchor.parentNode.removeChild(e{id}_anchor);"
-        ))
+        ));
     }
 }
 
@@ -463,18 +463,22 @@ impl Render for Attribute<'_> {
             }
 
             Self::Binding(binding) => {
-                match state.component.declared_vars().get_var(*binding, None) {
-                    Some(var_id) => {
-                        out.write_declln(format_args!("e{id}.value = ctx[{var_id}];"));
+                state
+                    .component
+                    .declared_vars()
+                    .get_var(*binding, None)
+                    .map_or_else(
+                        || todo!("unbound var lint"),
+                        |var_id| {
+                            out.write_declln(format_args!("e{id}.value = ctx[{var_id}];"));
 
-                        let dirty_idx = ((var_id + 7) / 8).saturating_sub(1) as usize;
-                        let bitmask = 1 << (var_id % 8);
-                        out.write_updateln(format_args!(
-                            "if (dirty[{dirty_idx}] & {bitmask}) e{id}.value = ctx[{var_id}];"
-                        ));
-                    }
-                    None => todo!("unbound var lint"),
-                }
+                            let dirty_idx = ((var_id + 7) / 8).saturating_sub(1) as usize;
+                            let bitmask = 1 << (var_id % 8);
+                            out.write_updateln(format_args!(
+                                "if (dirty[{dirty_idx}] & {bitmask}) e{id}.value = ctx[{var_id}];"
+                            ));
+                        },
+                    );
                 let binding_idx = state
                     .component
                     .declared_vars()

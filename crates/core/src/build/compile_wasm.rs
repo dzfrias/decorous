@@ -154,7 +154,7 @@ impl WasmCompiler for MainCompiler<'_> {
                         args.push('`');
                         args.push_str(&self.args.build_args.join(" "));
                         args.insert_str(0, " `");
-                        args.push('`')
+                        args.push('`');
                     }
                     args
                 }))
@@ -165,10 +165,7 @@ impl WasmCompiler for MainCompiler<'_> {
 
         let wasm_files = fs::read_dir(&self.args.out)?
             .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-            .filter(|path| match path.extension() {
-                Some(ext) if ext == OsStr::new("wasm") => true,
-                _ => false,
-            })
+            .filter(|path| matches!(path.extension(), Some(ext) if ext == OsStr::new("wasm")))
             .collect_vec();
 
         if let Some(opt) = self.args.optimize {
@@ -189,7 +186,7 @@ impl WasmCompiler for MainCompiler<'_> {
         if self.args.strip {
             for path in &wasm_files {
                 let spinner = Spinner::new("Stripping WebAssembly...");
-                strip(&path).context("problem stripping WebAssembly binary")?;
+                strip(path).context("problem stripping WebAssembly binary")?;
                 spinner.finish(
                     FinishLog::default()
                         .with_main_message("stripped WebAssembly")

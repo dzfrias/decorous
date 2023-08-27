@@ -42,10 +42,10 @@ pub fn build(args: &Build) -> Result<()> {
     );
 
     let config = utils::get_config()?;
-    compile(&args, &config)?;
+    compile(args, &config)?;
 
     if args.watch {
-        watch(&args, &config)?;
+        watch(args, &config)?;
     }
 
     Ok(())
@@ -120,7 +120,7 @@ fn watch(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
         match event.kind {
             EventKind::Modify(ModifyKind::Data(DataChange::Content)) => {
                 println!();
-                compile(&args, &config)?;
+                compile(args, config)?;
             }
             EventKind::Remove(_) => {
                 println!("Input file removed... exiting process");
