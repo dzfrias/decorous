@@ -187,7 +187,7 @@ export function add(a: number, b: number): number;
 ---out.js---
 import init, * as wasm from "/out/__tmp.js";
 await init();
-const elems = {"0":document.getElementById("0"),};
+const elems = {"0": document.getElementById("0"), }
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);
@@ -199,9 +199,4 @@ function __init_ctx() {
   return [__closure0];
 }
 const ctx = __init_ctx();
-function __update(dirty, initial) {
-}
-dirty.fill(255);
-__update(dirty, true);
-dirty.fill(0);
 

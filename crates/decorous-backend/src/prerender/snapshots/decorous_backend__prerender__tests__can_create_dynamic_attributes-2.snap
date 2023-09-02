@@ -3,15 +3,15 @@ source: crates/decorous-backend/src/prerender/mod.rs
 expression: output
 ---
 let x = 3;
-const elems = {"2":replace(document.getElementById("2")),"0":document.getElementById("0"),};
+const elems = {"0": document.getElementById("0"), "2": replace(document.getElementById("2")), }
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);
   return text;
 }
 function __update(dirty, initial) {
-  if (initial) elems[2].data = x;
   if (initial) elems["0"].setAttribute("class", x + 3);
+  if (initial) elems[2].data = x;
 }
 dirty.fill(255);
 __update(dirty, true);

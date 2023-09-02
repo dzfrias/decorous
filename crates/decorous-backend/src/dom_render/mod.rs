@@ -20,7 +20,7 @@ impl RenderBackend for DomRenderer {
     }
 }
 
-fn render<T: io::Write>(
+pub fn render<T: io::Write>(
     component: &Component,
     render_to: &mut T,
     metadata: &Options,

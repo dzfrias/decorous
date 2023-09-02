@@ -3,15 +3,15 @@ source: crates/decorous-backend/src/prerender/mod.rs
 expression: output
 ---
 let color = "blue"
-const elems = {"1":replace(document.getElementById("1")),"0":document.getElementById("0"),};
+const elems = {"0": document.getElementById("0"), "1": replace(document.getElementById("1")), }
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);
   return text;
 }
 function __update(dirty, initial) {
-  if (initial) elems[1].data = color;
   if (initial) elems["0"].setAttribute("style", `${`background: green;`} --decor-0: ${color}; `);
+  if (initial) elems[1].data = color;
 }
 dirty.fill(255);
 __update(dirty, true);

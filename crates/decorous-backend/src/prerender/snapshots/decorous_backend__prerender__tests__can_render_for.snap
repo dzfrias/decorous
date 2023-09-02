@@ -19,7 +19,7 @@ e2.parentNode.removeChild(e2);
 }
 };
 }
-const elems = {"0":replace(document.getElementById("0")),"0_block":[],};
+const elems = {"0": replace(document.getElementById("0")), "0_block": [], }
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);

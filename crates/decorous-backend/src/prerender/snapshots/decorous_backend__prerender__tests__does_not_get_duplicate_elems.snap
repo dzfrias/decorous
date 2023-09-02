@@ -3,7 +3,7 @@ source: crates/decorous-backend/src/prerender/mod.rs
 expression: output
 ---
 const dirty = new Uint8Array(new ArrayBuffer(1));
-const elems = {"0":document.getElementById("0"),};
+const elems = {"0": document.getElementById("0"), "0": document.getElementById("0"), }
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);
@@ -12,10 +12,10 @@ function replace(node) {
 function __init_ctx() {
   let __closure2 = () => console.log("hello");
   let x = 0;
-  elems["0"].addEventListener("click", () => console.log("hello"));
   elems["0"].value = x;
   let __binding1 = (ev) => __schedule_update(0, x = ev.target.value);
   elems["0"].addEventListener("input", __binding1);
+  elems["0"].addEventListener("click", () => console.log("hello"));
   return [x,__binding1,__closure2];
 }
 const ctx = __init_ctx();

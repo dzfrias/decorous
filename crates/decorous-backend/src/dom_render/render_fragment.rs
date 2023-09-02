@@ -76,7 +76,7 @@ fn render_fragment_to_out(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct State<'ast> {
     pub component: &'ast Component<'ast>,
     #[allow(unused)]

@@ -1,495 +1,566 @@
 use std::{
     borrow::Cow,
-    fmt::Debug,
+    collections::HashMap,
+    fmt::{Display, Write as FmtWrite},
     io::{self, Write},
 };
 
-mod html_render;
-mod node_analyzer;
-
-use decorous_frontend::{ast::SpecialBlock, utils, Component};
-use itertools::Itertools;
-use lazy_format::lazy_format;
-use rslint_parser::AstNode;
-use superfmt::{ContextBuilder, Formatter};
-
-pub use self::html_render::render_html;
-use self::node_analyzer::analyzers::Analysis;
 use crate::{
     codegen_utils,
-    dom_render::{render_fragment as dom_render_fragment, State},
-    Options, RenderBackend,
+    dom_render::{render_fragment as dom_render_fragment, State as DomRenderState},
+    Options,
 };
+use decorous_frontend::{
+    ast::{
+        Attribute, AttributeValue, Comment, Element, ForBlock, IfBlock, Mustache, Node, NodeType,
+        SpecialBlock, Text,
+    },
+    utils, Component, FragmentMetadata,
+};
+use rslint_parser::{AstNode, SmolStr, SyntaxNode};
 
-#[derive(Debug, PartialEq, Eq)]
-enum WriteStatus {
-    Something,
-    Nothing,
-}
-
-impl WriteStatus {
-    #[must_use]
-    fn wrote_something(&self) -> bool {
-        matches!(self, Self::Something)
+pub fn render(
+    component: &Component,
+    out: &mut impl io::Write,
+    html_out: &mut impl io::Write,
+    metadata: &Options,
+) -> io::Result<()> {
+    if let Some(wasm) = component.wasm() {
+        let _ = metadata.wasm_compiler.compile(
+            crate::CodeInfo {
+                lang: wasm.lang(),
+                body: wasm.body(),
+                exports: component.exports(),
+            },
+            out,
+        );
     }
-}
 
-pub struct Prerenderer;
-
-impl RenderBackend for Prerenderer {
-    fn render<T: io::Write>(out: &mut T, component: &Component, opts: &Options) -> io::Result<()> {
-        if let Some(wasm) = component.wasm() {
-            let _ = opts.wasm_compiler.compile(
-                crate::CodeInfo {
-                    lang: wasm.lang(),
-                    body: wasm.body(),
-                    exports: component.exports(),
-                },
-                out,
-            );
-        }
-        render(component, out)
+    let mut output = Output::default();
+    let mut state = State {
+        component,
+        id_overwrites: HashMap::new(),
+        style_cache: None,
+    };
+    for node in component.fragment_tree() {
+        node.render(&mut state, &mut output, &());
     }
-}
 
-fn render<T>(component: &Component, js_out: &mut T) -> io::Result<()>
-where
-    T: io::Write,
-{
-    let analysis = Analysis::analyze(component);
+    html_out.write_all(&output.html)?;
 
     let has_reactive_variables = !component.declared_vars().all_vars().is_empty();
 
     if has_reactive_variables {
         let vars = (component.declared_vars().all_vars().len() + 7) / 8;
         writeln!(
-            js_out,
+            out,
             "const dirty = new Uint8Array(new ArrayBuffer({vars}));",
         )?;
     }
 
-    render_hoists(component, &analysis, js_out)?;
-    let status = render_elements(&analysis, js_out)?;
-    if status.wrote_something() {
-        write!(js_out, include_str!("./templates/replace.js"))?;
+    for hoist in component.hoist() {
+        writeln!(out, "{hoist}")?;
     }
-    let status = render_ctx_init(component, &analysis, js_out)?;
-    if has_reactive_variables && status.wrote_something() {
-        writeln!(
-            js_out,
-            "const ctx = __init_ctx();
-let updating = false;"
+    out.write_all(&output.hoists)?;
+
+    if !output.elements.is_empty() {
+        // Write elements
+        let elems = unsafe { String::from_utf8_unchecked(output.elements) };
+        write!(
+            out,
+            concat!(
+                "const elems = {{{}}}\n",
+                include_str!("./templates/replace.js")
+            ),
+            elems
         )?;
-    } else if status.wrote_something() {
-        writeln!(js_out, "const ctx = __init_ctx();")?;
     }
-    let status = render_update_body(component, &analysis, js_out)?;
-    if status.wrote_something() {
+
+    // Write ctx init
+    if !output.ctx_init.is_empty()
+        || !component.declared_vars().is_empty()
+        || !component.toplevel_nodes().is_empty()
+    {
+        writeln!(out, "function __init_ctx() {{")?;
+        for (arrow_expr, (idx, scope_id)) in component.declared_vars().all_arrow_exprs() {
+            writeln!(out, "  let __closure{idx} = {};", {
+                codegen_utils::replace_assignments(
+                    arrow_expr.syntax(),
+                    &utils::get_unbound_refs(arrow_expr.syntax()),
+                    component.declared_vars(),
+                    *scope_id,
+                )
+            })?
+        }
+        for node in component.toplevel_nodes() {
+            if node.substitute_assign_refs {
+                let replacement = codegen_utils::replace_assignments(
+                    &node.node,
+                    &utils::get_unbound_refs(&node.node),
+                    component.declared_vars(),
+                    None,
+                );
+                let _ = writeln!(out, "  {replacement}");
+            } else {
+                let _ = writeln!(out, "  {}", node.node);
+            }
+        }
+        out.write_all(&output.ctx_init)?;
+        for (block, id) in component.declared_vars().all_reactive_blocks() {
+            let replaced = codegen_utils::replace_assignments(
+                block,
+                &utils::get_unbound_refs(block),
+                component.declared_vars(),
+                None,
+            );
+            writeln!(out, "  let __reactive{id} = () => {{ {replaced} }};")?;
+        }
+
+        let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
+        for (name, idx) in component.declared_vars().all_vars() {
+            ctx[*idx as usize] = Cow::Borrowed(name);
+        }
+        for (idx, _) in component.declared_vars().all_arrow_exprs().values() {
+            ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
+        }
+        for idx in component.declared_vars().all_bindings().values() {
+            ctx[*idx as usize] = Cow::Owned(format!("__binding{idx}"));
+        }
+        for idx in component.declared_vars().all_reactive_blocks().values() {
+            ctx[*idx as usize] = Cow::Owned(format!("__reactive{idx}"));
+        }
+        writeln!(out, "  return [{}];\n}}", ctx.join(","))?;
+
+        if has_reactive_variables {
+            writeln!(out, "const ctx = __init_ctx();\nlet updating = false;")?;
+        } else {
+            writeln!(out, "const ctx = __init_ctx();")?;
+        }
+    }
+
+    if !output.updates.is_empty() || !component.declared_vars().all_reactive_blocks().is_empty() {
+        writeln!(out, "function __update(dirty, initial) {{")?;
+
+        for (block, id) in component.declared_vars().all_reactive_blocks() {
+            let unbound = utils::get_unbound_refs(block);
+            let dirty = codegen_utils::calc_dirty(&unbound, component.declared_vars(), None);
+            writeln!(out, "  if ({dirty}) {{ ctx[{id}](); }}")?;
+        }
+
+        out.write_all(&output.updates)?;
+
+        writeln!(out, "}}")?;
+
         writeln!(
-            js_out,
+            out,
             "dirty.fill(255);
 __update(dirty, true);
 dirty.fill(0);"
         )?;
     }
-    // If there are no reactive variables, nothing can be updated, so remove this.
+
     if has_reactive_variables {
-        write!(js_out, include_str!("./templates/schedule_update.js"))?;
+        write!(out, include_str!("./templates/schedule_update.js"))?;
     }
 
     Ok(())
 }
 
-fn render_hoists<'a, T: io::Write>(
-    component: &Component<'a>,
-    analysis: &Analysis<'a>,
-    out: &mut T,
-) -> io::Result<()> {
-    let mut formatter = Formatter::new(out);
-
-    formatter.write_all_trailing(component.hoist(), "\n")?;
-
-    for (meta, block) in analysis.reactive_data().special_blocks() {
-        match block {
-            SpecialBlock::If(if_block) => {
-                let state = State {
-                    component,
-                    name: meta.id().to_string().into(),
-                    root: Some(meta.id()),
-                    uses: vec![],
-                };
-                dom_render_fragment(if_block.inner(), state, out)?;
-                if let Some(else_block) = if_block.else_block() {
-                    let state = State {
-                        component,
-                        name: format!("{}_else", meta.id()).into(),
-                        root: Some(meta.id()),
-                        uses: vec![],
-                    };
-                    dom_render_fragment(else_block, state, out)?;
-                }
-            }
-            SpecialBlock::For(for_block) => {
-                let state = State {
-                    component,
-                    name: meta.id().to_string().into(),
-                    root: Some(meta.id()),
-                    uses: vec![],
-                };
-                dom_render_fragment(for_block.inner(), state, out)?;
-            }
-            SpecialBlock::Use(_) => todo!(),
-        }
-    }
-
-    Ok(())
+#[derive(Debug, Default)]
+struct Output {
+    html: Vec<u8>,
+    elements: Vec<u8>,
+    ctx_init: Vec<u8>,
+    updates: Vec<u8>,
+    hoists: Vec<u8>,
 }
 
-fn render_elements<T: io::Write>(analysis: &Analysis, out: &mut T) -> io::Result<WriteStatus> {
-    let mut formatter = Formatter::new(out);
-
-    if analysis.reactive_data().mustaches().is_empty()
-        && analysis.reactive_data().key_values().is_empty()
-        && analysis.reactive_data().event_listeners().is_empty()
-        && analysis.reactive_data().bindings().is_empty()
-        && analysis.reactive_data().special_blocks().is_empty()
-    {
-        return Ok(WriteStatus::Nothing);
+impl Output {
+    fn write_html(&mut self, b: impl Display) {
+        let _ = write!(self.html, "{b}");
     }
 
-    formatter
-        .write("const elems = ")?
-        .begin_context(
-            ContextBuilder::default()
-                .starts_with("{")
-                .ends_with("};\n")
-                .build(),
-        )?
-        // For mustache tags, replace the marked tags (<span>s with id's) with text nodes.
-        .write_all_trailing(
-            analysis
-                .reactive_data()
-                .mustaches()
-                .iter()
-                .map(|(meta, _)| {
-                    let id = analysis.id_overwrites().try_get(meta.id());
-                    lazy_format!("\"{id}\":replace(document.getElementById(\"{id}\"))")
-                }),
-            ",",
-        )?
-        // For reactive key-value attributes, just get element by its generated id
-        .write_all_trailing(
-            analysis
-                .reactive_data()
-                .key_values()
-                .iter()
-                .chain(analysis.reactive_data().event_listeners())
-                .map(|(meta, _)| meta)
-                .chain(
-                    analysis
-                        .reactive_data()
-                        .bindings()
-                        .iter()
-                        .map(|(meta, _)| meta),
-                )
-                .unique_by(|meta| meta.id())
-                .map(|meta| {
-                    let id = analysis.id_overwrites().try_get(meta.id());
-                    lazy_format!("\"{id}\":document.getElementById(\"{id}\")")
-                }),
-            ",",
-        )?;
-
-    for (meta, block) in analysis.reactive_data().special_blocks() {
-        let id = analysis.id_overwrites().try_get(meta.id());
-        match *block {
-            SpecialBlock::If(block) => {
-                // {id} acts as an anchor for the eventual id_block that will be attached to the
-                // DOM. It's an empty text node. {id}_block is the reference to the DOM rendered if
-                // block. It is null when the condition is false (or the else block).
-                write!(
-                    formatter,
-                    "\"{id}\":replace(document.getElementById(\"{id}\")),\"{id}_block\":null,"
-                )?;
-                if block.else_block().is_some() {
-                    // Designates if the if block is in it's main or else body. True if main, false
-                    // if else
-                    write!(formatter, "\"{id}_on\":true,")?;
-                }
-            }
-            SpecialBlock::For(_) => {
-                // Much like the if block, {id} acts as the anchor point for all the rendered
-                // {#for} block children on the DOM. {id}_block holds these children
-                write!(
-                    formatter,
-                    "\"{id}\":replace(document.getElementById(\"{id}\")),\"{id}_block\":[],"
-                )?;
-            }
-            SpecialBlock::Use(_) => todo!(),
-        }
+    fn write_ctx_initln(&mut self, b: impl Display) {
+        let _ = writeln!(self.ctx_init, "  {b}");
     }
 
-    formatter.pop_ctx()?;
+    fn write_updateln(&mut self, b: impl Display) {
+        let _ = writeln!(self.updates, "  {b}");
+    }
 
-    Ok(WriteStatus::Something)
+    fn write_element(&mut self, key: impl Display, val: impl Display) {
+        let _ = write!(self.elements, "\"{key}\": {val}, ");
+    }
 }
 
-fn render_ctx_init<T: io::Write>(
-    component: &Component,
-    analysis: &Analysis,
-    out: &mut T,
-) -> io::Result<WriteStatus> {
-    let mut formatter = Formatter::new(out);
+#[derive(Debug)]
+struct State<'ast> {
+    component: &'ast Component<'ast>,
+    id_overwrites: HashMap<u32, SmolStr>,
+    style_cache: Option<String>,
+}
 
-    if component.declared_vars().is_empty()
-        && component.toplevel_nodes().is_empty()
-        && analysis.reactive_data().event_listeners().is_empty()
-    {
-        return Ok(WriteStatus::Nothing);
-    }
-
-    formatter.write("function __init_ctx() ")?.begin_context(
-        ContextBuilder::default()
-            .starts_with("{\n")
-            .ends_with("}\n")
-            .prepend("  ")
-            .build(),
-    )?;
-
-    // Write anonymous functions. Arrow exprs are pulled from the template (they're usually from
-    // event listeners).
-    formatter.write_all_trailing(
-        component
-            .declared_vars()
-            .all_arrow_exprs()
-            .iter()
-            .map(|(arrow_expr, (idx, scope_id))| {
-                lazy_format!(
-                    "let __closure{idx} = {};",
-                    codegen_utils::replace_assignments(
-                        arrow_expr.syntax(),
-                        &utils::get_unbound_refs(arrow_expr.syntax()),
-                        component.declared_vars(),
-                        *scope_id
-                    )
-                )
-            }),
-        "\n",
-    )?;
-
-    for node in component.toplevel_nodes() {
-        if node.substitute_assign_refs {
-            let replacement = codegen_utils::replace_assignments(
-                &node.node,
-                &utils::get_unbound_refs(&node.node),
-                component.declared_vars(),
-                None,
-            );
-            writeln!(formatter, "{}", replacement)?;
+impl<'ast> State<'ast> {
+    fn use_style_cache(&mut self) -> &str {
+        if let Some(ref style) = self.style_cache {
+            style.as_str()
         } else {
-            writeln!(formatter, "{}", node.node)?;
+            let style = {
+                // The minimum length of each part of the eventual style
+                const MIN_LEN: usize = "--decor-0: ${}; ".len();
+                let mut style = String::with_capacity(
+                    self.component.declared_vars().css_mustaches().len() * MIN_LEN,
+                );
+                for (mustache, id) in self.component.declared_vars().css_mustaches() {
+                    crate::codegen_utils::force_write!(style, "--decor-{id}: ${{{mustache}}}; ");
+                }
+                style
+            };
+            self.style_cache = Some(style);
+            self.style_cache.as_ref().unwrap().as_str()
         }
     }
-
-    for (meta, event, expr) in analysis.reactive_data().flat_listeners() {
-        let id = analysis.id_overwrites().try_get(meta.id());
-        let replaced = codegen_utils::replace_assignments(
-            expr,
-            &utils::get_unbound_refs(expr),
-            component.declared_vars(),
-            None,
-        );
-        writeln!(
-            formatter,
-            "elems[\"{id}\"].addEventListener(\"{event}\", {replaced});"
-        )?;
-    }
-
-    for (meta, binding) in analysis.reactive_data().bindings() {
-        let elem_id = analysis.id_overwrites().try_get(meta.id());
-        let id = component
-            .declared_vars()
-            .get_binding(binding)
-            .expect("BUG: every binding should have an id in declared vars");
-        let Some(var_id) = component.declared_vars().get_var(binding, None) else {
-            todo!("unbound var lint")
-        };
-        writeln!(formatter, "elems[\"{elem_id}\"].value = {binding};")?;
-        writeln!(
-            formatter,
-            "let __binding{id} = (ev) => __schedule_update({var_id}, {binding} = ev.target.value);"
-        )?;
-        writeln!(
-            formatter,
-            "elems[\"{elem_id}\"].addEventListener(\"input\", __binding{id});"
-        )?;
-    }
-
-    for (block, id) in component.declared_vars().all_reactive_blocks() {
-        let replaced = codegen_utils::replace_assignments(
-            block,
-            &utils::get_unbound_refs(block),
-            component.declared_vars(),
-            None,
-        );
-        writeln!(formatter, "let __reactive{id} = () => {{ {replaced} }};")?;
-    }
-
-    let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
-    for (name, idx) in component.declared_vars().all_vars() {
-        ctx[*idx as usize] = Cow::Borrowed(name);
-    }
-    for (idx, _) in component.declared_vars().all_arrow_exprs().values() {
-        ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
-    }
-    for idx in component.declared_vars().all_bindings().values() {
-        ctx[*idx as usize] = Cow::Owned(format!("__binding{idx}"));
-    }
-    for idx in component.declared_vars().all_reactive_blocks().values() {
-        ctx[*idx as usize] = Cow::Owned(format!("__reactive{idx}"));
-    }
-    writeln!(formatter, "return [{}];", ctx.join(","))?;
-
-    formatter.pop_ctx()?;
-
-    Ok(WriteStatus::Something)
 }
 
-fn render_update_body<T: io::Write>(
-    component: &Component,
-    analysis: &Analysis,
-    out: &mut T,
-) -> io::Result<WriteStatus> {
-    let mut formatter = Formatter::new(out);
+macro_rules! with_id {
+    ($id:expr, $state:expr, $exec:expr) => {
+        #[allow(unused)]
+        if let Some(id) = $state.id_overwrites.get(&$id).cloned() {
+            $exec(&id);
+        } else {
+            $exec($id);
+        }
+    };
+}
 
-    if analysis.reactive_data().mustaches().is_empty()
-        && analysis.reactive_data().bindings().is_empty()
-        && component.declared_vars().all_reactive_blocks().is_empty()
-        && analysis.reactive_data().special_blocks().is_empty()
-        && analysis.reactive_data().key_values().is_empty()
-        && analysis.reactive_data().event_listeners().is_empty()
-    {
-        return Ok(WriteStatus::Nothing);
+trait Render {
+    type Metadata;
+
+    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata);
+}
+
+impl Render for Node<'_, FragmentMetadata> {
+    type Metadata = ();
+
+    fn render(&self, state: &mut State, out: &mut Output, _meta: &Self::Metadata) {
+        match self.node_type() {
+            NodeType::Element(elem) => elem.render(state, out, self.metadata()),
+            NodeType::Text(t) => t.render(state, out, self.metadata()),
+            NodeType::Comment(c) => c.render(state, out, self.metadata()),
+            NodeType::SpecialBlock(block) => block.render(state, out, self.metadata()),
+            NodeType::Mustache(m) => m.render(state, out, self.metadata()),
+        }
     }
+}
 
-    formatter
-        .write("function __update(dirty, initial) ")?
-        .begin_context(
-            ContextBuilder::default()
-                .starts_with("{\n")
-                .ends_with("}\n")
-                .prepend("  ")
-                .build(),
-        )?;
+impl Render for Text<'_> {
+    type Metadata = FragmentMetadata;
 
-    for (block, id) in component.declared_vars().all_reactive_blocks() {
-        let unbound = utils::get_unbound_refs(block);
-        let dirty = codegen_utils::calc_dirty(&unbound, component.declared_vars(), None);
-        writeln!(formatter, "if ({dirty}) {{ ctx[{id}](); }}")?;
+    fn render(&self, _state: &mut State, out: &mut Output, _meta: &Self::Metadata) {
+        out.write_html(self);
     }
+}
 
-    for (meta, js) in analysis.reactive_data().mustaches() {
-        let unbound = utils::get_unbound_refs(js);
-        let dirty_indices =
-            codegen_utils::calc_dirty(&unbound, component.declared_vars(), meta.scope());
-        let replaced =
-            codegen_utils::replace_namerefs(js, &unbound, component.declared_vars(), meta.scope());
+impl Render for Element<'_, FragmentMetadata> {
+    type Metadata = FragmentMetadata;
 
+    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+        out.write_html(format_args!("<{}", self.tag()));
+        let mut overwritten = false;
+        let mut has_dynamic = false;
+        let mut has_style = false;
+        for attr in self.attrs() {
+            attr.render(state, out, meta);
+            match attr {
+                Attribute::KeyValue(key, Some(AttributeValue::Literal(literal)))
+                    if *key == "id" =>
+                {
+                    state.id_overwrites.insert(meta.id(), SmolStr::new(literal));
+                    overwritten = true;
+                }
+                Attribute::KeyValue(key, Some(AttributeValue::JavaScript(_)))
+                    if *key == "style" =>
+                {
+                    has_style = true;
+                    has_dynamic = true;
+                }
+                Attribute::KeyValue(key, Some(AttributeValue::Literal(_))) if *key == "style" => {
+                    has_style = true;
+                }
+                Attribute::KeyValue(_, Some(AttributeValue::JavaScript(_)))
+                | Attribute::EventHandler(_)
+                | Attribute::Binding(_) => has_dynamic = true,
+                _ => {}
+            }
+        }
+        if meta.parent_id().is_none() && !state.component.declared_vars().css_mustaches().is_empty()
+        {
+            has_dynamic = true;
+        }
+
+        let inline_styles_candidate = meta.parent_id().is_none()
+            && !state.component.declared_vars().css_mustaches().is_empty();
+        if !has_style && inline_styles_candidate {
+            let style = state.use_style_cache();
+            let new_js = rslint_parser::parse_text(&format!("`{style}`"), 0).syntax();
+            render_dyn_attr(meta, state, out, "style", &new_js);
+        }
+
+        if !overwritten && has_dynamic {
+            out.write_html(format_args!(" id=\"{}\"", meta.id()));
+        }
+        out.write_html(">");
+        for child in self.children() {
+            child.render(state, out, &());
+        }
+        out.write_html(format_args!("</{}>", self.tag()));
+    }
+}
+
+impl Render for Comment<'_> {
+    type Metadata = FragmentMetadata;
+
+    fn render(&self, _state: &mut State, out: &mut Output, _meta: &Self::Metadata) {
+        out.write_html(format_args!("<!--{}-->", self.0));
+    }
+}
+
+impl Render for Mustache {
+    type Metadata = FragmentMetadata;
+
+    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
+        out.write_html(format_args!("<span id=\"{id}\"></span>"));
+        out.write_element(
+            id,
+            format_args!("replace(document.getElementById(\"{id}\"))"),
+        );
+
+        let unbound = utils::get_unbound_refs(&self.0);
+        let dirty_indices =
+            codegen_utils::calc_dirty(&unbound, state.component.declared_vars(), meta.scope());
+        let replaced = codegen_utils::replace_namerefs(
+            &self.0,
+            &unbound,
+            state.component.declared_vars(),
+            meta.scope(),
+        );
         if dirty_indices.is_empty() {
-            writeln!(formatter, "if (initial) elems[{id}].data = {replaced};")?;
+            out.write_updateln(format_args!("if (initial) elems[{id}].data = {replaced};"));
         } else {
-            writeln!(
-                formatter,
+            out.write_updateln(format_args!(
                 "if ({dirty_indices}) elems[{id}].data = {replaced};"
-            )?;
+            ));
         }
     }
+}
 
-    for (meta, binding) in analysis.reactive_data().bindings() {
-        let Some(var_id) = component.declared_vars().get_var(binding, None) else {
-            todo!("unbound var lint");
+impl Render for SpecialBlock<'_, FragmentMetadata> {
+    type Metadata = FragmentMetadata;
+
+    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+        match self {
+            Self::If(block) => block.render(state, out, meta),
+            SpecialBlock::For(block) => block.render(state, out, meta),
+            SpecialBlock::Use(_) => todo!("use blocks"),
+        }
+    }
+}
+
+impl Render for IfBlock<'_, FragmentMetadata> {
+    type Metadata = FragmentMetadata;
+
+    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+        let id = meta.id();
+        let unbound = utils::get_unbound_refs(self.expr());
+        let replaced = codegen_utils::replace_namerefs(
+            self.expr(),
+            &unbound,
+            state.component.declared_vars(),
+            meta.scope(),
+        );
+
+        out.write_html(format_args!("<span id=\"{id}\"></span>"));
+
+        out.write_element(
+            id,
+            format_args!("replace(document.getElementById(\"{id}\"))"),
+        );
+        out.write_element(format_args!("{id}_block"), "null");
+
+        let state = DomRenderState {
+            component: state.component,
+            name: meta.id().to_string().into(),
+            root: Some(meta.id()),
+            uses: vec![],
         };
-        let dirty_idx = ((var_id + 7) / 8).saturating_sub(1) as usize;
-        let bitmask = 1 << (var_id % 8);
-        writeln!(
-            formatter,
-            "if (dirty[{dirty_idx}] & {bitmask}) elems[\"{}\"].value = ctx[{var_id}];",
-            meta.id()
-        )?;
-    }
+        let _ = dom_render_fragment(self.inner(), state.clone(), &mut out.hoists);
 
-    for (meta, special_block) in analysis.reactive_data().special_blocks() {
-        match special_block {
-            SpecialBlock::If(if_block) => {
-                let unbound = utils::get_unbound_refs(if_block.expr());
-                let replaced = codegen_utils::replace_namerefs(
-                    if_block.expr(),
-                    &unbound,
-                    component.declared_vars(),
-                    meta.scope(),
-                );
-
-                let id = meta.id();
-                if if_block.else_block().is_some() {
-                    writeln!(
-                        formatter,
-                        include_str!("./templates/if.js"),
-                        replaced = replaced,
-                        id = id
-                    )?;
-                } else {
-                    writeln!(
-                        formatter,
-                        "if ({replaced}) {{ if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].u(dirty); }} else {{ elems[\"{id}_block\"] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} }} else if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].d(); elems[\"{id}_block\"] = null; }}"
-                    )?;
-                }
-            }
-            SpecialBlock::For(block) => {
-                let unbound = utils::get_unbound_refs(block.expr());
-                let replaced = codegen_utils::replace_namerefs(
-                    block.expr(),
-                    &unbound,
-                    component.declared_vars(),
-                    meta.scope(),
-                );
-                let var_idx = component
-                    .declared_vars()
-                    .all_scopes()
-                    .get(&meta.id())
-                    .expect("BUG: for block should have an assigned scope")
-                    .get(block.binding())
-                    .expect("BUG: for block's scope should contain the binding");
-                let id = meta.id();
-                writeln!(formatter, "let i = 0; for (const v of ({replaced})) {{ ctx[{var_idx}] = v; if (i >= elems[\"{id}_block\"].length) {{ elems[\"{id}_block\"][i] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} elems[\"{id}_block\"][i].u(dirty); i += 1; }} elems[\"{id}_block\"].slice(i).forEach((b) => b.d()); elems[\"{id}_block\"].length = i;")?;
-            }
-            SpecialBlock::Use(_) => todo!(),
+        if let Some(else_block) = self.else_block() {
+            out.write_element(format_args!("{id}_on"), "true");
+            out.write_updateln(format_args!(
+                include_str!("./templates/if.js"),
+                replaced = replaced,
+                id = id
+            ));
+            // Write else block to hoists
+            let state = DomRenderState {
+                component: state.component,
+                name: format!("{}_else", meta.id()).into(),
+                root: Some(meta.id()),
+                uses: vec![],
+            };
+            let _ = dom_render_fragment(else_block, state, &mut out.hoists);
+        } else {
+            out.write_updateln(format_args!("if ({replaced}) {{ if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].u(dirty); }} else {{ elems[\"{id}_block\"] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} }} else if (elems[\"{id}_block\"]) {{ elems[\"{id}_block\"].d(); elems[\"{id}_block\"] = null; }}"));
         }
     }
+}
 
-    for (meta, attr, js) in analysis.reactive_data().flat_kvs() {
-        let id = analysis.id_overwrites().try_get(meta.id());
+impl Render for ForBlock<'_, FragmentMetadata> {
+    type Metadata = FragmentMetadata;
+
+    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+        let id = meta.id();
+        let unbound = utils::get_unbound_refs(self.expr());
+        let replaced = codegen_utils::replace_namerefs(
+            self.expr(),
+            &unbound,
+            state.component.declared_vars(),
+            meta.scope(),
+        );
+        let var_idx = state
+            .component
+            .declared_vars()
+            .all_scopes()
+            .get(&meta.id())
+            .expect("BUG: for block should have an assigned scope")
+            .get(self.binding())
+            .expect("BUG: for block's scope should contain the binding");
+
+        out.write_html(format_args!("<span id=\"{id}\"></span>"));
+        out.write_element(
+            id,
+            format_args!("replace(document.getElementById(\"{id}\"))"),
+        );
+        out.write_element(format_args!("{id}_block"), "[]");
+
+        let state = DomRenderState {
+            component: state.component,
+            name: meta.id().to_string().into(),
+            root: Some(meta.id()),
+            uses: vec![],
+        };
+        let _ = dom_render_fragment(self.inner(), state, &mut out.hoists);
+
+        out.write_updateln(format_args!("let i = 0; for (const v of ({replaced})) {{ ctx[{var_idx}] = v; if (i >= elems[\"{id}_block\"].length) {{ elems[\"{id}_block\"][i] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} elems[\"{id}_block\"][i].u(dirty); i += 1; }} elems[\"{id}_block\"].slice(i).forEach((b) => b.d()); elems[\"{id}_block\"].length = i;"));
+    }
+}
+
+impl Render for Attribute<'_> {
+    type Metadata = FragmentMetadata;
+
+    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+        let id = meta.id();
+        let inline_styles_candidate = meta.parent_id().is_none()
+            && !state.component.declared_vars().css_mustaches().is_empty();
+
+        match self {
+            Attribute::KeyValue(key, Some(AttributeValue::Literal(literal))) => {
+                if *key == "style" && inline_styles_candidate {
+                    let style = state.use_style_cache();
+                    let new_js =
+                        rslint_parser::parse_text(&format!("`{literal} {style}`"), 0).syntax();
+                    render_dyn_attr(meta, state, out, "style", &new_js);
+                }
+                out.write_html(format_args!(" {key}=\"{literal}\""));
+            }
+            Attribute::KeyValue(key, None) => {
+                out.write_html(format_args!(" {key}=\"\""));
+            }
+            Attribute::EventHandler(evt_handler) => {
+                with_id!(id, state, |id| {
+                    let replaced = codegen_utils::replace_assignments(
+                        evt_handler.expr(),
+                        &utils::get_unbound_refs(evt_handler.expr()),
+                        state.component.declared_vars(),
+                        None,
+                    );
+
+                    out.write_element(id, format_args!("document.getElementById(\"{id}\")"));
+                    out.write_ctx_initln(format_args!(
+                        "elems[\"{id}\"].addEventListener(\"{}\", {replaced});",
+                        evt_handler.event()
+                    ));
+                });
+            }
+            Attribute::Binding(binding) => {
+                with_id!(id, state, |id| {
+                    out.write_element(id, format_args!("document.getElementById(\"{id}\")"));
+                    let binding_id = state
+                        .component
+                        .declared_vars()
+                        .get_binding(*binding)
+                        .expect("BUG: every binding should have an id in declared vars");
+                    let Some(var_id) = state.component.declared_vars().get_var(*binding, None) else {
+                        todo!("unbound var lint")
+                    };
+
+                    out.write_ctx_initln(format_args!("elems[\"{id}\"].value = {binding};"));
+                    out.write_ctx_initln(format_args!("let __binding{binding_id} = (ev) => __schedule_update({var_id}, {binding} = ev.target.value);"));
+                    out.write_ctx_initln(format_args!(
+                        "elems[\"{id}\"].addEventListener(\"input\", __binding{binding_id});"
+                    ));
+
+                    let dirty_idx = ((var_id + 7) / 8).saturating_sub(1) as usize;
+                    let bitmask = 1 << (var_id % 8);
+                    out.write_updateln(format_args!(
+                        "if (dirty[{dirty_idx}] & {bitmask}) elems[\"{id}\"].value = ctx[{var_id}];"
+                    ))
+                });
+            }
+            Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) => {
+                let js = if *key == "style" && inline_styles_candidate {
+                    let style = state.use_style_cache();
+                    let new_js =
+                        rslint_parser::parse_text(&format!("`${{{js}}} {style}`"), 0).syntax();
+                    new_js
+                } else {
+                    js.clone()
+                };
+                render_dyn_attr(meta, state, out, key, &js);
+            }
+        }
+    }
+}
+fn render_dyn_attr(
+    meta: &FragmentMetadata,
+    state: &mut State,
+    out: &mut Output,
+    key: &str,
+    js: &SyntaxNode,
+) {
+    with_id!(meta.id(), state, |id| {
+        out.write_element(id, format_args!("document.getElementById(\"{id}\")"));
         let unbound = utils::get_unbound_refs(js);
         let dirty_indices =
-            codegen_utils::calc_dirty(&unbound, component.declared_vars(), meta.scope());
-        let replaced =
-            codegen_utils::replace_namerefs(js, &unbound, component.declared_vars(), meta.scope());
+            codegen_utils::calc_dirty(&unbound, state.component.declared_vars(), meta.scope());
+        let replaced = codegen_utils::replace_namerefs(
+            &js,
+            &unbound,
+            state.component.declared_vars(),
+            meta.scope(),
+        );
         if dirty_indices.is_empty() {
-            writeln!(
-                formatter,
-                "if (initial) elems[\"{id}\"].setAttribute(\"{attr}\", {replaced});"
-            )?;
+            out.write_updateln(format_args!(
+                "if (initial) elems[\"{id}\"].setAttribute(\"{key}\", {replaced});"
+            ));
         } else {
-            writeln!(
-                formatter,
-                "if ({dirty_indices}) elems[\"{id}\"].setAttribute(\"{attr}\", {replaced});"
-            )?;
+            out.write_updateln(format_args!(
+                "if ({dirty_indices}) elems[\"{id}\"].setAttribute(\"{key}\", {replaced});"
+            ));
         }
-    }
-
-    formatter.pop_ctx()?;
-
-    Ok(WriteStatus::Something)
+    });
 }
 
 #[cfg(test)]
@@ -511,8 +582,7 @@ mod tests {
                 let mut js_out = Vec::new();
                 let mut html_out = Vec::new();
                 let mut css_out = Vec::new();
-                render(&component, &mut js_out).unwrap();
-                render_html(&mut html_out, &component).unwrap();
+                render(&component, &mut js_out, &mut html_out, &Options::default()).unwrap();
                 if let Some(css) = component.css() {
                     render_css(css, &mut css_out, &component).unwrap();
                 }

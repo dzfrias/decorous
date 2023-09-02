@@ -17,7 +17,7 @@ e1.parentNode.removeChild(e1);
 }
 };
 }
-const elems = {"0":replace(document.getElementById("0")),"0_block":null,};
+const elems = {"0": replace(document.getElementById("0")), "0_block": null, }
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);

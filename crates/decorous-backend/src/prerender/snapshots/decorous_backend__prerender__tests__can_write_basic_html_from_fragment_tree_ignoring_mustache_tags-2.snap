@@ -2,7 +2,7 @@
 source: crates/decorous-backend/src/prerender/mod.rs
 expression: output
 ---
-const elems = {"4":replace(document.getElementById("4")),};
+const elems = {"4": replace(document.getElementById("4")), }
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);

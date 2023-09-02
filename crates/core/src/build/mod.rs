@@ -11,10 +11,8 @@ use std::{
 
 use anyhow::{ensure, Context, Result};
 use decorous_backend::{
-    css_render::render_css as render_css_backend,
-    dom_render::DomRenderer,
-    prerender::{render_html as prerender_html, Prerenderer},
-    render, Options,
+    css_render::render_css as render_css_backend, dom_render::DomRenderer,
+    prerender::render as prerender, render, Options,
 };
 use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use decorous_frontend::{parse_with_preprocessor, Component};
@@ -84,8 +82,8 @@ fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
     } else {
         format!("{}.js", args.out)
     };
-    render_js(args, &component, &metadata, &js_name)?;
-    render_html(args, &component, &metadata, &js_name)?;
+    warn_on_unused_wasm(args, &component)?;
+    render_all(args, &component, &metadata, &js_name)?;
     if component.css().is_some() {
         render_css(args, &component)?;
     }
@@ -157,12 +155,7 @@ fn render_css(args: &Build, component: &Component<'_>) -> Result<(), anyhow::Err
     Ok(())
 }
 
-fn render_js(
-    args: &Build,
-    component: &Component<'_>,
-    metadata: &Options<'_>,
-    js_name: &str,
-) -> Result<()> {
+fn warn_on_unused_wasm(args: &Build, component: &Component<'_>) -> Result<()> {
     let mut report = Report::new();
     if args.strip && component.wasm().is_none() {
         report.add_diagnostic(
@@ -189,15 +182,49 @@ fn render_js(
         decorous_errors::fmt::report(&report, &input_name, "...")?;
     }
 
+    Ok(())
+}
+
+fn render_all(
+    args: &Build,
+    component: &Component<'_>,
+    metadata: &Options<'_>,
+    js_name: &str,
+) -> Result<()> {
     let mut out = BufWriter::new(File::create(js_name).context("error creating out file")?);
     match args.render_method {
         RenderMethod::Csr => {
             render::<DomRenderer, _>(component, &mut out, metadata)
                 .context("error during rendering")?;
+            if args.html {
+                render_index_html(args, component, metadata, js_name, None)?;
+            }
         }
         RenderMethod::Prerender => {
-            render::<Prerenderer, _>(component, &mut out, metadata)
-                .context("error during rendering")?;
+            if args.html {
+                let mut html_out = vec![];
+                prerender(component, &mut out, &mut html_out, metadata)
+                    .context("error during rendering")?;
+                render_index_html(args, component, metadata, js_name, unsafe {
+                    Some(std::str::from_utf8_unchecked(&html_out))
+                })?;
+            } else {
+                let html_name = format!("{}.html", args.out);
+                let mut html_out = &mut BufWriter::new(
+                    File::create(&html_name)
+                        .with_context(|| format!("problem creating {}", html_name))?,
+                );
+                prerender(component, &mut out, &mut html_out, metadata)
+                    .context("error during rendering")?;
+                println!(
+                    "{}",
+                    FinishLog::default()
+                        .with_main_message("HTML")
+                        .with_sub_message("prerender")
+                        .with_file(&html_name)
+                        .enable_color(args.color)
+                );
+            }
         }
     }
     println!(
@@ -214,98 +241,36 @@ fn render_js(
     Ok(())
 }
 
-fn render_html(
+fn render_index_html(
     args: &Build,
     component: &Component,
     meta: &Options<'_>,
     js_name: &str,
+    to_render: Option<&str>,
 ) -> Result<()> {
     let mut handlebars = Handlebars::new();
     handlebars.register_escape_fn(no_escape);
     handlebars.register_template_string("index", include_str!("./templates/template.html"))?;
-    match args.render_method {
-        RenderMethod::Csr => {
-            if !args.html {
-                return Ok(());
-            }
-            let out = File::create("index.html").context("problem creating index.html")?;
 
-            let body = json!({
-                "script": js_name,
-                "css": component.css().is_some().then(|| format!("{}.css", args.out)),
-                "name": meta.name,
-                "html": None::<&str>,
-            });
+    let out = File::create("index.html").context("problem creating index.html")?;
+    let body = json!({
+        "script": js_name,
+        "css": component.css().is_some().then(|| format!("{}.css", args.out)),
+        "name": meta.name,
+        "html": to_render,
+    });
 
-            handlebars.render_template_to_write(
-                include_str!("./templates/template.html"),
-                &body,
-                out,
-            )?;
+    handlebars.render_template_to_write(include_str!("./templates/template.html"), &body, out)?;
 
-            println!(
-                "{}",
-                FinishLog::default()
-                    .with_main_message("HTML")
-                    .with_file("index.html")
-                    .enable_color(args.color)
-            );
+    println!(
+        "{}",
+        FinishLog::default()
+            .with_main_message("HTML")
+            .with_file("index.html")
+            .enable_color(args.color)
+    );
 
-            Ok(())
-        }
-        RenderMethod::Prerender => {
-            if args.html {
-                let mut out = vec![];
-                prerender_html(&mut out, component).context("error prerendering html")?;
-
-                let body = json!({
-                    "script": js_name,
-                    "css": component.css().is_some().then(|| format!("{}.css", args.out)),
-                    "name": meta.name,
-                    // SAFETY: HtmlPrerenderer only produces valid UTF-8
-                    "html": Some(unsafe {
-                        std::str::from_utf8_unchecked(&out)
-                    }),
-                });
-
-                handlebars.render_template_to_write(
-                    include_str!("./templates/template.html"),
-                    &body,
-                    File::create("index.html").context("problem creating index.html")?,
-                )?;
-
-                println!(
-                    "{}",
-                    FinishLog::default()
-                        .with_main_message("HTML")
-                        .with_sub_message("prerender")
-                        .with_file("index.html")
-                        .enable_color(args.color)
-                );
-                return Ok(());
-            }
-
-            let html = format!("{}.html", args.out);
-
-            prerender_html(
-                &mut BufWriter::new(
-                    File::create(&html).with_context(|| format!("problem creating {}", html))?,
-                ),
-                component,
-            )
-            .context("error prerendering html")?;
-            println!(
-                "{}",
-                FinishLog::default()
-                    .with_main_message("HTML")
-                    .with_sub_message("prerender")
-                    .with_file(html)
-                    .enable_color(args.color)
-            );
-
-            Ok(())
-        }
-    }
+    Ok(())
 }
 
 fn parse_component<'a>(input: &'a str, config: &Config, args: &Build) -> Result<Component<'a>> {

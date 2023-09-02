@@ -19,6 +19,17 @@ pub struct Options<'a> {
     pub use_resolver: &'a dyn UseResolver,
 }
 
+impl Default for Options<'_> {
+    fn default() -> Self {
+        Self {
+            name: "test",
+            modularize: false,
+            wasm_compiler: &NullCompiler,
+            use_resolver: &NullResolver,
+        }
+    }
+}
+
 pub trait RenderBackend {
     fn render<T: io::Write>(
         out: &mut T,

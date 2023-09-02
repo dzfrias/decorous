@@ -3,7 +3,7 @@ source: crates/decorous-backend/src/prerender/mod.rs
 expression: output
 ---
 let x = 3;
-const elems = {"0":document.getElementById("0"),};
+const elems = {"0": document.getElementById("0"), }
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);
