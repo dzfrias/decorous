@@ -5,8 +5,6 @@ pub mod prerender;
 mod use_resolver;
 mod wasm_compiler;
 
-use decorous_frontend::Component;
-use std::io;
 pub use use_resolver::*;
 pub use wasm_compiler::*;
 
@@ -28,20 +26,4 @@ impl Default for Options<'_> {
             use_resolver: &NullResolver,
         }
     }
-}
-
-pub trait RenderBackend {
-    fn render<T: io::Write>(
-        out: &mut T,
-        component: &Component,
-        metadata: &Options<'_>,
-    ) -> io::Result<()>;
-}
-
-pub fn render<B, T>(component: &Component, out: &mut T, metadata: &Options<'_>) -> io::Result<()>
-where
-    T: io::Write,
-    B: RenderBackend,
-{
-    <B as RenderBackend>::render(out, component, metadata)
 }

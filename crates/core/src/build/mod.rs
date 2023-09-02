@@ -11,8 +11,8 @@ use std::{
 
 use anyhow::{ensure, Context, Result};
 use decorous_backend::{
-    css_render::render_css as render_css_backend, dom_render::DomRenderer,
-    prerender::render as prerender, render, Options,
+    css_render::render_css as render_css_backend, dom_render::render as dom_render,
+    prerender::render as prerender, Options,
 };
 use decorous_errors::{DiagnosticBuilder, Report, Severity};
 use decorous_frontend::{parse_with_preprocessor, Component};
@@ -194,8 +194,7 @@ fn render_all(
     let mut out = BufWriter::new(File::create(js_name).context("error creating out file")?);
     match args.render_method {
         RenderMethod::Csr => {
-            render::<DomRenderer, _>(component, &mut out, metadata)
-                .context("error during rendering")?;
+            dom_render(component, &mut out, metadata).context("error during rendering")?;
             if args.html {
                 render_index_html(args, component, metadata, js_name, None)?;
             }

@@ -5,20 +5,8 @@ use itertools::Itertools;
 use rslint_parser::AstNode;
 use std::{borrow::Cow, io};
 
-use crate::{codegen_utils, Options, RenderBackend};
+use crate::{codegen_utils, Options};
 pub(crate) use render_fragment::{render_fragment, State};
-
-pub struct DomRenderer;
-
-impl RenderBackend for DomRenderer {
-    fn render<T: io::Write>(
-        out: &mut T,
-        component: &Component,
-        metadata: &Options,
-    ) -> io::Result<()> {
-        render(component, out, metadata)
-    }
-}
 
 pub fn render<T: io::Write>(
     component: &Component,

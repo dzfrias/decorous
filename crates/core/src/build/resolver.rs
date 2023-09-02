@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use decorous_backend::{dom_render::DomRenderer, render, Options, UseInfo, UseResolver};
+use decorous_backend::{dom_render::render, Options, UseInfo, UseResolver};
 use decorous_frontend::{parse_with_preprocessor, Component};
 
 use crate::{
@@ -32,7 +32,7 @@ impl UseResolver for Resolver<'_> {
         let stem = path.file_stem().unwrap().to_string_lossy();
         let name: PathBuf = format!("{}_{stem}.mjs", self.args.out).into();
         let mut f = BufWriter::new(File::create(&name)?);
-        render::<DomRenderer, _>(
+        render(
             &component,
             &mut f,
             &Options {
