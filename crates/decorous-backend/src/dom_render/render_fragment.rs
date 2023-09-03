@@ -64,7 +64,7 @@ fn render_fragment_to_out(
     for (block, id) in state.component.declared_vars().all_reactive_blocks() {
         let unbound = utils::get_unbound_refs(block);
         let dirty = codegen_utils::calc_dirty(&unbound, state.component.declared_vars(), None);
-        out.write_updateln(format_args!("if ({dirty}) {{ ctx[{id}]() }}"));
+        out.write_updateln(format_args!("if ({dirty}) {{ ctx[{id}](); }}"));
     }
 
     for node in nodes {

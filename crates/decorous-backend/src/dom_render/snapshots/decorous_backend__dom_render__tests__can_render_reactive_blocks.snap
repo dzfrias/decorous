@@ -21,7 +21,7 @@ e0.addEventListener("input", ctx[3]);
 mount(target, e0, anchor);
 return {
 u(dirty) {
-if (dirty[0] & 3) { ctx[2]() }
+if (dirty[0] & 3) { ctx[2](); }
 if (dirty[0] & 1) e0.value = ctx[0];
 },
 d() {
