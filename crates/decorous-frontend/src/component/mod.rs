@@ -167,8 +167,8 @@ impl<'a> Component<'a> {
     fn assign_node_classes(&self, nodes: &mut [Node<'_, Location>]) {
         traverse_mut(nodes, &mut |node| {
             let NodeType::Element(elem) = node.node_type_mut() else {
-            return;
-        };
+                return;
+            };
             let mut has_class = false;
             for attr in elem.attrs_mut() {
                 match attr {
@@ -489,8 +489,9 @@ impl<'a> Component<'a> {
             let Some(pos) = self
                 .toplevel_nodes()
                 .iter()
-                .position(|node| &node.node == v.decl.syntax()) else {
-                continue
+                .position(|node| &node.node == v.decl.syntax())
+            else {
+                continue;
             };
             self.toplevel_nodes.remove(pos);
             self.hoist.push(v.decl.syntax().clone());

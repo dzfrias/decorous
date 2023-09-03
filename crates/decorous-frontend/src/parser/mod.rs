@@ -882,7 +882,7 @@ mod tests {
                 _body: &str,
             ) -> std::result::Result<Override, PreprocessError> {
                 let body = match lang {
-                    "sass" => Override::Css(format!("p {{ color: red; }}")),
+                    "sass" => Override::Css("p { color: red; }".to_owned()),
                     _ => Override::None,
                 };
 

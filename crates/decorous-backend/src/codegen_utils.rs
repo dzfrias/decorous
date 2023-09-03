@@ -220,7 +220,11 @@ fn replace_assignments_indels(
 ) -> Vec<Indel> {
     let mut indels = vec![];
     for name_ref in name_refs {
-        let Some(assignment) = name_ref.syntax().parent().and_then(|parent| parent.try_to::<AssignExpr>()) else {
+        let Some(assignment) = name_ref
+            .syntax()
+            .parent()
+            .and_then(|parent| parent.try_to::<AssignExpr>())
+        else {
             continue;
         };
         let Some(name) = name_ref.ident_token() else {
