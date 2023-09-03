@@ -721,4 +721,9 @@ mod tests {
     fn can_render_reactive_blocks() {
         test_render!("---js let x = 0; let y = 0; $: y = x + 1; --- #input[:x:]/input");
     }
+
+    #[test]
+    fn can_have_resolver_for_use_path() {
+        test_render!("{#use \"./hello.decor\"} #p:Hello #hello /hello");
+    }
 }
