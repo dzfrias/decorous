@@ -13,7 +13,7 @@ use crate::{
 use decorous_frontend::{
     ast::{
         Attribute, AttributeValue, Comment, Element, ForBlock, IfBlock, Mustache, Node, NodeType,
-        SpecialBlock, Text,
+        SpecialBlock, Text, UseBlock,
     },
     utils, Component, FragmentMetadata,
 };
@@ -41,7 +41,9 @@ pub fn render(
         component,
         id_overwrites: HashMap::new(),
         style_cache: None,
+        uses: vec![],
     };
+
     for node in component.fragment_tree() {
         node.render(&mut state, &mut output, &());
     }
@@ -58,6 +60,19 @@ pub fn render(
         )?;
     }
 
+    for use_decl in component.uses() {
+        let Some(stem) = use_decl.file_stem() else {
+            continue;
+        };
+        let use_info = metadata.use_resolver.resolve(use_decl)?;
+        writeln!(
+            out,
+            "import __decor_{} from \"./{}\";",
+            // FIX: Make sure it is a valid JavaScript ident
+            stem.to_string_lossy(),
+            use_info.loc.display(),
+        )?;
+    }
     for hoist in component.hoist() {
         writeln!(out, "{hoist}")?;
     }
@@ -198,6 +213,7 @@ struct State<'ast> {
     component: &'ast Component<'ast>,
     id_overwrites: HashMap<u32, SmolStr>,
     style_cache: Option<String>,
+    uses: Vec<&'ast str>,
 }
 
 impl<'ast> State<'ast> {
@@ -233,16 +249,16 @@ macro_rules! with_id {
     };
 }
 
-trait Render {
+trait Render<'ast> {
     type Metadata;
 
-    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata);
+    fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, meta: &Self::Metadata);
 }
 
-impl Render for Node<'_, FragmentMetadata> {
+impl<'ast> Render<'ast> for Node<'ast, FragmentMetadata> {
     type Metadata = ();
 
-    fn render(&self, state: &mut State, out: &mut Output, _meta: &Self::Metadata) {
+    fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, _meta: &Self::Metadata) {
         match self.node_type() {
             NodeType::Element(elem) => elem.render(state, out, self.metadata()),
             NodeType::Text(t) => t.render(state, out, self.metadata()),
@@ -253,18 +269,34 @@ impl Render for Node<'_, FragmentMetadata> {
     }
 }
 
-impl Render for Text<'_> {
+impl<'ast> Render<'ast> for Text<'ast> {
     type Metadata = FragmentMetadata;
 
-    fn render(&self, _state: &mut State, out: &mut Output, _meta: &Self::Metadata) {
+    fn render(&'ast self, _state: &mut State<'ast>, out: &mut Output, _meta: &Self::Metadata) {
         out.write_html(self);
     }
 }
 
-impl Render for Element<'_, FragmentMetadata> {
+impl<'ast> Render<'ast> for Element<'ast, FragmentMetadata> {
     type Metadata = FragmentMetadata;
 
-    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+    fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, meta: &Self::Metadata) {
+        let id = meta.id();
+
+        if state.uses.contains(&self.tag()) {
+            out.write_html(format_args!("<span id=\"{id}\"></span>"));
+            out.write_element(
+                id,
+                format_args!("replace(document.getElementById(\"{id}\"))"),
+            );
+            out.write_ctx_initln(format_args!(
+                "__decor_{}(elems[\"{id}\"].parentNode, elems[\"{id}\"])",
+                self.tag()
+            ));
+
+            return;
+        }
+
         out.write_html(format_args!("<{}", self.tag()));
         let mut overwritten = false;
         let mut has_dynamic = false;
@@ -307,7 +339,7 @@ impl Render for Element<'_, FragmentMetadata> {
         }
 
         if !overwritten && has_dynamic {
-            out.write_html(format_args!(" id=\"{}\"", meta.id()));
+            out.write_html(format_args!(" id=\"{id}\""));
         }
         out.write_html(">");
         for child in self.children() {
@@ -317,18 +349,18 @@ impl Render for Element<'_, FragmentMetadata> {
     }
 }
 
-impl Render for Comment<'_> {
+impl<'ast> Render<'ast> for Comment<'ast> {
     type Metadata = FragmentMetadata;
 
-    fn render(&self, _state: &mut State, out: &mut Output, _meta: &Self::Metadata) {
+    fn render(&'ast self, _state: &mut State<'ast>, out: &mut Output, _meta: &Self::Metadata) {
         out.write_html(format_args!("<!--{}-->", self.0));
     }
 }
 
-impl Render for Mustache {
+impl<'ast> Render<'ast> for Mustache {
     type Metadata = FragmentMetadata;
 
-    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+    fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
         out.write_html(format_args!("<span id=\"{id}\"></span>"));
         out.write_element(
@@ -355,22 +387,37 @@ impl Render for Mustache {
     }
 }
 
-impl Render for SpecialBlock<'_, FragmentMetadata> {
+impl<'ast> Render<'ast> for SpecialBlock<'ast, FragmentMetadata> {
     type Metadata = FragmentMetadata;
 
-    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+    fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, meta: &Self::Metadata) {
         match self {
             Self::If(block) => block.render(state, out, meta),
             SpecialBlock::For(block) => block.render(state, out, meta),
-            SpecialBlock::Use(_) => todo!("use blocks"),
+            SpecialBlock::Use(use_decl) => use_decl.render(state, out, meta),
         }
     }
 }
 
-impl Render for IfBlock<'_, FragmentMetadata> {
+impl<'ast> Render<'ast> for UseBlock<'ast> {
     type Metadata = FragmentMetadata;
 
-    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+    fn render(&'ast self, state: &mut State<'ast>, _out: &mut Output, _meta: &Self::Metadata) {
+        let Some(name) = self.path().file_stem() else {
+            return;
+        };
+
+        state.uses.push(match <&str>::try_from(name) {
+            Ok(s) => s,
+            Err(_err) => todo!("error"),
+        });
+    }
+}
+
+impl<'ast> Render<'ast> for IfBlock<'ast, FragmentMetadata> {
+    type Metadata = FragmentMetadata;
+
+    fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
         let unbound = utils::get_unbound_refs(self.expr());
         let replaced = codegen_utils::replace_namerefs(
@@ -417,10 +464,10 @@ impl Render for IfBlock<'_, FragmentMetadata> {
     }
 }
 
-impl Render for ForBlock<'_, FragmentMetadata> {
+impl<'ast> Render<'ast> for ForBlock<'ast, FragmentMetadata> {
     type Metadata = FragmentMetadata;
 
-    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+    fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
         let unbound = utils::get_unbound_refs(self.expr());
         let replaced = codegen_utils::replace_namerefs(
@@ -457,10 +504,10 @@ impl Render for ForBlock<'_, FragmentMetadata> {
     }
 }
 
-impl Render for Attribute<'_> {
+impl<'ast> Render<'ast> for Attribute<'ast> {
     type Metadata = FragmentMetadata;
 
-    fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
+    fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
         let inline_styles_candidate = meta.parent_id().is_none()
             && !state.component.declared_vars().css_mustaches().is_empty();
@@ -502,7 +549,8 @@ impl Render for Attribute<'_> {
                         .declared_vars()
                         .get_binding(*binding)
                         .expect("BUG: every binding should have an id in declared vars");
-                    let Some(var_id) = state.component.declared_vars().get_var(*binding, None) else {
+                    let Some(var_id) = state.component.declared_vars().get_var(*binding, None)
+                    else {
                         todo!("unbound var lint")
                     };
 
@@ -533,9 +581,10 @@ impl Render for Attribute<'_> {
         }
     }
 }
-fn render_dyn_attr(
+
+fn render_dyn_attr<'ast>(
     meta: &FragmentMetadata,
-    state: &mut State,
+    state: &mut State<'ast>,
     out: &mut Output,
     key: &str,
     js: &SyntaxNode,
