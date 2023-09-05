@@ -5,6 +5,7 @@ use decorous_frontend::{
     },
     utils, Component, FragmentMetadata,
 };
+use heck::ToSnekCase;
 use itertools::Itertools;
 use std::{
     borrow::Cow,
@@ -190,7 +191,8 @@ impl Render for Element<'_, FragmentMetadata> {
     fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
 
-        if state.uses.contains(&self.tag().into()) {
+        let js_name = self.js_valid_tag_name();
+        if state.uses.iter().any(|tag| tag == js_name.as_ref()) {
             out.write_declln(format_args!(
                 "const e{id}_anchor = document.createTextNode(\"\");"
             ));
@@ -201,10 +203,7 @@ impl Render for Element<'_, FragmentMetadata> {
             } else {
                 panic!("BUG: node's parent should never be None while root is Some");
             }
-            out.write_mountln(format_args!(
-                "__decor_{}(target, e{id}_anchor);",
-                self.tag()
-            ));
+            out.write_mountln(format_args!("__decor_{js_name}(target, e{id}_anchor);"));
             if state.root != meta.parent_id() {
                 out.write_detachln(format_args!(
                     "e{id}_anchor.parentNode.removeChild(e{id}_anchor);"
@@ -312,7 +311,7 @@ impl Render for UseBlock<'_> {
             return;
         };
 
-        state.uses.push(name.to_string_lossy().to_string());
+        state.uses.push(name.to_string_lossy().to_snek_case());
     }
 }
 

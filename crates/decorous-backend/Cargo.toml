@@ -13,6 +13,7 @@ itertools = { workspace = true }
 thiserror = { workspace = true }
 lazy_format = "2.0.0"
 anyhow = { workspace = true }
+heck = "0.4.1"
 
 [dev-dependencies]
 insta = { workspace = true }

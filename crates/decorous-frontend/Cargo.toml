@@ -19,6 +19,7 @@ rand = "0.8.5"
 smallvec = "1.11.0"
 petgraph = "0.6.3"
 decorous-errors = { path = "../decorous-errors" }
+heck = "0.4.1"
 
 [dev-dependencies]
 insta = { workspace = true }

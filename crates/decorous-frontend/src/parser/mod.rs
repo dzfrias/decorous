@@ -292,10 +292,14 @@ fn attributes(input: NomSpan) -> Result<Vec<Attribute>> {
     )(input)
 }
 
+fn tag_name<'i>(input: NomSpan<'i>) -> Result<NomSpan<'i>> {
+    take_while(|c: char| c.is_alphanumeric() || c == '-')(input)
+}
+
 fn element(input: NomSpan) -> Result<Element<'_, Location>> {
     let (input, _) = char('#')(input)?;
     let (input, start_pos) = position(input)?;
-    let (input, tag_name) = alphanumeric1(input)?;
+    let (input, tag_name) = tag_name(input)?;
     let (input, attrs) = terminated(opt(attributes), multispace0)(input)?;
     let (input, children) = alt((
         preceded(

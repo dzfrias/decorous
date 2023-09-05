@@ -1,5 +1,6 @@
 use std::{borrow::Cow, fmt, path::Path};
 
+use heck::ToSnekCase;
 use itertools::Itertools;
 use rslint_parser::SyntaxNode;
 
@@ -180,15 +181,15 @@ impl<'a, T> Element<'a, T> {
         }
     }
 
-    pub fn tag(&self) -> &str {
+    pub fn tag(&self) -> &'a str {
         self.tag
     }
 
-    pub fn children(&self) -> &[Node<'_, T>] {
+    pub fn children(&self) -> &[Node<'a, T>] {
         self.children.as_ref()
     }
 
-    pub fn attrs(&self) -> &[Attribute<'_>] {
+    pub fn attrs(&self) -> &[Attribute<'a>] {
         self.attrs.as_ref()
     }
 
@@ -220,6 +221,14 @@ impl<'a, T> Element<'a, T> {
 
     pub fn attrs_mut(&mut self) -> &mut Vec<Attribute<'a>> {
         &mut self.attrs
+    }
+
+    pub fn js_valid_tag_name(&self) -> Cow<'a, str> {
+        if self.tag().contains("-") {
+            Cow::Owned(self.tag().to_snek_case())
+        } else {
+            Cow::Borrowed(self.tag())
+        }
     }
 }
 

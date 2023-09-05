@@ -1,0 +1,19 @@
+---
+source: crates/decorous-backend/src/prerender/mod.rs
+expression: output
+---
+import __decor_hello_world from "././hello-world.decor";
+const elems = {"2": replace(document.getElementById("2")), }
+function replace(node) {
+  const text = document.createTextNode("");
+  node.replaceWith(text);
+  return text;
+}
+function __init_ctx() {
+  __decor_hello_world(elems["2"].parentNode, elems["2"])
+  return [];
+}
+const ctx = __init_ctx();
+
+---
+ <span id="2"></span>

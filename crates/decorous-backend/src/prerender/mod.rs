@@ -17,6 +17,7 @@ use decorous_frontend::{
     },
     utils, Component, FragmentMetadata,
 };
+use heck::ToSnekCase;
 use rslint_parser::{AstNode, SmolStr, SyntaxNode};
 
 pub fn render(
@@ -68,8 +69,7 @@ pub fn render(
         writeln!(
             out,
             "import __decor_{} from \"./{}\";",
-            // FIX: Make sure it is a valid JavaScript ident
-            stem.to_string_lossy(),
+            stem.to_string_lossy().to_snek_case(),
             use_info.loc.display(),
         )?;
     }
@@ -213,7 +213,7 @@ struct State<'ast> {
     component: &'ast Component<'ast>,
     id_overwrites: HashMap<u32, SmolStr>,
     style_cache: Option<String>,
-    uses: Vec<&'ast str>,
+    uses: Vec<Cow<'ast, str>>,
 }
 
 impl<'ast> State<'ast> {
@@ -283,15 +283,15 @@ impl<'ast> Render<'ast> for Element<'ast, FragmentMetadata> {
     fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
 
-        if state.uses.contains(&self.tag()) {
+        let js_tag_name = self.js_valid_tag_name();
+        if state.uses.contains(&js_tag_name) {
             out.write_html(format_args!("<span id=\"{id}\"></span>"));
             out.write_element(
                 id,
                 format_args!("replace(document.getElementById(\"{id}\"))"),
             );
             out.write_ctx_initln(format_args!(
-                "__decor_{}(elems[\"{id}\"].parentNode, elems[\"{id}\"])",
-                self.tag()
+                "__decor_{js_tag_name}(elems[\"{id}\"].parentNode, elems[\"{id}\"])",
             ));
 
             return;
@@ -408,7 +408,13 @@ impl<'ast> Render<'ast> for UseBlock<'ast> {
         };
 
         state.uses.push(match <&str>::try_from(name) {
-            Ok(s) => s,
+            Ok(s) => {
+                if s.contains('-') {
+                    s.to_snek_case().into()
+                } else {
+                    s.into()
+                }
+            }
             Err(_err) => todo!("error"),
         });
     }
@@ -725,5 +731,10 @@ mod tests {
     #[test]
     fn can_have_resolver_for_use_path() {
         test_render!("{#use \"./hello.decor\"} #p:Hello #hello /hello");
+    }
+
+    #[test]
+    fn dashes_in_use_block_are_turned_into_underscores() {
+        test_render!("{#use \"./hello-world.decor\"} #hello-world /hello-world");
     }
 }

@@ -1,6 +1,7 @@
 mod render_fragment;
 
 use decorous_frontend::{utils, Component};
+use heck::ToSnekCase;
 use itertools::Itertools;
 use rslint_parser::AstNode;
 use std::{borrow::Cow, io};
@@ -32,8 +33,7 @@ pub fn render<T: io::Write>(
         writeln!(
             render_to,
             "import __decor_{} from \"./{}\";",
-            // FIX: Make sure it is a valid JavaScript ident
-            stem.to_string_lossy(),
+            stem.to_string_lossy().to_snek_case(),
             use_info.loc.display(),
         )?;
     }
@@ -309,5 +309,10 @@ mod tests {
     #[test]
     fn can_have_resolver_for_use_path() {
         test_render!("{#use \"./hello.decor\"} #p:Hello #hello /hello");
+    }
+
+    #[test]
+    fn dashes_in_use_block_are_turned_into_underscores() {
+        test_render!("{#use \"./hello-world.decor\"} #hello-world /hello-world");
     }
 }
