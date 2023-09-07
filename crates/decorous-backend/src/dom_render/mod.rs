@@ -15,6 +15,7 @@ pub fn render<T: io::Write>(
     metadata: &Options,
 ) -> io::Result<()> {
     if let Some(wasm) = component.wasm() {
+        // TODO: Error
         let _ = metadata.wasm_compiler.compile(
             crate::CodeInfo {
                 lang: wasm.lang(),
@@ -40,6 +41,21 @@ pub fn render<T: io::Write>(
     // Hoisted syntax nodes should come first
     for hoist in component.hoist() {
         writeln!(render_to, "{hoist}")?;
+    }
+
+    if let Some(comptime) = component.comptime() {
+        match metadata.wasm_compiler.compile_comptime(crate::CodeInfo {
+            lang: comptime.lang(),
+            body: comptime.body(),
+            exports: component.exports(),
+        }) {
+            Ok(env) => {
+                for decl in env.items() {
+                    writeln!(render_to, "const {} = {};", decl.name, decl.value)?;
+                }
+            }
+            Err(_err) => todo!("error"),
+        }
     }
 
     render_init_ctx(render_to, component)?;

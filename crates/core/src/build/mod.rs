@@ -57,7 +57,6 @@ fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
         config,
         args,
         input_path: &abs_input,
-        enable_color: args.color,
     };
     let metadata = Options {
         name: {
