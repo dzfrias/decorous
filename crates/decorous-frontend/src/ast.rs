@@ -22,6 +22,7 @@ pub struct DecorousAst<'a> {
     script: Option<SyntaxNode>,
     css: Option<Css>,
     wasm: Option<Code<'a>>,
+    comptime: Option<Code<'a>>,
 }
 
 /// A node of the [AST](DecorousAst).
@@ -152,11 +153,17 @@ pub struct Code<'a> {
     lang: &'a str,
     body: &'a str,
     offset: usize,
+    comptime: bool,
 }
 
 impl<'a> Code<'a> {
-    pub fn new(lang: &'a str, body: &'a str, offset: usize) -> Self {
-        Self { lang, body, offset }
+    pub fn new(lang: &'a str, body: &'a str, offset: usize, comptime: bool) -> Self {
+        Self {
+            lang,
+            body,
+            offset,
+            comptime,
+        }
     }
 
     pub fn lang(&self) -> &'a str {
@@ -169,6 +176,10 @@ impl<'a> Code<'a> {
 
     pub fn offset(&self) -> usize {
         self.offset
+    }
+
+    pub fn is_comptime(&self) -> bool {
+        self.comptime
     }
 }
 
@@ -432,12 +443,14 @@ impl<'a> DecorousAst<'a> {
         script: Option<SyntaxNode>,
         css: Option<Css>,
         wasm: Option<Code<'a>>,
+        comptime: Option<Code<'a>>,
     ) -> Self {
         Self {
             nodes,
             script,
             css,
             wasm,
+            comptime,
         }
     }
 
@@ -470,12 +483,17 @@ impl<'a> DecorousAst<'a> {
         Option<SyntaxNode>,
         Option<Css>,
         Option<Code<'a>>,
+        Option<Code<'a>>,
     ) {
-        (self.nodes, self.script, self.css, self.wasm)
+        (self.nodes, self.script, self.css, self.wasm, self.comptime)
     }
 
     pub fn wasm(&self) -> Option<&Code<'a>> {
         self.wasm.as_ref()
+    }
+
+    pub fn comptime(&self) -> Option<&Code<'a>> {
+        self.comptime.as_ref()
     }
 }
 

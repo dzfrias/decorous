@@ -23,6 +23,8 @@ pub enum ParseErrorType {
     CannotHaveTwoScripts,
     #[error("cannot have more than one style block")]
     CannotHaveTwoStyles,
+    #[error("cannot have more than one static block")]
+    CannotHaveTwoStatics,
     #[error("cannot have more than one WebAssembly block")]
     CannotHaveTwoWasmBlocks,
     #[error("parse error in JavaScript: {title}")]

@@ -41,6 +41,7 @@ pub struct Component<'a> {
     current_id: u32,
     css: Option<Css>,
     wasm: Option<Code<'a>>,
+    comptime: Option<Code<'a>>,
 }
 
 #[derive(Debug)]
@@ -67,6 +68,7 @@ impl<'a> Component<'a> {
             uses: vec![],
 
             css: None,
+            comptime: None,
             wasm: None,
         };
         c.compute(ast);
@@ -117,12 +119,16 @@ impl<'a> Component<'a> {
     pub fn uses(&self) -> &[&Path] {
         self.uses.as_ref()
     }
+
+    pub fn comptime(&self) -> Option<&Code<'a>> {
+        self.comptime.as_ref()
+    }
 }
 
 // Private methods of Component
 impl<'a> Component<'a> {
     fn compute(&mut self, ast: DecorousAst<'a>) {
-        let (mut nodes, script, css, wasm) = ast.into_components();
+        let (mut nodes, script, css, wasm, comptime) = ast.into_components();
         if let Some(script) = script {
             self.extract_toplevel_data(script);
         }
@@ -131,6 +137,7 @@ impl<'a> Component<'a> {
             self.css = Some(css);
         }
         self.wasm = wasm;
+        self.comptime = comptime;
         self.build_fragment_tree(nodes);
     }
 

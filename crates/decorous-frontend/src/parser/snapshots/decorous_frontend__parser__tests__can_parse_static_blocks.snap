@@ -9,10 +9,10 @@ Ok(
         css: None,
         wasm: Some(
             Code {
-                lang: "wasm",
-                body: " let x = 3; ",
-                offset: 7,
-                comptime: false,
+                lang: "js",
+                body: " console.log(\"hello\"); ",
+                offset: 12,
+                comptime: true,
             },
         ),
     },

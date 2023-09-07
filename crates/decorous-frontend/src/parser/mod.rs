@@ -103,8 +103,8 @@ fn _parse<'i, P: Preprocessor>(input: NomSpan<'i>, preproc: &P) -> Result<'i, De
     let (input, _) = parse_code_blocks(input, input, &mut blocks, preproc)?;
     let (input, nodes) = nodes(input)?;
     let (input, _) = parse_code_blocks(input, src, &mut blocks, preproc)?;
-    let (script, css, wasm) = blocks.into_parts();
-    Ok((input, DecorousAst::new(nodes, script, css, wasm)))
+    let (script, css, wasm, comptime) = blocks.into_parts();
+    Ok((input, DecorousAst::new(nodes, script, css, wasm, comptime)))
 }
 
 fn parse_code_blocks<'a, P: Preprocessor>(
@@ -116,6 +116,17 @@ fn parse_code_blocks<'a, P: Preprocessor>(
     let (input, code_blocks) = many0(ws(code))(input)?;
     for b in code_blocks {
         match b.lang() {
+            _ if b.is_comptime() => {
+                let offset = b.offset();
+                blocks.set_static_wasm(b).map_err(|_err| {
+                    nom_err!(
+                        src.slice(offset..),
+                        Failure,
+                        ParseErrorType::CannotHaveTwoStatics,
+                        None
+                    )
+                })?;
+            }
             "js" => {
                 let syntax_node = parse_js_block(b.body(), b.offset(), src)?;
                 blocks.set_script(syntax_node).map_err(|_err| {
@@ -226,11 +237,15 @@ fn parse_js_block(
 
 fn code(input: NomSpan) -> Result<Code> {
     let (input, _) = tag("---")(input)?;
-    let (input, lang) = take_while(|c: char| !c.is_whitespace())(input)?;
+    let (input, lang) = take_while(|c: char| !c.is_whitespace() && c != ':')(input)?;
+    let (input, comptime) = opt(tag(":static"))(input)?;
     let (input, loc) = position(input)?;
     let (input, body) = take_until("---")(input)?;
     let (input, _) = take(3usize)(input)?;
-    Ok((input, Code::new(&lang, &body, loc.location_offset())))
+    Ok((
+        input,
+        Code::new(&lang, &body, loc.location_offset(), comptime.is_some()),
+    ))
 }
 
 fn nodes(input: NomSpan) -> Result<Vec<Node<'_, Location>>> {
@@ -901,5 +916,10 @@ mod tests {
     #[test]
     fn can_parse_use_decls() {
         nom_test_all_insta!(parse, ["{#use \"path\"} #p hello /p"]);
+    }
+
+    #[test]
+    fn can_parse_static_blocks() {
+        nom_test_all_insta!(parse, ["---js:static console.log(\"hello\"); ---"]);
     }
 }
