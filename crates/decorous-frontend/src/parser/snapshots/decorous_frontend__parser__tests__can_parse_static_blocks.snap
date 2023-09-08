@@ -7,7 +7,8 @@ Ok(
         nodes: [],
         script: None,
         css: None,
-        wasm: Some(
+        wasm: None,
+        comptime: Some(
             Code {
                 lang: "js",
                 body: " console.log(\"hello\"); ",

@@ -59,5 +59,6 @@ Ok(
         ),
         css: None,
         wasm: None,
+        comptime: None,
     },
 )

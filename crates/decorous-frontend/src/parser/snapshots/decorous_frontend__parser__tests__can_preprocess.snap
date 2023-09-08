@@ -56,5 +56,6 @@ Ok(
             },
         ),
         wasm: None,
+        comptime: None,
     },
 )

@@ -36,5 +36,6 @@ Ok(
         script: None,
         css: None,
         wasm: None,
+        comptime: None,
     },
 )

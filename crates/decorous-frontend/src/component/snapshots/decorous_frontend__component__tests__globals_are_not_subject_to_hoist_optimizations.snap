@@ -91,4 +91,5 @@ Component {
     current_id: 1,
     css: None,
     wasm: None,
+    comptime: None,
 }
