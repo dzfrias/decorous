@@ -52,12 +52,7 @@ pub fn build(args: &Build) -> Result<()> {
 fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
     let start = Instant::now();
     let input = fs::read_to_string(&args.input).context("error reading provided input file")?;
-    let abs_input = fs::canonicalize(&args.input)?;
-    let compiler = MainCompiler {
-        config,
-        args,
-        input_path: &abs_input,
-    };
+    let compiler = MainCompiler::new(config, args);
     let metadata = Options {
         name: {
             &args

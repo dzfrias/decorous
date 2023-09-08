@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    cell::Cell,
     collections::HashMap,
     ffi::OsStr,
     fs, io,
@@ -29,12 +30,20 @@ use crate::{
 
 #[derive(Debug)]
 pub struct MainCompiler<'a> {
-    pub config: &'a Config,
-    pub args: &'a Build,
-    pub input_path: &'a Path,
+    config: &'a Config,
+    args: &'a Build,
+    comptime: Cell<bool>,
 }
 
 impl<'a> MainCompiler<'a> {
+    pub fn new(config: &'a Config, args: &'a Build) -> Self {
+        Self {
+            config,
+            args,
+            comptime: false.into(),
+        }
+    }
+
     fn get_python(&self) -> Option<Cow<'_, Path>> {
         if let Some(py) = &self.config.python {
             return Some(Cow::Borrowed(py));
@@ -113,8 +122,10 @@ impl WasmCompiler for MainCompiler<'_> {
             }
         }
 
+        let input_path =
+            fs::canonicalize(&self.args.input).context("error getting abs path of input")?;
         let cache_path = if config.use_cache {
-            gen_cache(self.input_path)?
+            gen_cache(&input_path)?
         } else {
             PathBuf::new()
         };
@@ -125,6 +136,10 @@ impl WasmCompiler for MainCompiler<'_> {
             .env("DECOR_OUT_DIR", outdir)
             .env("DECOR_EXPORTS", exports.iter().join(" "))
             .env("DECOR_CACHE", &cache_path)
+            .env(
+                "DECOR_COMPTIME",
+                self.comptime.get().then_some("1").unwrap_or_default(),
+            )
             .current_dir(dir.path())
             .args(&self.args.build_args)
             .output()?;
@@ -203,92 +218,22 @@ impl WasmCompiler for MainCompiler<'_> {
         Ok(())
     }
 
-    fn compile_comptime(
-        &self,
-        CodeInfo {
-            lang,
-            body,
-            exports,
-        }: CodeInfo,
-    ) -> Result<JsEnv> {
-        let config = self
-            .config
-            .compilers
-            .get(lang)
-            .with_context(|| format!("unsupported language: {lang}"))?;
-        warn_unused_deps(&config.deps)?;
-        let dir = TempDir::new(lang).context("error creating temp dir for compiler")?;
-        let path: PathBuf = dir.path().join(format!(
-            "__tmp.{}",
-            config.ext_override.as_deref().unwrap_or(lang)
-        ));
-
-        fs::write(&path, body)?;
-
-        defer! {
-            // No .expect() to save on format! call
-            fs::remove_file(&path).unwrap_or_else(|_| {
-                panic!("error removing \"{}\"! Remove it manually!", path.display())
-            });
-        }
-
-        match fs::create_dir(&self.args.out) {
-            Ok(()) => {}
-            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
-                fs::remove_dir_all(&self.args.out).context("error removing previous outdir")?;
+    fn compile_comptime(&self, info: CodeInfo) -> Result<JsEnv> {
+        struct NullWrite;
+        impl io::Write for NullWrite {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                Ok(buf.len())
             }
-            Err(err) => bail!(err),
-        }
-        let outdir = fs::canonicalize(&self.args.out).unwrap();
-
-        let python = self
-            .get_python()
-            .context("python not found in $PATH! Make sure to install it!")?;
-        let file_loc = match &config.script {
-            ScriptOrFile::File(file) => Cow::Owned(
-                fs::canonicalize(file.as_path())
-                    .context("error getting absolute path of script")?,
-            ),
-            ScriptOrFile::Script(script) => {
-                fs::write(dir.path().join("__tmp.py"), script)?;
-                Cow::Borrowed(Path::new("__tmp.py"))
-            }
-        };
-        // This defer! cannot be used in the above match statement, as it executes when a
-        // scope ends, and match arms have individual scopes
-        defer! {
-            if matches!(&config.script, ScriptOrFile::Script(_)) {
-                fs::remove_file(dir.path().join("__tmp.py")).expect("error removing \"__tmp.py\"! Remove it manually!");
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
             }
         }
 
-        let cache_path = if config.use_cache {
-            gen_cache(self.input_path)?
-        } else {
-            PathBuf::new()
-        };
-        // TODO: Output stuff
-        Command::new(python.as_ref())
-            .arg(file_loc.as_ref())
-            .env("DECOR_INPUT", &path)
-            .env("DECOR_OUT", &self.args.out)
-            .env("DECOR_OUT_DIR", &outdir)
-            .env("DECOR_EXPORTS", exports.iter().join(" "))
-            .env("DECOR_CACHE", &cache_path)
-            .env("DECOR_COMPTIME", "1")
-            .current_dir(dir.path())
-            .args(&self.args.build_args)
-            .output()?;
+        self.comptime.set(true);
+        self.compile(info, &mut NullWrite)?;
+        self.comptime.set(false);
 
-        if cache_path != Path::new("")
-            && fs::read_dir(&cache_path)
-                .context("error reading cache dir")?
-                .count()
-                == 0
-        {
-            fs::remove_dir(&cache_path).context("error removing cache dir - should be empty")?;
-        }
-
+        let outdir = fs::canonicalize(&self.args.out).expect("outdir should have been created");
         let wasm_path = fs::read_dir(&outdir)?
             .filter_map(|entry| entry.ok().map(|entry| entry.path()))
             .filter(|path| matches!(path.extension(), Some(ext) if ext == OsStr::new("wasm")))
