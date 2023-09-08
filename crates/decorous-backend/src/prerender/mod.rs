@@ -78,6 +78,21 @@ pub fn render(
     }
     out.write_all(&output.hoists)?;
 
+    if let Some(comptime) = component.comptime() {
+        match metadata.wasm_compiler.compile_comptime(crate::CodeInfo {
+            lang: comptime.lang(),
+            body: comptime.body(),
+            exports: component.exports(),
+        }) {
+            Ok(env) => {
+                for decl in env.items() {
+                    writeln!(out, "const {} = {};", decl.name, decl.value)?;
+                }
+            }
+            Err(_err) => todo!("error"),
+        }
+    }
+
     if !output.elements.is_empty() {
         // Write elements
         let elems = unsafe { String::from_utf8_unchecked(output.elements) };
