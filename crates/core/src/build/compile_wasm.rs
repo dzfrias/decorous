@@ -81,7 +81,12 @@ impl WasmCompiler for MainCompiler<'_> {
             config.ext_override.as_deref().unwrap_or(lang)
         ));
 
-        let spinner = Spinner::new(format!("Building WebAssembly ({lang})..."));
+        let msg = if !self.comptime.get() {
+            format!("Building WebAssembly ({lang})...")
+        } else {
+            format!("Building static WebAssembly ({lang})...")
+        };
+        let spinner = Spinner::new(msg);
 
         fs::write(&path, body)?;
 

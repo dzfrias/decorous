@@ -1,0 +1,26 @@
+---
+source: tests/tests.rs
+expression: all
+---
+
+---input.decor---
+---rust:static
+fn main() {
+    println!("{{ \"is_static\": true }}");
+}
+---
+
+---js
+console.log(is_static);
+---
+
+---out.html---
+
+---out.js---
+const is_static = true;
+function __init_ctx() {
+  console.log(is_static);
+  return [];
+}
+const ctx = __init_ctx();
+

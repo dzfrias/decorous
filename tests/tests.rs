@@ -351,3 +351,12 @@ decor_test!(
         insta::assert_snapshot!(filtered_stdout);
     }
 );
+
+decor_test!(
+    can_static_eval_code_blocks,
+    STATIC,
+    |dir: &mut TempDir, mut cmd: Command| {
+        cmd.assert().success();
+        assert_all!(dir.path());
+    }
+);

@@ -1,0 +1,9 @@
+---rust:static
+fn main() {
+    println!("{{ \"is_static\": true }}");
+}
+---
+
+---js
+console.log(is_static);
+---
