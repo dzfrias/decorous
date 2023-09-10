@@ -24,14 +24,18 @@ macro_rules! expect {
     ($self:expr, $kind:ident(_)) => {{
         $self.next_token();
         let TokenKind::$kind(binding) = $self.current_token.kind else {
-            todo!("error");
+            return Err($self.error_on_current(ParseErrorType::Expected(
+                TokenKind::$kind(Default::default()).display_kind(),
+            )));
         };
         Ok(binding)
     }};
     ($self:expr, $kind:ident) => {{
         $self.next_token();
         let TokenKind::$kind = $self.current_token.kind else {
-            todo!("error");
+            return Err(
+                $self.error_on_current(ParseErrorType::Expected(TokenKind::$kind.display_kind()))
+            );
         };
         Ok(())
     }};
@@ -72,7 +76,7 @@ impl<'src> Parser<'src> {
     fn expect_next_token(&mut self, expected: TokenKind) -> Result<()> {
         self.next_token();
         if self.current_token.kind != expected {
-            todo!("error");
+            return Err(self.error_on_current(ParseErrorType::Expected(expected.display_kind())));
         }
         Ok(())
     }
@@ -88,7 +92,13 @@ impl<'src> Parser<'src> {
             TokenKind::Mustache(_) => NodeType::Mustache(self.parse_mustache()?),
             TokenKind::Text(t) => NodeType::Text(Text(t)),
 
-            t => todo!("error, got: {t:?}"),
+            _ => {
+                return Err(self.error_on_current(ParseErrorType::ExpectedAny(&[
+                    "the beginning of an element",
+                    "a JavaScript expression",
+                    "plain text",
+                ])));
+            }
         };
         self.next_token();
 
@@ -135,11 +145,8 @@ impl<'src> Parser<'src> {
                 if end_name == tag_name {
                     break;
                 } else {
-                    return Err(ParseError::new(
-                        Location::new(self.current_offset(), self.current_token.loc.length()),
-                        ParseErrorType::InvalidClosingTag(tag_name.to_owned()),
-                        None,
-                    ));
+                    return Err(self
+                        .error_on_current(ParseErrorType::InvalidClosingTag(tag_name.to_owned())));
                 }
             }
         }
@@ -152,10 +159,10 @@ impl<'src> Parser<'src> {
             panic!("should be called with Mustache");
         };
 
-        self.js_expr(js_text).map(Mustache)
+        self.parse_js_expr(js_text).map(Mustache)
     }
 
-    fn js_expr(&self, js_text: &str) -> Result<SyntaxNode> {
+    fn parse_js_expr(&self, js_text: &str) -> Result<SyntaxNode> {
         let parse = rslint_parser::parse_expr(js_text, 0);
         if parse.errors().is_empty() {
             Ok(parse.syntax())
@@ -191,7 +198,11 @@ impl<'src> Parser<'src> {
             TokenKind::At => self.parse_event_handler(),
             TokenKind::Ident(_) => self.parse_generic_attr(),
             TokenKind::Colon => self.parse_binding(),
-            a => todo!("error, {a:?}"),
+            _ => Err(self.error_on_current(ParseErrorType::ExpectedAny(&[
+                "an attribute name",
+                "colon binding (i.e. `:bind:`)",
+                "event handler (i.e. `@event`)",
+            ]))),
         }
     }
 
@@ -204,7 +215,7 @@ impl<'src> Parser<'src> {
 
         Ok(Attribute::EventHandler(EventHandler::new(
             event,
-            self.js_expr(expr_text)?,
+            self.parse_js_expr(expr_text)?,
         )))
     }
 
@@ -227,9 +238,14 @@ impl<'src> Parser<'src> {
             }
             TokenKind::Mustache(mustache) => Attribute::KeyValue(
                 key,
-                Some(AttributeValue::JavaScript(self.js_expr(mustache)?)),
+                Some(AttributeValue::JavaScript(self.parse_js_expr(mustache)?)),
             ),
-            a => todo!("error, {a:?}"),
+            _ => {
+                return Err(self.error_on_current(ParseErrorType::ExpectedAny(&[
+                    "a quoted literal",
+                    "a JavaScript expression",
+                ])))
+            }
         };
 
         Ok(attr)
@@ -242,5 +258,9 @@ impl<'src> Parser<'src> {
         expect!(self, Colon)?;
 
         Ok(Attribute::Binding(bind))
+    }
+
+    fn error_on_current(&self, kind: ParseErrorType) -> ParseError<Location> {
+        ParseError::new(self.current_token.loc, kind, None)
     }
 }

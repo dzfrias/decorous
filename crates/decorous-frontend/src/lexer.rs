@@ -16,7 +16,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Token<'src> {
     pub kind: TokenKind<'src>,
     pub loc: Location,
@@ -226,4 +226,24 @@ fn span_to_loc(span: Span) -> Location {
 
 fn is_html_ident(c: char) -> bool {
     c.is_digit(36) || matches!(c, '-' | '_')
+}
+
+impl TokenKind<'_> {
+    pub fn display_kind(&self) -> &'static str {
+        match self {
+            TokenKind::Text(_) => "text",
+            TokenKind::ElemBegin(_) => "an element beginning",
+            TokenKind::ElemEnd(_) => "an element ending",
+            TokenKind::Mustache(_) => "a JavaScript expression",
+            TokenKind::Quotes(_) => "quoted text",
+            TokenKind::Ident(_) => "an identifier",
+            TokenKind::Lbracket => "a left bracket",
+            TokenKind::Rbracket => "a right bracket",
+            TokenKind::Colon => "a colon",
+            TokenKind::Equals => "an equals sign",
+            TokenKind::At => "an at symbol",
+            TokenKind::Invalid(_) => "INVALID",
+            TokenKind::Eof => "eof",
+        }
+    }
 }

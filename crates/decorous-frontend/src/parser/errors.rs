@@ -15,6 +15,10 @@ pub enum ParseErrorType {
     UnclosedTag(String),
     #[error("invalid character, expected {0}")]
     ExpectedCharacter(char),
+    #[error("expected {0}")]
+    Expected(&'static str),
+    #[error("expected {:?}", .0)]
+    ExpectedAny(&'static [&'static str]),
     #[error("invalid character, expected {0:?}, got {1}")]
     ExpectedCharacterAny(Vec<char>, char),
     #[error("expected closing tag. If you meant to escape the slash, use '\\/'")]
