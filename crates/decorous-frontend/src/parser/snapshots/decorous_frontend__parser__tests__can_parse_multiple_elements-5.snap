@@ -15,8 +15,6 @@ Ok(
                 metadata: Location {
                     offset: 0,
                     length: 8,
-                    line: 1,
-                    column: 1,
                 },
                 node_type: Element(
                     Element {
@@ -30,8 +28,6 @@ Ok(
                 metadata: Location {
                     offset: 8,
                     length: 9,
-                    line: 1,
-                    column: 9,
                 },
                 node_type: Comment(
                     Comment(

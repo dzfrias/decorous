@@ -27,8 +27,6 @@ Ok(
                     metadata: Location {
                         offset: 0,
                         length: 0,
-                        line: 0,
-                        column: 0,
                     },
                     node_type: Text(
                         Text(

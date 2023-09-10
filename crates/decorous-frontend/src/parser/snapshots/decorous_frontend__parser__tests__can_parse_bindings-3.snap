@@ -9,8 +9,6 @@ Ok(
                 metadata: Location {
                     offset: 0,
                     length: 33,
-                    line: 1,
-                    column: 1,
                 },
                 node_type: Element(
                     Element {

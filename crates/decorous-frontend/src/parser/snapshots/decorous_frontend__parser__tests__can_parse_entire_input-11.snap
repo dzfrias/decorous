@@ -9,8 +9,6 @@ Ok(
                 metadata: Location {
                     offset: 0,
                     length: 9,
-                    line: 1,
-                    column: 1,
                 },
                 node_type: Element(
                     Element {
@@ -21,8 +19,6 @@ Ok(
                                 metadata: Location {
                                     offset: 3,
                                     length: 3,
-                                    line: 1,
-                                    column: 4,
                                 },
                                 node_type: Text(
                                     Text(
@@ -38,8 +34,6 @@ Ok(
                 metadata: Location {
                     offset: 9,
                     length: 7,
-                    line: 1,
-                    column: 10,
                 },
                 node_type: Text(
                     Text(
@@ -51,8 +45,6 @@ Ok(
                 metadata: Location {
                     offset: 16,
                     length: 6,
-                    line: 1,
-                    column: 17,
                 },
                 node_type: Mustache(
                     Mustache(

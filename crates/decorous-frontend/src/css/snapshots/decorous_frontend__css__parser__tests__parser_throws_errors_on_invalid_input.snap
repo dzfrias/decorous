@@ -7,8 +7,6 @@ Err(
         fragment: Location {
             offset: 0,
             length: 1,
-            line: 1,
-            column: 0,
         },
         help: None,
         err_type: ExpectedMediaQueryName,

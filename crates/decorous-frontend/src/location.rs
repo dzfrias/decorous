@@ -6,17 +6,17 @@ use nom_locate::LocatedSpan;
 pub struct Location {
     offset: usize,
     length: usize,
-    line: u32,
-    column: usize,
 }
 
 impl Location {
+    pub fn new(offset: usize, length: usize) -> Self {
+        Self { offset, length }
+    }
+
     pub fn from_spans<'a>(span1: LocatedSpan<&'a str>, span2: LocatedSpan<&'a str>) -> Self {
         Self {
             offset: span1.location_offset(),
             length: span2.location_offset() - span1.location_offset(),
-            line: span1.location_line(),
-            column: span1.get_column(),
         }
     }
 
@@ -26,26 +26,8 @@ impl Location {
     /// # Panics
     ///
     /// Panics if the offset is greater than the length of the source code.
-    pub fn from_source(offset: usize, source: &str) -> Self {
-        if offset > source.len() {
-            panic!("offset should not be greater than source length");
-        }
-        let mut line = 1;
-        let mut col = 0;
-        for b in source.as_bytes().iter().take(offset) {
-            col += 1;
-            const NEWLINE: u8 = 0x0A;
-            if *b == NEWLINE {
-                line += 1;
-                col = 0;
-            }
-        }
-        Self {
-            offset,
-            length: 1,
-            line,
-            column: col,
-        }
+    pub fn from_source(offset: usize, _source: &str) -> Self {
+        Self { offset, length: 1 }
     }
 
     pub fn offset(&self) -> usize {
@@ -55,14 +37,6 @@ impl Location {
     pub fn length(&self) -> usize {
         self.length
     }
-
-    pub fn line(&self) -> u32 {
-        self.line
-    }
-
-    pub fn column(&self) -> usize {
-        self.column
-    }
 }
 
 impl<'a> From<LocatedSpan<&'a str>> for Location {
@@ -70,8 +44,15 @@ impl<'a> From<LocatedSpan<&'a str>> for Location {
         Self {
             offset: span.location_offset(),
             length: 1,
-            line: span.location_line(),
-            column: span.get_column(),
+        }
+    }
+}
+
+impl From<usize> for Location {
+    fn from(value: usize) -> Self {
+        Self {
+            offset: value,
+            length: 1,
         }
     }
 }
@@ -86,8 +67,6 @@ mod tests {
         let source = "hello world\nhi";
         assert_eq!(
             Location {
-                column: 2,
-                line: 2,
                 offset: 14,
                 length: 1
             },

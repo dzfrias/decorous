@@ -18,8 +18,6 @@ Ok(
                     metadata: Location {
                         offset: 4,
                         length: 1,
-                        line: 1,
-                        column: 5,
                     },
                     node_type: Text(
                         Text(

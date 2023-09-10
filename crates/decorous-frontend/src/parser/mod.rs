@@ -1,5 +1,6 @@
 mod code_blocks;
 pub mod errors;
+mod parser2;
 mod preprocessor;
 
 use std::{borrow::Cow, ops::Range, slice};

@@ -813,6 +813,7 @@ dependencies = [
 name = "decorous-frontend"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.4.0",
  "criterion",
  "decorous-errors",
  "harpoon",

@@ -11,8 +11,6 @@ Component {
                 location: Location {
                     offset: 68,
                     length: 3,
-                    line: 1,
-                    column: 69,
                 },
                 scope: None,
             },

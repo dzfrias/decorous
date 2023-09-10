@@ -10,8 +10,6 @@ expression: component.fragment_tree
             location: Location {
                 offset: 0,
                 length: 34,
-                line: 1,
-                column: 1,
             },
             scope: None,
         },
@@ -29,8 +27,6 @@ expression: component.fragment_tree
                             location: Location {
                                 offset: 5,
                                 length: 12,
-                                line: 1,
-                                column: 6,
                             },
                             scope: None,
                         },
@@ -48,8 +44,6 @@ expression: component.fragment_tree
                                             location: Location {
                                                 offset: 0,
                                                 length: 0,
-                                                line: 0,
-                                                column: 0,
                                             },
                                             scope: None,
                                         },
@@ -72,8 +66,6 @@ expression: component.fragment_tree
                             location: Location {
                                 offset: 17,
                                 length: 13,
-                                line: 1,
-                                column: 18,
                             },
                             scope: None,
                         },
@@ -91,8 +83,6 @@ expression: component.fragment_tree
                                             location: Location {
                                                 offset: 0,
                                                 length: 0,
-                                                line: 0,
-                                                column: 0,
                                             },
                                             scope: None,
                                         },

@@ -15,8 +15,6 @@ Ok(
                 metadata: Location {
                     offset: 0,
                     length: 8,
-                    line: 1,
-                    column: 1,
                 },
                 node_type: Element(
                     Element {
@@ -30,8 +28,6 @@ Ok(
                 metadata: Location {
                     offset: 8,
                     length: 16,
-                    line: 1,
-                    column: 9,
                 },
                 node_type: Element(
                     Element {
@@ -42,8 +38,6 @@ Ok(
                                 metadata: Location {
                                     offset: 13,
                                     length: 6,
-                                    line: 1,
-                                    column: 14,
                                 },
                                 node_type: Text(
                                     Text(
@@ -59,8 +53,6 @@ Ok(
                 metadata: Location {
                     offset: 24,
                     length: 5,
-                    line: 1,
-                    column: 25,
                 },
                 node_type: Text(
                     Text(

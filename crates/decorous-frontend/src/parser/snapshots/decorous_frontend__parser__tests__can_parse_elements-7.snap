@@ -18,8 +18,6 @@ Ok(
                     metadata: Location {
                         offset: 5,
                         length: 10,
-                        line: 1,
-                        column: 6,
                     },
                     node_type: Element(
                         Element {
