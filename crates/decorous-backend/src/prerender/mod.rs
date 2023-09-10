@@ -89,7 +89,7 @@ pub fn render(
                     writeln!(out, "const {} = {};", decl.name, decl.value)?;
                 }
             }
-            Err(_err) => todo!("error"),
+            Err(err) => todo!("error: {err}"),
         }
     }
 
