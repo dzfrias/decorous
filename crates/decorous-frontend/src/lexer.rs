@@ -33,6 +33,7 @@ pub enum TokenKind<'src> {
     SpecialBlockEnd(&'src str),
     SpecialExtender(&'src str),
     Mustache(&'src str),
+    Comment(&'src str),
 
     Rbrace,
     Quotes(&'src str),
@@ -80,6 +81,7 @@ impl<'src> Lexer<'src> {
 
         let tok = match self.harpoon.peek() {
             Some('#') => return self.consume_elem(),
+            Some('/') if self.harpoon.peek_equals("//") => self.consume_comment(),
             Some('/') => return self.consume_elem_end(),
             Some('{') if self.harpoon.peek_equals("{#") => self.consume_special_block_start(),
             Some('{') if self.harpoon.peek_equals("{/") => self.consume_special_block_end(),
@@ -277,6 +279,18 @@ impl<'src> Lexer<'src> {
             loc: span_to_loc(name),
         }
     }
+
+    fn consume_comment(&mut self) -> Token<'src> {
+        debug_assert_eq!(Some('/'), self.harpoon.consume());
+        debug_assert_eq!(Some('/'), self.harpoon.consume());
+
+        let comment = self.harpoon.harpoon(|h| h.consume_while(|c| c != '\n'));
+
+        Token {
+            kind: TokenKind::Comment(comment.text()),
+            loc: span_to_loc(comment),
+        }
+    }
 }
 
 impl<'src> Iterator for Lexer<'src> {
@@ -317,6 +331,7 @@ impl TokenKind<'_> {
             TokenKind::SpecialExtender(_) => "a special block extender",
             TokenKind::SpecialBlockEnd(_) => "the end of a special block",
             TokenKind::Rbrace => "an rbrace",
+            TokenKind::Comment(_) => "a comment",
             TokenKind::Invalid(_) => "INVALID",
             TokenKind::Eof => "eof",
         }

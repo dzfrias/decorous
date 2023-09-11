@@ -4,8 +4,8 @@ use rslint_parser::SyntaxNode;
 
 use crate::{
     ast::{
-        Attribute, AttributeValue, DecorousAst, Element, EventHandler, ForBlock, IfBlock, Mustache,
-        Node, NodeType, SpecialBlock, Text, UseBlock,
+        Attribute, AttributeValue, Comment, DecorousAst, Element, EventHandler, ForBlock, IfBlock,
+        Mustache, Node, NodeType, SpecialBlock, Text, UseBlock,
     },
     errors::{ParseError, ParseErrorType},
     lexer::{Allowed, Lexer, Token, TokenKind},
@@ -96,6 +96,7 @@ impl<'src> Parser<'src> {
             TokenKind::Mustache(_) => NodeType::Mustache(self.parse_mustache()?),
             TokenKind::SpecialBlockStart(_) => NodeType::SpecialBlock(self.parse_special_block()?),
             TokenKind::Text(t) => NodeType::Text(Text(t)),
+            TokenKind::Comment(comment) => NodeType::Comment(Comment(comment)),
 
             _ => {
                 return Err(self.error_on_current(ParseErrorType::ExpectedAny(&[
