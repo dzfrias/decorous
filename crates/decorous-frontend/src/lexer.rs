@@ -13,6 +13,8 @@ bitflags! {
         const RBRACKET = 0b00000100;
         const EQUALS   = 0b00001000;
         const AT       = 0b00010000;
+        const QUOTES   = 0b00100000;
+        const IN       = 0b01000000;
     }
 }
 
@@ -27,15 +29,20 @@ pub enum TokenKind<'src> {
     Text(&'src str),
     ElemBegin(&'src str),
     ElemEnd(&'src str),
+    SpecialBlockStart(&'src str),
+    SpecialBlockEnd(&'src str),
+    SpecialExtender(&'src str),
     Mustache(&'src str),
+
+    Rbrace,
     Quotes(&'src str),
     Ident(&'src str),
-
     Lbracket,
     Rbracket,
     Colon,
     Equals,
     At,
+    In,
 
     Invalid(char),
     Eof,
@@ -74,6 +81,9 @@ impl<'src> Lexer<'src> {
         let tok = match self.harpoon.peek() {
             Some('#') => return self.consume_elem(),
             Some('/') => return self.consume_elem_end(),
+            Some('{') if self.harpoon.peek_equals("{#") => self.consume_special_block_start(),
+            Some('{') if self.harpoon.peek_equals("{/") => self.consume_special_block_end(),
+            Some('{') if self.harpoon.peek_equals("{:") => self.consume_special_extender(),
             Some('{') => return self.consume_mustache(),
             Some(':') if self.allowed.intersects(Allowed::COLON) => {
                 token1!(Colon, self.harpoon.offset())
@@ -89,6 +99,25 @@ impl<'src> Lexer<'src> {
         self.harpoon.consume();
 
         tok
+    }
+
+    pub fn text_until(&mut self, until: char) -> Token<'src> {
+        let span = self.harpoon.harpoon(|h| h.consume_while(|c| c != until));
+        // Consume the `until` char
+        self.harpoon.consume();
+
+        Token {
+            kind: TokenKind::Text(span.text()),
+            loc: span_to_loc(span),
+        }
+    }
+
+    pub fn allow(&mut self, allow: Allowed) {
+        self.allowed |= allow;
+    }
+
+    pub fn disallow_all(&mut self) {
+        self.allowed = Allowed::empty();
     }
 
     pub fn peek_token(&mut self) -> Token<'src> {
@@ -120,6 +149,10 @@ impl<'src> Lexer<'src> {
         self.harpoon.consume_while(|c| c.is_whitespace());
 
         let tok = match self.harpoon.peek() {
+            Some('i') if self.harpoon.peek_equals("in") && self.allowed.intersects(Allowed::IN) => {
+                self.harpoon.consume();
+                token1!(In, self.harpoon.offset())
+            }
             Some(c) if c.is_alphabetic() => return self.consume_ident(),
             Some('{') => return self.consume_mustache(),
             Some('"') => return self.consume_quotes(),
@@ -127,6 +160,7 @@ impl<'src> Lexer<'src> {
             Some(':') => token1!(Colon, self.harpoon.offset()),
             Some('@') => token1!(At, self.harpoon.offset()),
             Some(']') => token1!(Rbracket, self.harpoon.offset()),
+            Some('}') => token1!(Rbrace, self.harpoon.offset()),
 
             Some(c) => Token {
                 kind: TokenKind::Invalid(c),
@@ -207,6 +241,42 @@ impl<'src> Lexer<'src> {
             loc: span_to_loc(contents),
         }
     }
+
+    fn consume_special_block_start(&mut self) -> Token<'src> {
+        debug_assert_eq!(Some('{'), self.harpoon.consume());
+        debug_assert_eq!(Some('#'), self.harpoon.consume());
+
+        let name = self.harpoon.harpoon(|h| h.consume_while(is_html_ident));
+
+        Token {
+            kind: TokenKind::SpecialBlockStart(name.text()),
+            loc: span_to_loc(name),
+        }
+    }
+
+    fn consume_special_block_end(&mut self) -> Token<'src> {
+        debug_assert_eq!(Some('{'), self.harpoon.consume());
+        debug_assert_eq!(Some('/'), self.harpoon.consume());
+
+        let name = self.harpoon.harpoon(|h| h.consume_while(is_html_ident));
+
+        Token {
+            kind: TokenKind::SpecialBlockEnd(name.text()),
+            loc: span_to_loc(name),
+        }
+    }
+
+    fn consume_special_extender(&mut self) -> Token<'src> {
+        debug_assert_eq!(Some('{'), self.harpoon.consume());
+        debug_assert_eq!(Some(':'), self.harpoon.consume());
+
+        let name = self.harpoon.harpoon(|h| h.consume_while(is_html_ident));
+
+        Token {
+            kind: TokenKind::SpecialExtender(name.text()),
+            loc: span_to_loc(name),
+        }
+    }
 }
 
 impl<'src> Iterator for Lexer<'src> {
@@ -235,6 +305,7 @@ impl TokenKind<'_> {
             TokenKind::ElemBegin(_) => "an element beginning",
             TokenKind::ElemEnd(_) => "an element ending",
             TokenKind::Mustache(_) => "a JavaScript expression",
+            TokenKind::In => "the in keyword",
             TokenKind::Quotes(_) => "quoted text",
             TokenKind::Ident(_) => "an identifier",
             TokenKind::Lbracket => "a left bracket",
@@ -242,6 +313,10 @@ impl TokenKind<'_> {
             TokenKind::Colon => "a colon",
             TokenKind::Equals => "an equals sign",
             TokenKind::At => "an at symbol",
+            TokenKind::SpecialBlockStart(_) => "the start of a special block",
+            TokenKind::SpecialExtender(_) => "a special block extender",
+            TokenKind::SpecialBlockEnd(_) => "the end of a special block",
+            TokenKind::Rbrace => "an rbrace",
             TokenKind::Invalid(_) => "INVALID",
             TokenKind::Eof => "eof",
         }

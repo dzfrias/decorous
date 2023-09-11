@@ -11,6 +11,8 @@ use crate::{css, location::Location, PreprocessError};
 pub enum ParseErrorType {
     #[error("invalid closing tag, expected {0}")]
     InvalidClosingTag(String),
+    #[error("invalid extender, expected {0}")]
+    InvalidExtender(&'static str),
     #[error("unclosed tag: {0}")]
     UnclosedTag(String),
     #[error("invalid character, expected {0}")]

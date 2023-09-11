@@ -4,8 +4,8 @@ use rslint_parser::SyntaxNode;
 
 use crate::{
     ast::{
-        Attribute, AttributeValue, DecorousAst, Element, EventHandler, Mustache, Node, NodeType,
-        Text,
+        Attribute, AttributeValue, DecorousAst, Element, EventHandler, ForBlock, IfBlock, Mustache,
+        Node, NodeType, SpecialBlock, Text, UseBlock,
     },
     errors::{ParseError, ParseErrorType},
     lexer::{Allowed, Lexer, Token, TokenKind},
@@ -81,6 +81,10 @@ impl<'src> Parser<'src> {
         Ok(())
     }
 
+    fn error_on_current(&self, kind: ParseErrorType) -> ParseError<Location> {
+        ParseError::new(self.current_token.loc, kind, None)
+    }
+
     fn current_offset(&self) -> usize {
         self.current_token.loc.offset()
     }
@@ -90,6 +94,7 @@ impl<'src> Parser<'src> {
         let ty = match self.current_token.kind {
             TokenKind::ElemBegin(_) => NodeType::Element(self.parse_elem()?),
             TokenKind::Mustache(_) => NodeType::Mustache(self.parse_mustache()?),
+            TokenKind::SpecialBlockStart(_) => NodeType::SpecialBlock(self.parse_special_block()?),
             TokenKind::Text(t) => NodeType::Text(Text(t)),
 
             _ => {
@@ -260,7 +265,119 @@ impl<'src> Parser<'src> {
         Ok(Attribute::Binding(bind))
     }
 
-    fn error_on_current(&self, kind: ParseErrorType) -> ParseError<Location> {
-        ParseError::new(self.current_token.loc, kind, None)
+    fn parse_special_block(&mut self) -> Result<SpecialBlock<'src, Location>> {
+        let TokenKind::SpecialBlockStart(block_name) = self.current_token.kind else {
+            panic!("should only call with SpecialBlockStart");
+        };
+
+        let block = match block_name {
+            "for" => SpecialBlock::For(self.parse_for_block()?),
+            "if" => SpecialBlock::If(self.parse_if_block()?),
+            "use" => SpecialBlock::Use(self.parse_use_block()?),
+            _ => {
+                return Err(self.error_on_current(ParseErrorType::ExpectedAny(&[
+                    "a for block",
+                    "an if block",
+                    "a use block",
+                ])))
+            }
+        };
+
+        Ok(block)
+    }
+
+    fn parse_for_block(&mut self) -> Result<ForBlock<'src, Location>> {
+        self.lexer.attrs_mode(true);
+        let binding = expect!(self, Ident(_))?;
+        self.lexer.allow(Allowed::IN);
+        expect!(self, In)?;
+        self.lexer.attrs_mode(false);
+
+        let text = self.lexer.text_until('}');
+        let TokenKind::Text(js_text) = text.kind else {
+            panic!("text_until should return a text token");
+        };
+        self.next_token();
+        let iterator = self.parse_js_expr(js_text)?;
+
+        let mut inner = vec![];
+        loop {
+            let node = self.parse_node()?;
+            inner.push(node);
+
+            match self.current_token.kind {
+                TokenKind::SpecialBlockEnd(end_name) if end_name == "for" => break,
+                TokenKind::SpecialBlockEnd(_) => {
+                    return Err(
+                        self.error_on_current(ParseErrorType::InvalidClosingTag("for".to_owned()))
+                    )
+                }
+                _ => {}
+            }
+        }
+
+        Ok(ForBlock::new(binding, None, iterator, inner))
+    }
+
+    fn parse_if_block(&mut self) -> Result<IfBlock<'src, Location>> {
+        let text = self.lexer.text_until('}');
+        let TokenKind::Text(js_text) = text.kind else {
+            panic!("text_until should return a text token");
+        };
+        self.next_token();
+        let condition = self.parse_js_expr(js_text)?;
+
+        let mut inner = vec![];
+        loop {
+            let node = self.parse_node()?;
+            inner.push(node);
+
+            match self.current_token.kind {
+                TokenKind::SpecialBlockEnd(end_name) if end_name == "if" => break,
+                TokenKind::SpecialExtender(extender) if extender == "else" => break,
+                TokenKind::SpecialBlockEnd(_) => {
+                    return Err(
+                        self.error_on_current(ParseErrorType::InvalidClosingTag("if".to_owned()))
+                    )
+                }
+                TokenKind::SpecialExtender(_) => {
+                    return Err(self.error_on_current(ParseErrorType::InvalidExtender("else")))
+                }
+                _ => {}
+            }
+        }
+
+        let else_block = if matches!(self.current_token.kind, TokenKind::SpecialExtender(_)) {
+            self.next_token();
+            let mut inner = vec![];
+            loop {
+                let node = self.parse_node()?;
+                inner.push(node);
+
+                match self.current_token.kind {
+                    TokenKind::SpecialBlockEnd(end_name) if end_name == "if" => break,
+                    TokenKind::SpecialBlockEnd(_) => {
+                        return Err(self
+                            .error_on_current(ParseErrorType::InvalidClosingTag("if".to_owned())))
+                    }
+                    _ => {}
+                }
+            }
+
+            Some(inner)
+        } else {
+            None
+        };
+
+        Ok(IfBlock::new(condition, inner, else_block))
+    }
+
+    fn parse_use_block(&mut self) -> Result<UseBlock<'src>> {
+        self.lexer.attrs_mode(true);
+        let path = expect!(self, Quotes(_))?;
+        expect!(self, Rbrace)?;
+        self.lexer.attrs_mode(false);
+
+        Ok(UseBlock::new(path))
     }
 }
