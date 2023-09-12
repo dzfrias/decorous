@@ -110,12 +110,13 @@ impl<'src> Lexer<'src> {
         let first = until.chars().next().expect("`until` be length one or more");
         let span = self.harpoon.harpoon(|h| loop {
             h.consume_while(|c| c != first);
-            if h.try_consume("---") || h.peek().is_none() {
+            if h.try_consume(until) || h.peek().is_none() {
                 break;
             }
+            h.consume();
         });
 
-        span.text().strip_suffix("---").unwrap_or(span.text())
+        span.text().strip_suffix(until).unwrap_or(span.text())
     }
 
     pub fn text_until(&mut self, until: char) -> &'src str {

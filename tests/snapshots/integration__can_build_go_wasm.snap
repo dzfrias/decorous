@@ -23,8 +23,9 @@ IGNORED
 IGNORED
 
 ---out.html---
-<h1>Hello!</h1>
 
+
+<h1>Hello!</h1>
 ---out.js---
 import "./out/wasm_exec.js";
 const go = new Go();

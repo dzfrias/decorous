@@ -12,8 +12,9 @@ expression: all
   </head>
   <body>
     <script type="module" src="out.js"></script>
-    <p>Hi</p>
+    
 
+<p>Hi</p>
   </body>
 </html>
 

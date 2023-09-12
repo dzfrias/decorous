@@ -7,15 +7,12 @@ function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
 const e1 = document.createTextNode(ctx[0]);
-const e2 = document.createTextNode(" ");
 mount(target, e1, anchor);
-mount(target, e2, anchor);
 return {
 u(dirty) {
 },
 d() {
 e1.parentNode.removeChild(e1);
-e2.parentNode.removeChild(e2);
 }
 };
 }

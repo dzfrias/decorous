@@ -5,16 +5,12 @@ expression: ast
 Err(
     ParseError {
         fragment: Location {
-            offset: 4,
-            length: 1,
+            offset: 1,
+            length: 3,
         },
         help: None,
-        err_type: ExpectedAny(
-            [
-                "the beginning of an element",
-                "a JavaScript expression",
-                "plain text",
-            ],
+        err_type: UnclosedTag(
+            "div",
         ),
     },
 )

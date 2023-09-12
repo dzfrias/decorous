@@ -182,12 +182,13 @@ export function add(a: number, b: number): number;
   ]
 }
 ---out.html---
-<button id="0">Hello!</button>
 
+
+<button id="1">Hello!</button>
 ---out.js---
 import init, * as wasm from "/out/__tmp.js";
 await init();
-const elems = {"0": document.getElementById("0"), }
+const elems = {"1": document.getElementById("1"), }
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);
@@ -195,7 +196,7 @@ function replace(node) {
 }
 function __init_ctx() {
   let __closure0 = () => console.log(wasm.add(1, 2));
-  elems["0"].addEventListener("click", () => console.log(wasm.add(1, 2)));
+  elems["1"].addEventListener("click", () => console.log(wasm.add(1, 2)));
   return [__closure0];
 }
 const ctx = __init_ctx();

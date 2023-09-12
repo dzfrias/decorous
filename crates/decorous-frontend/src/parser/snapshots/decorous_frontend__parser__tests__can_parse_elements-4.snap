@@ -5,16 +5,10 @@ expression: ast
 Err(
     ParseError {
         fragment: Location {
-            offset: 30,
+            offset: 4,
             length: 1,
         },
         help: None,
-        err_type: ExpectedAny(
-            [
-                "an attribute name",
-                "colon binding (i.e. `:bind`)",
-                "event handler (i.e. `@event`)",
-            ],
-        ),
+        err_type: UnclosedAttrs,
     },
 )

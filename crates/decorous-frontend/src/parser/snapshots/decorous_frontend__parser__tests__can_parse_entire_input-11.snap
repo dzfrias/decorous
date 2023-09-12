@@ -33,7 +33,7 @@ Ok(
             Node {
                 metadata: Location {
                     offset: 8,
-                    length: 9,
+                    length: 8,
                 },
                 node_type: Text(
                     Text(
@@ -43,13 +43,14 @@ Ok(
             },
             Node {
                 metadata: Location {
-                    offset: 17,
-                    length: 5,
+                    offset: 16,
+                    length: 6,
                 },
                 node_type: Mustache(
                     Mustache(
-                        NAME_REF@0..4
-                          IDENT@0..4 "name"
+                        EXPR_STMT@0..4
+                          NAME_REF@0..4
+                            IDENT@0..4 "name"
                         ,
                     ),
                 ),

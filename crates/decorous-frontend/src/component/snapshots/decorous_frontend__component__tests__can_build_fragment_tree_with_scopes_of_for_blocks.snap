@@ -18,20 +18,20 @@ expression: component.fragment_tree
                 ForBlock {
                     binding: "i",
                     index: None,
-                    expr: ARRAY_EXPR@0..10
-                      WHITESPACE@0..1 " "
-                      L_BRACK@1..2 "["
-                      LITERAL@2..3
-                        NUMBER@2..3 "1"
-                      COMMA@3..4 ","
-                      WHITESPACE@4..5 " "
-                      LITERAL@5..6
-                        NUMBER@5..6 "2"
-                      COMMA@6..7 ","
-                      WHITESPACE@7..8 " "
-                      LITERAL@8..9
-                        NUMBER@8..9 "3"
-                      R_BRACK@9..10 "]"
+                    expr: EXPR_STMT@1..10
+                      ARRAY_EXPR@1..10
+                        L_BRACK@1..2 "["
+                        LITERAL@2..3
+                          NUMBER@2..3 "1"
+                        COMMA@3..4 ","
+                        WHITESPACE@4..5 " "
+                        LITERAL@5..6
+                          NUMBER@5..6 "2"
+                        COMMA@6..7 ","
+                        WHITESPACE@7..8 " "
+                        LITERAL@8..9
+                          NUMBER@8..9 "3"
+                        R_BRACK@9..10 "]"
                     ,
                     inner: [
                         Node {

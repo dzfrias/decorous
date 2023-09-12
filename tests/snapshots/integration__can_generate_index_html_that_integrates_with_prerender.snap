@@ -12,11 +12,8 @@ expression: all
   </head>
   <body>
     <script type="module" src="out.js"></script>
-    <h1>This is a page</h1>
-
-<div class="green"><p>Hello, my name is <em class="red">Diego!</em></p>
-</div>
-
+    <h1>This is a page</h1><div class="green">
+  <p>Hello, my name is <em class="red">Diego!</em></p></div>
   </body>
 </html>
 

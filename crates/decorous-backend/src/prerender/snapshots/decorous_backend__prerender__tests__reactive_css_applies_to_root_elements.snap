@@ -16,7 +16,7 @@ __update(dirty, true);
 dirty.fill(0);
 
 ---
-<div class="decor-0" id="0"><p class="decor-0">Hello </p></div>
+<div class="decor-0" id="0"><p class="decor-0">Hello</p></div>
 ---
 p.decor-0 {
   color: var(--decor-0);

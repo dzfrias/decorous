@@ -49,7 +49,7 @@ expression: component.fragment_tree
                                         },
                                         node_type: Text(
                                             Text(
-                                                "hello ",
+                                                "hello",
                                             ),
                                         ),
                                     },
@@ -88,7 +88,7 @@ expression: component.fragment_tree
                                         },
                                         node_type: Text(
                                             Text(
-                                                "hello2 ",
+                                                "hello2",
                                             ),
                                         ),
                                     },

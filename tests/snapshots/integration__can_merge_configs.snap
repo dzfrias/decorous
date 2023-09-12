@@ -30,10 +30,11 @@ p.decor-0 span.decor-0 {
 }
 
 ---out.html---
-<p class="decor-0"><span id="1"></span>! <span class="decor-0">span! </span></p>
 
+
+<p class="decor-0"><span id="2"></span>! <span class="decor-0">span!</span></p>
 ---out.js---
-const elems = {"1": replace(document.getElementById("1")), }
+const elems = {"2": replace(document.getElementById("2")), }
 function replace(node) {
   const text = document.createTextNode("");
   node.replaceWith(text);
@@ -45,7 +46,7 @@ function __init_ctx() {
 }
 const ctx = __init_ctx();
 function __update(dirty, initial) {
-  if (initial) elems[1].data = x;
+  if (initial) elems[2].data = x;
 }
 dirty.fill(255);
 __update(dirty, true);

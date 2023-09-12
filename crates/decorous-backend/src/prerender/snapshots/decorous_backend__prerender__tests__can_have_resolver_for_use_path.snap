@@ -16,4 +16,4 @@ function __init_ctx() {
 const ctx = __init_ctx();
 
 ---
- <p>Hello </p><span id="4"></span>
+ <p>Hello</p><span id="4"></span>

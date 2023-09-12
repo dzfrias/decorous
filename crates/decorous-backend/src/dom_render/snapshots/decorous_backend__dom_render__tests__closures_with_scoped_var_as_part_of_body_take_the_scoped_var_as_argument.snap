@@ -17,7 +17,7 @@ function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
 const e1 = document.createElement("button");
-e1.textContent = "Click ";
+e1.textContent = "Click";
 const arg0 = ctx[0];
 e1.addEventListener("click", (...args) => ctx[1](arg0, ...args));
 mount(target, e1, anchor);

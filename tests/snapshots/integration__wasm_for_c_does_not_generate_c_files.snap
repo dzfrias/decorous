@@ -22,8 +22,9 @@ IGNORED
 COULD NOT BE READ: stream did not contain valid UTF-8
 
 ---out.html---
-<h1>Hello!</h1>
 
+
+<h1>Hello!</h1>
 ---out.js---
 import init from "./out/__tmp.js";
 let wasm = await init();

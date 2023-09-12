@@ -17,13 +17,14 @@ Ok(
                         children: [
                             Node {
                                 metadata: Location {
-                                    offset: 27,
-                                    length: 2,
+                                    offset: 26,
+                                    length: 3,
                                 },
                                 node_type: Mustache(
                                     Mustache(
-                                        NAME_REF@0..1
-                                          IDENT@0..1 "x"
+                                        EXPR_STMT@0..1
+                                          NAME_REF@0..1
+                                            IDENT@0..1 "x"
                                         ,
                                     ),
                                 ),

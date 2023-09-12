@@ -207,7 +207,7 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
                 tag_name,
                 attrs,
                 vec![Node::new(
-                    NodeType::Text(Text(text)),
+                    NodeType::Text(Text(text.trim_end())),
                     Location::new(loc, text.len()),
                 )],
             ));
@@ -249,9 +249,12 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
     }
 
     fn parse_js_expr(&self, js_text: &str) -> Result<SyntaxNode> {
-        let parse = rslint_parser::parse_expr(js_text, 0);
+        let parse = rslint_parser::parse_module(js_text, 0);
         if parse.errors().is_empty() {
-            Ok(parse.syntax())
+            Ok(parse
+                .syntax()
+                .first_child()
+                .map_or(parse.syntax(), |child| child))
         } else {
             let error = parse.ok().expect_err("should have errors").swap_remove(0);
             let range = error.primary.unwrap().span.range;
@@ -318,7 +321,7 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
     }
 
     fn parse_attr(&mut self) -> Result<Attribute<'src>> {
-        match dbg!(self.current_token).kind {
+        match self.current_token.kind {
             TokenKind::At => self.parse_event_handler(),
             TokenKind::Ident(_) => self.parse_generic_attr(),
             TokenKind::Colon => self.parse_binding(),

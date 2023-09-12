@@ -23,29 +23,29 @@ function create_main_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
-const e0 = document.createElement("p");
-const e1 = document.createTextNode("The counter is: ");
-const e2 = document.createTextNode(ctx[0]);
-const e3 = document.createTextNode(" ");
-const e4 = document.createElement("button");
-e4.textContent = "Click me!";
-e4.addEventListener("click", ctx[1])
-const e6 = document.createTextNode(" ");
-e0.appendChild(e1);
-e0.appendChild(e2);
+const e0 = document.createTextNode("\n\n");
+const e1 = document.createElement("p");
+const e2 = document.createTextNode("The counter is: ");
+const e3 = document.createTextNode(ctx[0]);
+const e4 = document.createTextNode(" ");
+const e5 = document.createElement("button");
+e5.textContent = "Click me!";
+e5.addEventListener("click", ctx[1])
 mount(target, e0, anchor);
-mount(target, e3, anchor);
+e1.appendChild(e2);
+e1.appendChild(e3);
+mount(target, e1, anchor);
 mount(target, e4, anchor);
-mount(target, e6, anchor);
+mount(target, e5, anchor);
 return {
 u(dirty) {
-if (dirty[0] & 1) e2.data = ctx[0];
+if (dirty[0] & 1) e3.data = ctx[0];
 },
 d() {
 e0.parentNode.removeChild(e0);
-e3.parentNode.removeChild(e3);
+e1.parentNode.removeChild(e1);
 e4.parentNode.removeChild(e4);
-e6.parentNode.removeChild(e6);
+e5.parentNode.removeChild(e5);
 }
 };
 }

@@ -5,8 +5,8 @@ expression: ast
 Err(
     ParseError {
         fragment: Location {
-            offset: 18,
-            length: 5,
+            offset: 17,
+            length: 7,
         },
         help: None,
         err_type: Expected(

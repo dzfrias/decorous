@@ -7,7 +7,7 @@ function create_0_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
-const e1 = document.createTextNode("wow ");
+const e1 = document.createTextNode("wow");
 mount(target, e1, anchor);
 return {
 u(dirty) {
@@ -21,7 +21,7 @@ function create_0_else_block(target, anchor) {
 function mount(target, newNode, anchor) {
 target.insertBefore(newNode, anchor || null);
 }
-const e2 = document.createTextNode("wow!! ");
+const e2 = document.createTextNode("wow!!");
 mount(target, e2, anchor);
 return {
 u(dirty) {

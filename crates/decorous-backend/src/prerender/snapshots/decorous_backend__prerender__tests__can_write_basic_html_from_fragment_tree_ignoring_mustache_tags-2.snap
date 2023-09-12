@@ -16,4 +16,4 @@ __update(dirty, true);
 dirty.fill(0);
 
 ---
-<div><p>Hi</p>Hello, <span id="4"></span></div>
+<div><p>Hi</p> Hello, <span id="4"></span></div>

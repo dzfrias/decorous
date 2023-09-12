@@ -9,15 +9,16 @@ Component {
                 id: 0,
                 parent_id: None,
                 location: Location {
-                    offset: 69,
-                    length: 2,
+                    offset: 68,
+                    length: 3,
                 },
                 scope: None,
             },
             node_type: Mustache(
                 Mustache(
-                    NAME_REF@0..1
-                      IDENT@0..1 "z"
+                    EXPR_STMT@0..1
+                      NAME_REF@0..1
+                        IDENT@0..1 "z"
                     ,
                 ),
             ),

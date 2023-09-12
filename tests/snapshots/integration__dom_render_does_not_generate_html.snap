@@ -22,24 +22,18 @@ target.insertBefore(newNode, anchor || null);
 }
 const e0 = document.createElement("h1");
 e0.textContent = "This is a page";
-const e2 = document.createTextNode("\n\n");
-const e3 = document.createElement("div");
-e3.innerHTML = `<p >  Hello, my name is   <em class="red">  Diego!</em></p>
-`;
-e3.setAttribute("class", "green")
-const e9 = document.createTextNode(" ");
+const e2 = document.createElement("div");
+e2.innerHTML = `
+  <p >  Hello, my name is   <em class="red">  Diego!</em></p>`;
+e2.setAttribute("class", "green")
 mount(target, e0, anchor);
 mount(target, e2, anchor);
-mount(target, e3, anchor);
-mount(target, e9, anchor);
 return {
 u(dirty) {
 },
 d() {
 e0.parentNode.removeChild(e0);
 e2.parentNode.removeChild(e2);
-e3.parentNode.removeChild(e3);
-e9.parentNode.removeChild(e9);
 }
 };
 }

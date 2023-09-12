@@ -369,7 +369,11 @@ impl<'a> Component<'a> {
                 for attr in elem.attrs() {
                     match attr {
                         Attribute::EventHandler(handler) => {
-                            if let Some(arrow_expr) = handler.expr().try_to::<ArrowExpr>() {
+                            if let Some(arrow_expr) = handler
+                                .expr()
+                                .first_child()
+                                .and_then(|child| child.try_to::<ArrowExpr>())
+                            {
                                 self.declared_vars.insert_arrow_expr(arrow_expr, scope);
                             }
                         }

@@ -14,7 +14,7 @@ target.insertBefore(newNode, anchor || null);
 }
 const e1 = document.createTextNode(" ");
 const e2 = document.createElement("p");
-e2.textContent = "Hello ";
+e2.textContent = "Hello";
 const e4_anchor = document.createTextNode("");
 mount(target, e1, anchor);
 mount(target, e2, anchor);
