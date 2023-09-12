@@ -1,6 +1,6 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: parse(input.into())
+expression: ast
 ---
 Ok(
     DecorousAst {
@@ -12,7 +12,7 @@ Ok(
             Code {
                 lang: "js",
                 body: " console.log(\"hello\"); ",
-                offset: 12,
+                offset: 2,
                 comptime: true,
             },
         ),

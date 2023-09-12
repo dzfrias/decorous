@@ -8,8 +8,8 @@ expression: component.fragment_tree
             id: 0,
             parent_id: None,
             location: Location {
-                offset: 0,
-                length: 44,
+                offset: 2,
+                length: 42,
             },
             scope: None,
         },
@@ -18,20 +18,20 @@ expression: component.fragment_tree
                 ForBlock {
                     binding: "i",
                     index: None,
-                    expr: EXPR_STMT@0..9
-                      ARRAY_EXPR@0..9
-                        L_BRACK@0..1 "["
-                        LITERAL@1..2
-                          NUMBER@1..2 "1"
-                        COMMA@2..3 ","
-                        WHITESPACE@3..4 " "
-                        LITERAL@4..5
-                          NUMBER@4..5 "2"
-                        COMMA@5..6 ","
-                        WHITESPACE@6..7 " "
-                        LITERAL@7..8
-                          NUMBER@7..8 "3"
-                        R_BRACK@8..9 "]"
+                    expr: ARRAY_EXPR@0..10
+                      WHITESPACE@0..1 " "
+                      L_BRACK@1..2 "["
+                      LITERAL@2..3
+                        NUMBER@2..3 "1"
+                      COMMA@3..4 ","
+                      WHITESPACE@4..5 " "
+                      LITERAL@5..6
+                        NUMBER@5..6 "2"
+                      COMMA@6..7 ","
+                      WHITESPACE@7..8 " "
+                      LITERAL@8..9
+                        NUMBER@8..9 "3"
+                      R_BRACK@9..10 "]"
                     ,
                     inner: [
                         Node {
@@ -41,8 +41,8 @@ expression: component.fragment_tree
                                     0,
                                 ),
                                 location: Location {
-                                    offset: 22,
-                                    length: 16,
+                                    offset: 23,
+                                    length: 14,
                                 },
                                 scope: Some(
                                     0,
@@ -60,8 +60,8 @@ expression: component.fragment_tree
                                                     1,
                                                 ),
                                                 location: Location {
-                                                    offset: 27,
-                                                    length: 6,
+                                                    offset: 26,
+                                                    length: 8,
                                                 },
                                                 scope: Some(
                                                     0,

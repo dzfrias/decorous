@@ -277,7 +277,25 @@ fn parse_component<'a>(input: &'a str, config: &Config, args: &Build) -> Result<
             }
             Ok(c)
         }
-        Err(report) => {
+        Err(err) => {
+            let mut diagnostic =
+                DiagnosticBuilder::new(err.to_string(), Severity::Error, err.fragment().offset())
+                    .build();
+            if let Some(help) = err.help() {
+                diagnostic.note = Some(Cow::Borrowed(help.message()));
+                if let Some(span) = help.corresponding_span() {
+                    diagnostic.helpers.push(decorous_errors::Helper {
+                        msg: Cow::Borrowed("from here"),
+                        span: span.clone(),
+                    });
+                }
+            }
+            diagnostic.helpers.push(decorous_errors::Helper {
+                msg: Cow::Borrowed("here"),
+                span: err.fragment().offset()..err.fragment().offset() + err.fragment().length(),
+            });
+            let mut report = decorous_errors::Report::new();
+            report.add_diagnostic(diagnostic);
             decorous_errors::fmt::report(&report, &file_name, input)?;
             anyhow::bail!("\nthe decorous parser failed");
         }

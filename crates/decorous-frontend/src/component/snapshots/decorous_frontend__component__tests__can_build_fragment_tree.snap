@@ -8,8 +8,8 @@ expression: component.fragment_tree
             id: 0,
             parent_id: None,
             location: Location {
-                offset: 0,
-                length: 34,
+                offset: 1,
+                length: 33,
             },
             scope: None,
         },
@@ -25,7 +25,7 @@ expression: component.fragment_tree
                                 0,
                             ),
                             location: Location {
-                                offset: 5,
+                                offset: 6,
                                 length: 12,
                             },
                             scope: None,
@@ -42,8 +42,8 @@ expression: component.fragment_tree
                                                 1,
                                             ),
                                             location: Location {
-                                                offset: 0,
-                                                length: 0,
+                                                offset: 11,
+                                                length: 6,
                                             },
                                             scope: None,
                                         },
@@ -64,7 +64,7 @@ expression: component.fragment_tree
                                 0,
                             ),
                             location: Location {
-                                offset: 17,
+                                offset: 18,
                                 length: 13,
                             },
                             scope: None,
@@ -81,8 +81,8 @@ expression: component.fragment_tree
                                                 3,
                                             ),
                                             location: Location {
-                                                offset: 0,
-                                                length: 0,
+                                                offset: 23,
+                                                length: 7,
                                             },
                                             scope: None,
                                         },

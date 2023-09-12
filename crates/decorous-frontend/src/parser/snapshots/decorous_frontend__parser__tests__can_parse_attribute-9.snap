@@ -1,28 +1,16 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: attribute(input.into())
+expression: ast
 ---
 Err(
-    Failure(
-        Report(
-            Report {
-                diagnostics: [
-                    Diagnostic {
-                        msg: "parser error: invalid character, expected =",
-                        severity: Error,
-                        helpers: [
-                            Helper {
-                                msg: "here",
-                                span: 6..7,
-                            },
-                        ],
-                        offset: 6,
-                        note: Some(
-                            "value-less event handlers are not allowed",
-                        ),
-                    },
-                ],
-            },
+    ParseError {
+        fragment: Location {
+            offset: 11,
+            length: 1,
+        },
+        help: None,
+        err_type: Expected(
+            "an equals sign",
         ),
-    ),
+    },
 )

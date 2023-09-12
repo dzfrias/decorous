@@ -1,15 +1,20 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: nodes(input.into())
+expression: ast
 ---
-Ok(
-    (
-        LocatedSpan {
-            offset: 0,
-            line: 1,
-            fragment: "/div",
-            extra: (),
+Err(
+    ParseError {
+        fragment: Location {
+            offset: 1,
+            length: 3,
         },
-        [],
-    ),
+        help: None,
+        err_type: ExpectedAny(
+            [
+                "the beginning of an element",
+                "a JavaScript expression",
+                "plain text",
+            ],
+        ),
+    },
 )

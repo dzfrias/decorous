@@ -3,20 +3,12 @@ source: crates/decorous-frontend/src/parser/mod.rs
 expression: ast
 ---
 Err(
-    Report {
-        diagnostics: [
-            Diagnostic {
-                msg: "parser error: cannot have more than one style block",
-                severity: Error,
-                helpers: [
-                    Helper {
-                        msg: "here",
-                        span: 25..26,
-                    },
-                ],
-                offset: 25,
-                note: None,
-            },
-        ],
+    ParseError {
+        fragment: Location {
+            offset: 20,
+            length: 1,
+        },
+        help: None,
+        err_type: CannotHaveTwoStyles,
     },
 )

@@ -1,42 +1,32 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: parse(input.into())
+expression: ast
 ---
 Ok(
     DecorousAst {
         nodes: [
             Node {
                 metadata: Location {
-                    offset: 0,
-                    length: 48,
+                    offset: 2,
+                    length: 28,
                 },
                 node_type: SpecialBlock(
-                    For(
-                        ForBlock {
-                            binding: "elem",
-                            index: Some(
-                                "idx",
-                            ),
-                            expr: EXPR_STMT@0..9
-                              ARRAY_EXPR@0..9
-                                L_BRACK@0..1 "["
-                                LITERAL@1..2
-                                  NUMBER@1..2 "1"
-                                COMMA@2..3 ","
-                                WHITESPACE@3..4 " "
-                                LITERAL@4..5
-                                  NUMBER@4..5 "2"
-                                COMMA@5..6 ","
-                                WHITESPACE@6..7 " "
-                                LITERAL@7..8
-                                  NUMBER@7..8 "3"
-                                R_BRACK@8..9 "]"
+                    If(
+                        IfBlock {
+                            expr: BIN_EXPR@0..6
+                              NAME_REF@0..1
+                                IDENT@0..1 "x"
+                              WHITESPACE@1..2 " "
+                              EQ2@2..4 "=="
+                              WHITESPACE@4..5 " "
+                              LITERAL@5..6
+                                NUMBER@5..6 "3"
                             ,
                             inner: [
                                 Node {
                                     metadata: Location {
-                                        offset: 30,
-                                        length: 12,
+                                        offset: 14,
+                                        length: 10,
                                     },
                                     node_type: Element(
                                         Element {
@@ -45,8 +35,8 @@ Ok(
                                             children: [
                                                 Node {
                                                     metadata: Location {
-                                                        offset: 33,
-                                                        length: 6,
+                                                        offset: 15,
+                                                        length: 8,
                                                     },
                                                     node_type: Text(
                                                         Text(
@@ -59,6 +49,7 @@ Ok(
                                     ),
                                 },
                             ],
+                            else_block: None,
                         },
                     ),
                 ),

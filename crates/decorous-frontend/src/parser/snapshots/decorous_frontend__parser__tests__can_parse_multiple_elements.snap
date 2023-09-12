@@ -1,19 +1,13 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: nodes(input.into())
+expression: ast
 ---
 Ok(
-    (
-        LocatedSpan {
-            offset: 29,
-            line: 1,
-            fragment: "",
-            extra: (),
-        },
-        [
+    DecorousAst {
+        nodes: [
             Node {
                 metadata: Location {
-                    offset: 0,
+                    offset: 1,
                     length: 8,
                 },
                 node_type: Element(
@@ -26,8 +20,8 @@ Ok(
             },
             Node {
                 metadata: Location {
-                    offset: 8,
-                    length: 16,
+                    offset: 9,
+                    length: 14,
                 },
                 node_type: Element(
                     Element {
@@ -36,8 +30,8 @@ Ok(
                         children: [
                             Node {
                                 metadata: Location {
-                                    offset: 13,
-                                    length: 6,
+                                    offset: 12,
+                                    length: 8,
                                 },
                                 node_type: Text(
                                     Text(
@@ -51,15 +45,19 @@ Ok(
             },
             Node {
                 metadata: Location {
-                    offset: 24,
-                    length: 5,
+                    offset: 23,
+                    length: 6,
                 },
                 node_type: Text(
                     Text(
-                        "hello",
+                        " hello",
                     ),
                 ),
             },
         ],
-    ),
+        script: None,
+        css: None,
+        wasm: None,
+        comptime: None,
+    },
 )

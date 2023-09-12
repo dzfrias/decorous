@@ -21,6 +21,8 @@ pub enum ParseErrorType {
     Expected(&'static str),
     #[error("expected {:?}", .0)]
     ExpectedAny(&'static [&'static str]),
+    #[error("unclosed attrs")]
+    UnclosedAttrs,
     #[error("invalid character, expected {0:?}, got {1}")]
     ExpectedCharacterAny(Vec<char>, char),
     #[error("expected closing tag. If you meant to escape the slash, use '\\/'")]

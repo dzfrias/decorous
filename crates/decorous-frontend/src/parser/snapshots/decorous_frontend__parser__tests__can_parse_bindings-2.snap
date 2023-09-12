@@ -1,28 +1,16 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: attribute(input.into())
+expression: ast
 ---
 Err(
-    Failure(
-        Report(
-            Report {
-                diagnostics: [
-                    Diagnostic {
-                        msg: "parser error: invalid character, expected :",
-                        severity: Error,
-                        helpers: [
-                            Helper {
-                                msg: "here",
-                                span: 8..9,
-                            },
-                        ],
-                        offset: 8,
-                        note: Some(
-                            "expected because binding was started with \":\"",
-                        ),
-                    },
-                ],
-            },
+    ParseError {
+        fragment: Location {
+            offset: 13,
+            length: 1,
+        },
+        help: None,
+        err_type: Expected(
+            "a colon",
         ),
-    ),
+    },
 )

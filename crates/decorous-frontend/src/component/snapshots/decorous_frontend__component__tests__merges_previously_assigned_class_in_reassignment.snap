@@ -8,8 +8,8 @@ expression: component.fragment_tree()
             id: 0,
             parent_id: None,
             location: Location {
-                offset: 29,
-                length: 24,
+                offset: 30,
+                length: 23,
             },
             scope: None,
         },
@@ -34,8 +34,8 @@ expression: component.fragment_tree()
                                 0,
                             ),
                             location: Location {
-                                offset: 0,
-                                length: 0,
+                                offset: 47,
+                                length: 6,
                             },
                             scope: None,
                         },

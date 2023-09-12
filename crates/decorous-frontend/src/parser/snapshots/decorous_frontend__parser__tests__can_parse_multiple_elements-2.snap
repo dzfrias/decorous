@@ -1,15 +1,13 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: nodes(input.into())
+expression: ast
 ---
 Ok(
-    (
-        LocatedSpan {
-            offset: 0,
-            line: 1,
-            fragment: "",
-            extra: (),
-        },
-        [],
-    ),
+    DecorousAst {
+        nodes: [],
+        script: None,
+        css: None,
+        wasm: None,
+        comptime: None,
+    },
 )
