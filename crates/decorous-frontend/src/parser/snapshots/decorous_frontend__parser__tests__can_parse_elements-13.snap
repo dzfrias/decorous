@@ -1,42 +1,48 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: element(input.into())
+expression: ast
 ---
 Ok(
-    (
-        LocatedSpan {
-            offset: 28,
-            line: 1,
-            fragment: "",
-            extra: (),
-        },
-        Element {
-            tag: "span",
-            attrs: [
-                KeyValue(
-                    "x",
-                    Some(
-                        Literal(
-                            "green",
-                        ),
-                    ),
-                ),
-            ],
-            children: [
-                Node {
-                    metadata: Location {
-                        offset: 0,
-                        length: 0,
-                        line: 0,
-                        column: 0,
-                    },
-                    node_type: Text(
-                        Text(
-                            "hello world",
-                        ),
-                    ),
+    DecorousAst {
+        nodes: [
+            Node {
+                metadata: Location {
+                    offset: 1,
+                    length: 27,
                 },
-            ],
-        },
-    ),
+                node_type: Element(
+                    Element {
+                        tag: "span",
+                        attrs: [
+                            KeyValue(
+                                "x",
+                                Some(
+                                    Literal(
+                                        "green",
+                                    ),
+                                ),
+                            ),
+                        ],
+                        children: [
+                            Node {
+                                metadata: Location {
+                                    offset: 17,
+                                    length: 11,
+                                },
+                                node_type: Text(
+                                    Text(
+                                        "hello world",
+                                    ),
+                                ),
+                            },
+                        ],
+                    },
+                ),
+            },
+        ],
+        script: None,
+        css: None,
+        wasm: None,
+        comptime: None,
+    },
 )

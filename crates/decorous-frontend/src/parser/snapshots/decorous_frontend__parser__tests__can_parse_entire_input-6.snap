@@ -1,24 +1,20 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: parse(input.into())
+expression: ast
 ---
 Err(
-    Report {
-        diagnostics: [
-            Diagnostic {
-                msg: "parser error: expected closing tag. If you meant to escape the slash, use '\\/'",
-                severity: Error,
-                helpers: [
-                    Helper {
-                        msg: "here",
-                        span: 0..1,
-                    },
-                ],
-                offset: 0,
-                note: Some(
-                    "escape the slash with \\/",
-                ),
-            },
-        ],
+    ParseError {
+        fragment: Location {
+            offset: 1,
+            length: 0,
+        },
+        help: None,
+        err_type: ExpectedAny(
+            [
+                "the beginning of an element",
+                "a JavaScript expression",
+                "plain text",
+            ],
+        ),
     },
 )

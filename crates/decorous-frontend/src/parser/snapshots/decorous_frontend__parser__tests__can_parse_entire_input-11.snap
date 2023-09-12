@@ -1,16 +1,14 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: parse(input.into())
+expression: ast
 ---
 Ok(
     DecorousAst {
         nodes: [
             Node {
                 metadata: Location {
-                    offset: 0,
-                    length: 9,
-                    line: 1,
-                    column: 1,
+                    offset: 1,
+                    length: 7,
                 },
                 node_type: Element(
                     Element {
@@ -19,10 +17,8 @@ Ok(
                         children: [
                             Node {
                                 metadata: Location {
-                                    offset: 3,
-                                    length: 3,
-                                    line: 1,
-                                    column: 4,
+                                    offset: 2,
+                                    length: 5,
                                 },
                                 node_type: Text(
                                     Text(
@@ -36,29 +32,24 @@ Ok(
             },
             Node {
                 metadata: Location {
-                    offset: 9,
-                    length: 7,
-                    line: 1,
-                    column: 10,
+                    offset: 8,
+                    length: 9,
                 },
                 node_type: Text(
                     Text(
-                        "Hello, ",
+                        " Hello, ",
                     ),
                 ),
             },
             Node {
                 metadata: Location {
-                    offset: 16,
-                    length: 6,
-                    line: 1,
-                    column: 17,
+                    offset: 17,
+                    length: 5,
                 },
                 node_type: Mustache(
                     Mustache(
-                        EXPR_STMT@0..4
-                          NAME_REF@0..4
-                            IDENT@0..4 "name"
+                        NAME_REF@0..4
+                          IDENT@0..4 "name"
                         ,
                     ),
                 ),

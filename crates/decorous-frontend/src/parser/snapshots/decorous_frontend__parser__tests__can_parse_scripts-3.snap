@@ -1,6 +1,6 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: parse(input.into())
+expression: ast
 ---
 Ok(
     DecorousAst {
@@ -11,7 +11,7 @@ Ok(
             Code {
                 lang: "wasm",
                 body: " let x = 3; ",
-                offset: 7,
+                offset: 2,
                 comptime: false,
             },
         ),

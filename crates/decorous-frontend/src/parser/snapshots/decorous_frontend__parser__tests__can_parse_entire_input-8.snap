@@ -1,24 +1,16 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: parse(input.into())
+expression: ast
 ---
 Err(
-    Report {
-        diagnostics: [
-            Diagnostic {
-                msg: "parser error: invalid character, expected }",
-                severity: Error,
-                helpers: [
-                    Helper {
-                        msg: "here",
-                        span: 12..13,
-                    },
-                ],
-                offset: 12,
-                note: Some(
-                    "mustache was never closed",
-                ),
-            },
-        ],
+    ParseError {
+        fragment: Location {
+            offset: 12,
+            length: 10,
+        },
+        help: None,
+        err_type: Expected(
+            "a JavaScript expression",
+        ),
     },
 )

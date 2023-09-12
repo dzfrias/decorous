@@ -1,16 +1,14 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: parse(input.into())
+expression: ast
 ---
 Ok(
     DecorousAst {
         nodes: [
             Node {
                 metadata: Location {
-                    offset: 0,
-                    length: 33,
-                    line: 1,
-                    column: 1,
+                    offset: 1,
+                    length: 32,
                 },
                 node_type: Element(
                     Element {

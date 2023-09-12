@@ -1,28 +1,16 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: attribute(input.into())
+expression: ast
 ---
 Err(
-    Failure(
-        Report(
-            Report {
-                diagnostics: [
-                    Diagnostic {
-                        msg: "parser error: invalid character, expected {",
-                        severity: Error,
-                        helpers: [
-                            Helper {
-                                msg: "here",
-                                span: 12..13,
-                            },
-                        ],
-                        offset: 12,
-                        note: Some(
-                            "expected because event handlers must always have curly braces as their values",
-                        ),
-                    },
-                ],
-            },
+    ParseError {
+        fragment: Location {
+            offset: 18,
+            length: 5,
+        },
+        help: None,
+        err_type: Expected(
+            "a JavaScript expression",
         ),
-    ),
+    },
 )

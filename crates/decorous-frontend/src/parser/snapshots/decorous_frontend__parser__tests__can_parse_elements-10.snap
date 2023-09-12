@@ -1,28 +1,16 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: element(input.into())
+expression: ast
 ---
 Err(
-    Failure(
-        Report(
-            Report {
-                diagnostics: [
-                    Diagnostic {
-                        msg: "parser error: invalid closing tag, expected div",
-                        severity: Error,
-                        helpers: [
-                            Helper {
-                                msg: "here",
-                                span: 20..21,
-                            },
-                        ],
-                        offset: 20,
-                        note: Some(
-                            "replace this tag with the expected!",
-                        ),
-                    },
-                ],
-            },
+    ParseError {
+        fragment: Location {
+            offset: 20,
+            length: 6,
+        },
+        help: None,
+        err_type: InvalidClosingTag(
+            "div",
         ),
-    ),
+    },
 )

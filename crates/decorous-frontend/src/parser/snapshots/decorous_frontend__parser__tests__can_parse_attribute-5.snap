@@ -1,22 +1,36 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: attribute(input.into())
+expression: ast
 ---
 Ok(
-    (
-        LocatedSpan {
-            offset: 14,
-            line: 1,
-            fragment: "",
-            extra: (),
-        },
-        KeyValue(
-            "hello",
-            Some(
-                Literal(
-                    "你好",
+    DecorousAst {
+        nodes: [
+            Node {
+                metadata: Location {
+                    offset: 1,
+                    length: 23,
+                },
+                node_type: Element(
+                    Element {
+                        tag: "div",
+                        attrs: [
+                            KeyValue(
+                                "hello",
+                                Some(
+                                    Literal(
+                                        "你好",
+                                    ),
+                                ),
+                            ),
+                        ],
+                        children: [],
+                    },
                 ),
-            ),
-        ),
-    ),
+            },
+        ],
+        script: None,
+        css: None,
+        wasm: None,
+        comptime: None,
+    },
 )

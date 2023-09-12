@@ -1,28 +1,16 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: parse(input.into())
+expression: ast
 ---
 Err(
-    Report {
-        diagnostics: [
-            Diagnostic {
-                msg: "parser error: unclosed tag: div",
-                severity: Error,
-                helpers: [
-                    Helper {
-                        msg: "from here",
-                        span: 1..2,
-                    },
-                    Helper {
-                        msg: "here",
-                        span: 5..6,
-                    },
-                ],
-                offset: 5,
-                note: Some(
-                    "tag never closed",
-                ),
-            },
-        ],
+    ParseError {
+        fragment: Location {
+            offset: 6,
+            length: 0,
+        },
+        help: None,
+        err_type: InvalidClosingTag(
+            "div",
+        ),
     },
 )

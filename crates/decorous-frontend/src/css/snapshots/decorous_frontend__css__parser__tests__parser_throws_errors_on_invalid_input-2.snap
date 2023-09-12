@@ -7,8 +7,6 @@ Err(
         fragment: Location {
             offset: 44,
             length: 1,
-            line: 1,
-            column: 44,
         },
         help: None,
         err_type: ExpectedCharacter(

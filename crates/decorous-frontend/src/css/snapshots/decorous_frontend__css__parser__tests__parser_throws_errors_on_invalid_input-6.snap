@@ -7,8 +7,6 @@ Err(
         fragment: Location {
             offset: 12,
             length: 1,
-            line: 1,
-            column: 12,
         },
         help: None,
         err_type: JavaScriptParseError(

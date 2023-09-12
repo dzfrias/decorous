@@ -1,77 +1,76 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: element(input.into())
+expression: ast
 ---
 Ok(
-    (
-        LocatedSpan {
-            offset: 40,
-            line: 1,
-            fragment: "",
-            extra: (),
-        },
-        Element {
-            tag: "div",
-            attrs: [],
-            children: [
-                Node {
-                    metadata: Location {
-                        offset: 5,
-                        length: 5,
-                        line: 1,
-                        column: 6,
-                    },
-                    node_type: Text(
-                        Text(
-                            "text ",
-                        ),
-                    ),
+    DecorousAst {
+        nodes: [
+            Node {
+                metadata: Location {
+                    offset: 1,
+                    length: 39,
                 },
-                Node {
-                    metadata: Location {
-                        offset: 10,
-                        length: 10,
-                        line: 1,
-                        column: 11,
+                node_type: Element(
+                    Element {
+                        tag: "div",
+                        attrs: [],
+                        children: [
+                            Node {
+                                metadata: Location {
+                                    offset: 4,
+                                    length: 7,
+                                },
+                                node_type: Text(
+                                    Text(
+                                        "text ",
+                                    ),
+                                ),
+                            },
+                            Node {
+                                metadata: Location {
+                                    offset: 11,
+                                    length: 9,
+                                },
+                                node_type: Mustache(
+                                    Mustache(
+                                        NAME_REF@0..8
+                                          IDENT@0..8 "mustache"
+                                        ,
+                                    ),
+                                ),
+                            },
+                            Node {
+                                metadata: Location {
+                                    offset: 20,
+                                    length: 8,
+                                },
+                                node_type: Text(
+                                    Text(
+                                        " hello ",
+                                    ),
+                                ),
+                            },
+                            Node {
+                                metadata: Location {
+                                    offset: 28,
+                                    length: 7,
+                                },
+                                node_type: Element(
+                                    Element {
+                                        tag: "div",
+                                        attrs: [],
+                                        children: [],
+                                    },
+                                ),
+                            },
+                        ],
                     },
-                    node_type: Mustache(
-                        Mustache(
-                            EXPR_STMT@0..8
-                              NAME_REF@0..8
-                                IDENT@0..8 "mustache"
-                            ,
-                        ),
-                    ),
-                },
-                Node {
-                    metadata: Location {
-                        offset: 20,
-                        length: 7,
-                        line: 1,
-                        column: 21,
-                    },
-                    node_type: Text(
-                        Text(
-                            " hello ",
-                        ),
-                    ),
-                },
-                Node {
-                    metadata: Location {
-                        offset: 27,
-                        length: 9,
-                        line: 1,
-                        column: 28,
-                    },
-                    node_type: Element(
-                        Element {
-                            tag: "div",
-                            attrs: [],
-                            children: [],
-                        },
-                    ),
-                },
-            ],
-        },
-    ),
+                ),
+            },
+        ],
+        script: None,
+        css: None,
+        wasm: None,
+        comptime: None,
+    },
 )

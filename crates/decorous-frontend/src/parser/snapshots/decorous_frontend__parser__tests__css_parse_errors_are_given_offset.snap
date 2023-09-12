@@ -1,28 +1,32 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: parse(input.into())
+expression: ast
 ---
 Err(
-    Report {
-        diagnostics: [
-            Diagnostic {
-                msg: "parser error: css parsing error: parse error: expected: ;",
-                severity: Error,
-                helpers: [
-                    Helper {
-                        msg: "from here",
-                        span: 10..11,
+    ParseError {
+        fragment: Location {
+            offset: 12,
+            length: 3,
+        },
+        help: None,
+        err_type: CssParsingError(
+            ParseError {
+                fragment: Location {
+                    offset: 16,
+                    length: 1,
+                },
+                help: Some(
+                    Help {
+                        corresponding_span: Some(
+                            10..11,
+                        ),
+                        message: "declaration needs a closing semicolon",
                     },
-                    Helper {
-                        msg: "here",
-                        span: 32..33,
-                    },
-                ],
-                offset: 32,
-                note: Some(
-                    "declaration needs a closing semicolon",
+                ),
+                err_type: ExpectedCharacter(
+                    ';',
                 ),
             },
-        ],
+        ),
     },
 )

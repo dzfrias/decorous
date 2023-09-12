@@ -1,857 +1,702 @@
 mod code_blocks;
+mod ctx;
 pub mod errors;
-mod preprocessor;
 
-use std::{borrow::Cow, ops::Range, slice};
-
-use nom::{
-    branch::alt,
-    bytes::complete::{escaped, tag, take, take_until, take_while},
-    character::complete::{
-        alpha1, alphanumeric1, anychar, char, multispace0, multispace1, none_of, one_of,
-    },
-    combinator::{all_consuming, cut, eof, map, not, opt, peek, recognize, value},
-    error::ParseError as NomParseError,
-    multi::{many0, many0_count, separated_list0},
-    sequence::{delimited, pair, preceded, terminated},
-    IResult, InputIter, InputTake, Slice,
-};
-use nom_locate::{position, LocatedSpan};
 use rslint_parser::{parse_module, SyntaxNode};
 
-use self::errors::{Help, ParseError, ParseErrorType, Report};
 use crate::{
     ast::{
         Attribute, AttributeValue, Code, Comment, DecorousAst, Element, EventHandler, ForBlock,
         IfBlock, Mustache, Node, NodeType, SpecialBlock, Text, UseBlock,
     },
-    css::{self, ast::Css},
+    css,
+    errors::{ParseError, ParseErrorType},
+    lexer::{Allowed, Lexer, Token, TokenKind},
     location::Location,
     parser::code_blocks::CodeBlocks,
 };
-pub use preprocessor::*;
+pub use ctx::*;
 
-struct NullPreproc;
+type Result<T> = std::result::Result<T, ParseError<Location>>;
 
-impl Preprocessor for NullPreproc {
-    fn preprocess(
-        &self,
-        _lang: &str,
-        _body: &str,
-    ) -> std::result::Result<Override, PreprocessError> {
-        Ok(Override::None)
-    }
+pub struct Parser<'src, 'ctx> {
+    lexer: Lexer<'src>,
+    current_token: Token<'src>,
+    code_blocks: CodeBlocks<'src>,
+    ctx: Ctx<'ctx>,
 }
 
-type Result<'a, Output> = IResult<NomSpan<'a>, Output, Report>;
-type NomSpan<'a> = LocatedSpan<&'a str>;
+macro_rules! expect {
+    ($self:expr, $kind:ident(_)) => {{
+        $self.next_token();
+        let TokenKind::$kind(binding) = $self.current_token.kind else {
+            return error!($self, TokenKind::$kind(Default::default()).display_kind());
+        };
+        Ok(binding)
+    }};
+    ($self:expr, $kind:ident) => {{
+        $self.next_token();
+        let TokenKind::$kind = $self.current_token.kind else {
+            return error!($self, TokenKind::$kind.display_kind());
+        };
+        Ok(())
+    }};
+}
 
-/// Helper macro for creating an `IResult` error by hand.
-macro_rules! nom_err_res {
-    ($input:expr, $severity:ident, $err_type:expr, $help:expr) => {
-        Err(nom_err!($input, $severity, $err_type, $help))
+macro_rules! error {
+    ($self:expr, $expected:expr) => {
+        Err($self.error_on_current(ParseErrorType::Expected($expected)))
+    };
+    ($self:expr, $($expected:expr),*) => {
+        Err($self.error_on_current(ParseErrorType::ExpectedAny(&[$($expected),*])))
     };
 }
 
-macro_rules! nom_err {
-    ($input:expr, $severity:ident, $err_type:expr, $help:expr) => {
-        nom::Err::$severity(Report::from(ParseError::new($input, $err_type, $help)))
-    };
+pub fn parse(input: &str) -> Result<DecorousAst> {
+    let lexer = Lexer::new(input);
+    let parser = Parser::new(lexer);
+    parser.parse()
 }
 
-pub fn parse_with_preprocessor<'i, P>(
-    input: &'i str,
-    preproc: &P,
-) -> std::result::Result<DecorousAst<'i>, decorous_errors::Report>
-where
-    P: Preprocessor,
-{
-    let parse = |input| _parse(input, preproc);
-    let result = cut(alt((
-        all_consuming(parse),
-        failure_case(char('/'), |_| {
-            (
-                ParseErrorType::ExpectedClosingTag,
-                Some(Help::with_message("escape the slash with \\/")),
-            )
-        }),
-    )))(input.into());
-    match result {
-        Err(err) => {
-            use nom::Err::Failure;
-            match err {
-                // NomSpans from the report are turned into Locations, so to not leak into the
-                // public interface of this module.
-                Failure(report) => Err(report.0),
-                _ => unreachable!(),
-            }
-        }
-        Ok((_, ast)) => Ok(ast),
+pub fn parse_with_preprocessor<'src>(
+    input: &'src str,
+    preprocessor: &dyn Preprocessor,
+) -> Result<DecorousAst<'src>> {
+    let lexer = Lexer::new(input);
+    let parser = Parser::new(lexer).with_ctx(Ctx { preprocessor });
+    parser.parse()
+}
+
+impl<'src, 'ctx> Parser<'src, 'ctx> {
+    pub fn new(lexer: Lexer<'src>) -> Self {
+        let mut parser = Self {
+            lexer,
+            current_token: Token {
+                kind: TokenKind::Eof,
+                loc: Location::default(),
+            },
+            code_blocks: CodeBlocks::new(),
+            ctx: Ctx::default(),
+        };
+
+        parser.next_token();
+        parser
     }
-}
 
-/// Parses a string decorous syntax into an AST.
-///
-/// A successful parse will yield a [`DecorousAst`]. An unsuccessful one will yield a [`Report`].
-pub fn parse(input: &str) -> std::result::Result<DecorousAst, decorous_errors::Report> {
-    parse_with_preprocessor(input, &NullPreproc)
-}
+    pub fn with_ctx(mut self, ctx: Ctx<'ctx>) -> Self {
+        self.ctx = ctx;
+        self
+    }
 
-fn _parse<'i, P: Preprocessor>(input: NomSpan<'i>, preproc: &P) -> Result<'i, DecorousAst<'i>> {
-    let src = input;
-    let mut blocks = CodeBlocks::new();
-    let (input, _) = parse_code_blocks(input, input, &mut blocks, preproc)?;
-    let (input, nodes) = nodes(input)?;
-    let (input, _) = parse_code_blocks(input, src, &mut blocks, preproc)?;
-    let (script, css, wasm, comptime) = blocks.into_parts();
-    Ok((input, DecorousAst::new(nodes, script, css, wasm, comptime)))
-}
+    pub fn parse(mut self) -> Result<DecorousAst<'src>> {
+        self.parse_code_blocks()?;
+        let nodes = self.parse_nodes(|tok| {
+            Ok(matches!(
+                tok.kind,
+                TokenKind::CodeBlockIndicator | TokenKind::Eof
+            ))
+        })?;
+        self.parse_code_blocks()?;
 
-fn parse_code_blocks<'a, P: Preprocessor>(
-    input: LocatedSpan<&'a str>,
-    src: LocatedSpan<&'a str>,
-    blocks: &mut CodeBlocks<'a>,
-    preproc: P,
-) -> Result<'a, ()> {
-    let (input, code_blocks) = many0(ws(code))(input)?;
-    for b in code_blocks {
-        match b.lang() {
-            _ if b.is_comptime() => {
-                let offset = b.offset();
-                blocks.set_static_wasm(b).map_err(|_err| {
-                    nom_err!(
-                        src.slice(offset..),
-                        Failure,
-                        ParseErrorType::CannotHaveTwoStatics,
-                        None
-                    )
-                })?;
+        let (script, css, wasm, comptime) = self.code_blocks.into_parts();
+
+        Ok(DecorousAst::new(nodes, script, css, wasm, comptime))
+    }
+
+    fn next_token(&mut self) {
+        self.current_token = self.lexer.next_token();
+    }
+
+    fn next_token_allow(&mut self, allow: Allowed) {
+        self.current_token = self.lexer.next_token_allow(allow);
+    }
+
+    fn error_on_current(&self, kind: ParseErrorType) -> ParseError<Location> {
+        ParseError::new(self.current_token.loc, kind, None)
+    }
+
+    fn current_offset(&self) -> usize {
+        self.current_token.loc.offset()
+    }
+
+    fn parse_node(&mut self) -> Result<Node<'src, Location>> {
+        let begin_loc = self.current_offset();
+        let ty = match self.current_token.kind {
+            TokenKind::ElemBegin(_) => NodeType::Element(self.parse_elem()?),
+            TokenKind::Mustache(_) => NodeType::Mustache(self.parse_mustache()?),
+            TokenKind::SpecialBlockStart(_) => NodeType::SpecialBlock(self.parse_special_block()?),
+            TokenKind::Text(t) => NodeType::Text(Text(t)),
+            TokenKind::Comment(comment) => NodeType::Comment(Comment(comment)),
+            TokenKind::Eof => {
+                return Err(self.error_on_current(ParseErrorType::UnclosedTag(String::new())))
             }
-            "js" => {
-                let syntax_node = parse_js_block(b.body(), b.offset(), src)?;
-                blocks.set_script(syntax_node).map_err(|_err| {
-                    nom_err!(
-                        src.slice(b.offset()..),
-                        Failure,
-                        ParseErrorType::CannotHaveTwoScripts,
-                        None
-                    )
-                })?;
-            }
-            "css" => {
-                let ast = parse_css_block(b.body(), b.offset(), src)?;
-                blocks.set_css(ast).map_err(|_err| {
-                    nom_err!(
-                        src.slice(b.offset()..),
-                        Failure,
-                        ParseErrorType::CannotHaveTwoStyles,
-                        None
-                    )
-                })?;
-            }
+
             _ => {
-                match preproc.preprocess(b.lang(), b.body()).map_err(|err| {
-                    nom::Err::Failure(
-                        ParseError::new(
-                            src.slice(b.offset() + err.loc.offset()..),
-                            ParseErrorType::PreprocError(Box::new(err)),
-                            None,
-                        )
-                        .into(),
-                    )
-                })? {
-                    Override::Css(new_css) => {
-                        let ast = parse_css_block(&new_css, b.offset(), src)?;
-                        blocks.set_css(ast).map_err(|_err| {
-                            nom_err!(
-                                src.slice(b.offset()..),
-                                Failure,
-                                ParseErrorType::CannotHaveTwoStyles,
-                                None
-                            )
-                        })?;
-                    }
-                    Override::Js(js) => {
-                        let script = parse_js_block(&js, b.offset(), src)?;
-                        blocks.set_script(script).map_err(|_err| {
-                            nom_err!(
-                                src.slice(b.offset()..),
-                                Failure,
-                                ParseErrorType::CannotHaveTwoScripts,
-                                None
-                            )
-                        })?;
-                    }
-                    Override::None => {
-                        let offset = b.offset();
-                        blocks.set_wasm(b).map_err(|_err| {
-                            nom_err!(
-                                src.slice(offset..),
-                                Failure,
-                                ParseErrorType::CannotHaveTwoWasmBlocks,
-                                None
-                            )
-                        })?;
-                    }
-                }
+                return error!(
+                    self,
+                    "the beginning of an element", "a JavaScript expression", "plain text"
+                );
             }
-        }
+        };
+        self.next_token();
+
+        Ok(Node::new(
+            ty,
+            Location::new(begin_loc, self.current_offset() - begin_loc),
+        ))
     }
-    Ok((input, ()))
-}
 
-fn parse_css_block(
-    code: &str,
-    offset: usize,
-    src: LocatedSpan<&str>,
-) -> std::result::Result<Css, nom::Err<Report>> {
-    let p = css::Parser::new(code);
-    let ast = p.parse().map_err(|err| {
-        let pos = src.slice(offset + err.fragment().offset() + 1..);
-        let help = err.help().cloned();
-        nom_err!(
-            pos,
-            Failure,
-            ParseErrorType::CssParsingError(err.into()),
-            help
-        )
-    })?;
-    Ok(ast)
-}
-
-fn parse_js_block(
-    code: &str,
-    offset: usize,
-    src: LocatedSpan<&str>,
-) -> std::result::Result<SyntaxNode, nom::Err<Report>> {
-    parse_js(code).map_err(|(title, span)| {
-        let pos = src.slice(offset + span.start..);
-        nom_err!(
-            pos,
-            Failure,
-            ParseErrorType::JavaScriptDiagnostics { title },
-            None
-        )
-    })
-}
-
-fn code(input: NomSpan) -> Result<Code> {
-    let (input, _) = tag("---")(input)?;
-    let (input, lang) = take_while(|c: char| !c.is_whitespace() && c != ':')(input)?;
-    let (input, comptime) = opt(tag(":static"))(input)?;
-    let (input, loc) = position(input)?;
-    let (input, body) = take_until("---")(input)?;
-    let (input, _) = take(3usize)(input)?;
-    Ok((
-        input,
-        Code::new(&lang, &body, loc.location_offset(), comptime.is_some()),
-    ))
-}
-
-fn nodes(input: NomSpan) -> Result<Vec<Node<'_, Location>>> {
-    many0(node)(input)
-}
-
-fn node(input: NomSpan) -> Result<Node<'_, Location>> {
-    let (input, pos) = position(input)?;
-    // Do not succeed if empty
-    if input.is_empty() {
-        return nom_err_res!(
-            input,
-            Error,
-            ParseErrorType::Nom(nom::error::ErrorKind::Eof),
-            None
-        );
-    }
-    if peek(ws(tag::<&str, NomSpan, Report>("---")))(input).is_ok() {
-        return nom_err_res!(
-            input,
-            Error,
-            ParseErrorType::Nom(nom::error::ErrorKind::Tag),
-            None
-        );
-    }
-    let (input, node) = alt((
-        map(element, NodeType::Element),
-        map(comment, |c| NodeType::Comment(Comment(&c))),
-        map(special_block, NodeType::SpecialBlock),
-        map(mustache, |js| NodeType::Mustache(Mustache(js))),
-        map(
-            escaped(none_of("/#\\{"), '\\', one_of(r#"/#{}"#)),
-            |text: NomSpan| NodeType::Text(Text(&text)),
-        ),
-    ))(input)?;
-    let (input, end_pos) = position(input)?;
-    let location = Location::from_spans(pos, end_pos);
-
-    Ok((input, Node::new(node, location)))
-}
-
-fn attributes(input: NomSpan) -> Result<Vec<Attribute>> {
-    let (input, start_pos) = position(input)?;
-    delimited(
-        ws_trailing(char('[')),
-        separated_list0(multispace1, attribute),
-        alt((
-            ws_leading(char(']')),
-            failure_case(bad_char, move |_| {
-                (
-                    ParseErrorType::ExpectedCharacter(']'),
-                    Some(Help::with_span(
-                        start_pos.location_offset()..start_pos.location_offset() + 1,
-                        "attribute bracket was never closed",
-                    )),
-                )
-            }),
-        )),
-    )(input)
-}
-
-fn tag_name<'i>(input: NomSpan<'i>) -> Result<NomSpan<'i>> {
-    take_while(|c: char| c.is_alphanumeric() || c == '-')(input)
-}
-
-fn element(input: NomSpan) -> Result<Element<'_, Location>> {
-    let (input, _) = char('#')(input)?;
-    let (input, start_pos) = position(input)?;
-    let (input, tag_name) = tag_name(input)?;
-    let (input, attrs) = terminated(opt(attributes), multispace0)(input)?;
-    let (input, children) = alt((
-        preceded(
-            char(':'),
-            map(parse_text, |text: NomSpan| {
-                vec![Node::new(NodeType::Text(Text(&text)), Location::default())]
-            }),
-        ),
-        terminated(
-            map(nodes, |mut nodes| {
-                if let Some(NodeType::Text(Text(t))) =
-                    nodes.last_mut().map(|node| node.node_type_mut())
-                {
-                    *t = t.strip_suffix(' ').unwrap_or(t);
-                    if t.is_empty() {
-                        nodes.pop();
-                    }
-                }
-                nodes
-            }),
-            alt((
-                terminated(
-                    preceded(
-                        char('/'),
-                        alt((
-                            tag(*tag_name.fragment()),
-                            failure_case(identifier, |_| {
-                                (
-                                    ParseErrorType::InvalidClosingTag(tag_name.to_string()),
-                                    Some(Help::with_message("replace this tag with the expected!")),
-                                )
-                            }),
-                        )),
-                    ),
-                    opt(char(' ')),
-                ),
-                failure_case(bad_char, |_| {
-                    (
-                        ParseErrorType::UnclosedTag(tag_name.to_string()),
-                        Some(Help::with_span(
-                            start_pos.location_offset()..start_pos.location_offset() + 1,
-                            "tag never closed",
-                        )),
-                    )
-                }),
-            )),
-        ),
-    ))(input)?;
-    Ok((
-        input,
-        Element::new(&tag_name, attrs.unwrap_or_default(), children),
-    ))
-}
-
-fn attribute(input: NomSpan) -> Result<Attribute<'_>> {
-    alt((parse_evt_handler, parse_binding, parse_attr))(input)
-}
-
-fn parse_attr(input: LocatedSpan<&str>) -> Result<Attribute> {
-    let (input, attr) = identifier(input)?;
-    let (input, eq_char) = opt(ws(char('=')))(input)?;
-    if eq_char.is_none() {
-        return Ok((input, Attribute::KeyValue(&attr, None)));
-    }
-    let (input, attribute) = alt((
-        map(mustache, |node| {
-            Attribute::KeyValue(&attr, Some(AttributeValue::JavaScript(node)))
-        }),
-        map(parse_quoted, |t| {
-            Attribute::KeyValue(&attr, Some(AttributeValue::Literal(Cow::Borrowed(&t))))
-        }),
-    ))(input)?;
-    Ok((input, attribute))
-}
-
-fn parse_quoted(input: NomSpan) -> Result<LocatedSpan<&str>> {
-    preceded(
-        alt((
-            char('\"'),
-            failure_case(bad_char, |_| {
-                (
-                    ParseErrorType::ExpectedCharacter('"'),
-                    Some(Help::with_message("expected either { or \"")),
-                )
-            }),
-        )),
-        alt((
-            terminated(parse_str, char('\"')),
-            failure_case(bad_char, |_| {
-                (
-                    ParseErrorType::ExpectedCharacter('"'),
-                    Some(Help::with_message("quote was never closed")),
-                )
-            }),
-        )),
-    )(input)
-}
-
-fn parse_binding(input: LocatedSpan<&str>) -> Result<Attribute> {
-    map(
-        delimited(
-            char(':'),
-            identifier,
-            alt((
-                char(':'),
-                failure_case(bad_char, |_| {
-                    (
-                        ParseErrorType::ExpectedCharacter(':'),
-                        Some(Help::with_message(
-                            "expected because binding was started with \":\"",
-                        )),
-                    )
-                }),
-            )),
-        ),
-        |ident| Attribute::Binding(&ident),
-    )(input)
-}
-
-fn parse_evt_handler(input: LocatedSpan<&str>) -> Result<Attribute> {
-    let (input, _) = char('@')(input)?;
-    let (input, attr) = identifier(input)?;
-    let (input, _) = alt((
-        ws(char('=')),
-        failure_case(bad_char, |_| {
-            (
-                ParseErrorType::ExpectedCharacter('='),
-                Some(Help::with_message(
-                    "value-less event handlers are not allowed",
-                )),
-            )
-        }),
-    ))(input)?;
-    if peek(char::<NomSpan, Report>('{'))(input).is_err() {
-        return nom_err_res!(
-            input,
-            Failure,
-            ParseErrorType::ExpectedCharacter('{'),
-            Some(Help::with_message(
-                "expected because event handlers must always have curly braces as their values"
-            ))
-        );
-    }
-    // clippy is wrong here...
-    #[allow(clippy::needless_return)]
-    return map(mustache, |node| {
-        Attribute::EventHandler(EventHandler::new(&attr, node))
-    })(input);
-}
-
-fn comment(input: NomSpan) -> Result<NomSpan> {
-    preceded(tag("//"), take_while(|c| c != '\n'))(input)
-}
-
-fn mustache(input: NomSpan) -> Result<SyntaxNode> {
-    // Make sure it doesn't parse "{/", as that's the beginning of the end of a special block
-    not(alt((tag("{/"), tag("{:"))))(input)?;
-    preceded(char('{'), mustache_inner)(input)
-}
-
-fn special_block(input: NomSpan) -> Result<SpecialBlock<'_, Location>> {
-    let (input, block_type) = preceded(tag("{#"), identifier)(input)?;
-    match *block_type.fragment() {
-        "for" => {
-            let (input, binding) = delimited(multispace1, identifier, multispace0)(input)?;
-            let (input, true_binding) = opt(preceded(ws_trailing(char(',')), identifier))(input)?;
-            let (input, _) = delimited(multispace0, tag("in"), multispace1)(input)?;
-            let (input, expr) = terminated(mustache_inner, opt(char(' ')))(input)?;
-            let (input, inner) = terminated(nodes, tag("{/for}"))(input)?;
-            if let Some(bind) = true_binding {
-                Ok((
-                    input,
-                    SpecialBlock::For(ForBlock::new(&bind, Some(&binding), expr, inner)),
-                ))
-            } else {
-                Ok((
-                    input,
-                    SpecialBlock::For(ForBlock::new(&binding, None, expr, inner)),
-                ))
-            }
-        }
-        "if" => {
-            let (input, expr) = terminated(mustache_inner, opt(char(' ')))(input)?;
-            let (input, (inner, else_block)) = pair(
-                nodes,
-                alt((
-                    map(tag("{/if}"), |_| None),
-                    map(
-                        delimited(
-                            delimited(multispace0, tag("{:else}"), opt(char(' '))),
-                            nodes,
-                            tag("{/if}"),
-                        ),
-                        Some,
-                    ),
-                )),
-            )(input)?;
-            Ok((
-                input,
-                SpecialBlock::If(IfBlock::new(expr, inner, else_block)),
-            ))
-        }
-        "use" => {
-            let (input, path) = delimited(multispace1, parse_quoted, multispace0)(input)?;
-            let (input, _) = char('}')(input)?;
-            Ok((input, SpecialBlock::Use(UseBlock::new(path.fragment()))))
-        }
-        "each" => nom_err_res!(
-            input,
-            Failure,
-            ParseErrorType::InvalidSpecialBlockType(String::from("each")),
-            Some(Help::with_message(
-                "you might've meant `for`. each loops do not exist in decorous"
-            ))
-        ),
-        block => nom_err_res!(
-            input,
-            Failure,
-            ParseErrorType::InvalidSpecialBlockType(block.to_owned()),
-            None
-        ),
-    }
-}
-
-fn mustache_inner(input: NomSpan) -> Result<SyntaxNode> {
-    let (input, loc) = position(input)?;
-    let (input, js_text) = terminated(
-        alt((
-            take_ignoring_nested('{', '}'),
-            failure_case(bad_char, |_| {
-                (
-                    ParseErrorType::ExpectedCharacter('}'),
-                    Some(Help::with_message("mustache was never closed")),
-                )
-            }),
-        )),
-        char('}'),
-    )(input)?;
-
-    match parse_js(&js_text) {
-        Ok(s) => Ok((input, s.first_child().map_or(s, |child| child))),
-        Err((title, span)) => {
-            let src = get_unoffsetted_str(input);
-            let src_loc = LocatedSpan::new(src);
-            nom_err_res!(
-                src_loc.slice(loc.location_offset() + span.start..loc.location_offset() + span.end),
-                Failure,
-                ParseErrorType::JavaScriptDiagnostics { title },
-                None
-            )
-        }
-    }
-}
-
-fn parse_js(text: &str) -> std::result::Result<SyntaxNode, (String, Range<usize>)> {
-    let res = parse_module(text, 0);
-    if res.errors().is_empty()
-        || (res.errors().len() == 1
-            && res.errors().first().is_some_and(|err| {
-                // HACK: This essentially swallows the error... Not very stable, but
-                // I didn't find a well defined error identification system in the docs
-                // of rslint_errors.
-                //
-                // https://docs.rs/rslint_errors/0.2.0/rslint_errors/struct.Diagnostic.html
-                err.title.as_str() == "Duplicate statement labels are not allowed"
-            }))
+    fn parse_nodes<F>(&mut self, mut stop_pred: F) -> Result<Vec<Node<'src, Location>>>
+    where
+        F: FnMut(Token) -> std::result::Result<bool, ParseError<Location>>,
     {
-        Ok(res.syntax())
-    } else {
-        // A bit of a weird way to get owned diagnostics...
-        // We also get the first element error because this parser has a fail-fast strategy
-        let error = res.ok().expect_err("should have errors").swap_remove(0);
-        let range = error
-            .primary
-            .map(|diag| diag.span.range)
-            .unwrap_or_default();
-        Err((error.title, range))
-    }
-}
-
-// Thanks to https://docs.rs/nom_locate/latest/src/nom_locate/lib.rs.html#326 for
-// most of the code of this function. This function retrieves the source a NomSpan
-// is derived from, up to the end of the NomSpan.
-//
-// With an input and span (denoted by ^) of:
-// Hello, world!
-//   ^^^
-// This function returns: "Hello"
-fn get_unoffsetted_str(span: NomSpan) -> &str {
-    let self_bytes = span.fragment().as_bytes();
-    let self_ptr = self_bytes.as_ptr();
-    unsafe {
-        // Part of safety condition at https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html
-        assert!(
-            isize::try_from(span.location_offset()).is_ok(),
-            "offset is too big"
-        );
-        let orig_ptr = self_ptr.offset(-(span.location_offset() as isize));
-        let bytes = slice::from_raw_parts(orig_ptr, span.location_offset() + self_bytes.len());
-        // SAFETY: we got it from an &str originally, so we know it's valid utf8
-        std::str::from_utf8_unchecked(bytes)
-    }
-}
-
-fn parse_str(i: NomSpan) -> Result<NomSpan> {
-    escaped(none_of("\""), '\\', one_of("\"n\\"))(i)
-}
-
-fn parse_text(input: NomSpan) -> Result<NomSpan> {
-    escaped(
-        take_while(|c| !matches!(c, '/' | '#' | '\\' | '{' | '\n' | '\r')),
-        '\\',
-        one_of(r#"/#{}"#),
-    )(input)
-}
-
-// --General purpose parsers--
-
-fn failure_case<'i, Free, Parsed, P, F>(
-    parser: P,
-    err_constructor: F,
-) -> impl Fn(NomSpan<'i>) -> Result<'i, Free>
-where
-    P: Fn(NomSpan<'i>) -> Result<'i, Parsed>,
-    F: Fn(Parsed) -> (ParseErrorType, Option<Help>),
-{
-    use nom::Err::{Error, Failure, Incomplete};
-    move |i: NomSpan<'i>| match parser(i) {
-        Ok((_, parsed)) => {
-            let (err, help) = err_constructor(parsed);
-            let report = Report::from(ParseError::new(i, err, help));
-            Err(Failure(report))
+        let mut is_first = true;
+        let mut nodes = vec![];
+        while !stop_pred(self.current_token)? {
+            let mut node = self.parse_node()?;
+            if is_first {
+                // If the first node is a text node with a leading space, strip it
+                if let NodeType::Text(Text(t)) = node.node_type_mut() {
+                    *t = t.strip_prefix(' ').unwrap_or(t);
+                    // Avoid pushing the node as a child if it's empty
+                    if t.is_empty() {
+                        is_first = false;
+                        continue;
+                    }
+                }
+            }
+            is_first = false;
+            nodes.push(node);
         }
-        Err(Failure(e)) => Err(Failure(e)),
-        Err(Error(e)) => Err(Error(e)),
-        Err(Incomplete(need)) => Err(Incomplete(need)),
-    }
-}
 
-fn take_ignoring_nested(left: char, right: char) -> impl Fn(NomSpan) -> Result<NomSpan> {
-    move |i: NomSpan| {
-        let mut index = 0;
-        let mut needed = 1;
-        let mut chars = i.iter_elements();
-
-        while needed > 0 {
-            let c = chars.next().unwrap_or_default();
-            if c == left {
-                needed += 1;
-            }
-            if c == right {
-                needed -= 1;
-            }
-            if c == '\0' {
-                return Err(nom::Err::Error(Report::from_error_kind(
-                    i,
-                    nom::error::ErrorKind::Eof,
-                )));
-            }
-            if needed > 0 {
-                index += c.len_utf8();
+        if let Some(NodeType::Text(Text(t))) = nodes.last_mut().map(|node| node.node_type_mut()) {
+            if t.chars().all(|c| c.is_whitespace()) {
+                nodes.pop();
+            } else {
+                // If the last node is a text node, strip the trailing space
+                *t = t.strip_suffix(' ').unwrap_or(t);
+                // Pop it if it's empty
+                if t.is_empty() {
+                    nodes.pop();
+                }
             }
         }
 
-        let (new_i, old_i) = i.take_split(index);
-        Ok((new_i, old_i))
+        Ok(nodes)
     }
-}
 
-/// Matches eof or any character
-fn bad_char(input: NomSpan) -> Result<char> {
-    alt((value('\0', eof), anychar))(input)
-}
+    fn parse_elem(&mut self) -> Result<Element<'src, Location>> {
+        let TokenKind::ElemBegin(tag_name) = self.current_token.kind else {
+            panic!("should be called with ElemBegin");
+        };
+        let tag_loc = self.current_token.loc;
 
-fn ws<'a, F: 'a, O>(inner: F) -> impl FnMut(NomSpan<'a>) -> Result<O>
-where
-    F: Fn(NomSpan<'a>) -> Result<O>,
-{
-    delimited(multispace0, inner, multispace0)
-}
+        let attrs = if self.lexer.peek_token_allow(Allowed::LBRACKET).kind == TokenKind::Lbracket {
+            self.next_token_allow(Allowed::LBRACKET);
+            self.parse_attrs()?
+        } else {
+            vec![]
+        };
 
-fn ws_leading<'a, F: 'a, O>(inner: F) -> impl FnMut(NomSpan<'a>) -> Result<O>
-where
-    F: Fn(NomSpan<'a>) -> Result<O>,
-{
-    preceded(multispace0, inner)
-}
+        self.next_token_allow(Allowed::COLON);
+        if self.current_token.kind == TokenKind::Colon {
+            // Plus one because of the colon token
+            let loc = self.current_offset() + 1;
+            let text = expect!(self, Text(_))?;
+            return Ok(Element::new(
+                tag_name,
+                attrs,
+                vec![Node::new(
+                    NodeType::Text(Text(text)),
+                    Location::new(loc, text.len()),
+                )],
+            ));
+        }
 
-fn ws_trailing<'a, F: 'a, O>(inner: F) -> impl FnMut(NomSpan<'a>) -> Result<O>
-where
-    F: Fn(NomSpan<'a>) -> Result<O>,
-{
-    terminated(inner, multispace0)
-}
+        let children = self.parse_nodes(|tok| {
+            if tok.kind == TokenKind::Eof {
+                return Err(ParseError::new(
+                    tag_loc,
+                    ParseErrorType::UnclosedTag(tag_name.to_owned()),
+                    None,
+                ));
+            }
 
-fn identifier(input: NomSpan) -> Result<NomSpan> {
-    recognize(pair(
-        alt((alpha1, tag("_"))),
-        many0_count(alt((alphanumeric1, tag("_")))),
-    ))(input)
+            // Try to close the tag
+            if let TokenKind::ElemEnd(end_name) = tok.kind {
+                return if end_name == tag_name {
+                    Ok(true)
+                } else {
+                    Err(ParseError::new(
+                        tok.loc,
+                        ParseErrorType::InvalidClosingTag(tag_name.to_owned()),
+                        None,
+                    ))
+                };
+            }
+            Ok(false)
+        })?;
+
+        Ok(Element::new(tag_name, attrs, children))
+    }
+
+    fn parse_mustache(&mut self) -> Result<Mustache> {
+        let TokenKind::Mustache(js_text) = self.current_token.kind else {
+            panic!("should be called with Mustache");
+        };
+
+        self.parse_js_expr(js_text).map(Mustache)
+    }
+
+    fn parse_js_expr(&self, js_text: &str) -> Result<SyntaxNode> {
+        let parse = rslint_parser::parse_expr(js_text, 0);
+        if parse.errors().is_empty() {
+            Ok(parse.syntax())
+        } else {
+            let error = parse.ok().expect_err("should have errors").swap_remove(0);
+            let range = error.primary.unwrap().span.range;
+            Err(ParseError::new(
+                Location::new(self.current_offset() + range.start, range.len()),
+                ParseErrorType::JavaScriptDiagnostics { title: error.title },
+                None,
+            ))
+        }
+    }
+
+    fn parse_js_block(&self, js_text: &str) -> Result<SyntaxNode> {
+        let res = parse_module(js_text, 0);
+        if res.errors().is_empty()
+            || (res.errors().len() == 1
+                && res.errors().first().is_some_and(|err| {
+                    // HACK: This essentially swallows the error... Not very stable, but
+                    // I didn't find a well defined error identification system in the docs
+                    // of rslint_errors.
+                    //
+                    // https://docs.rs/rslint_errors/0.2.0/rslint_errors/struct.Diagnostic.html
+                    err.title.as_str() == "Duplicate statement labels are not allowed"
+                }))
+        {
+            Ok(res.syntax())
+        } else {
+            // A bit of a weird way to get owned diagnostics...
+            // We also get the first element error because this parser has a fail-fast strategy
+            let error = res.ok().expect_err("should have errors").swap_remove(0);
+            let range = error
+                .primary
+                .map(|diag| diag.span.range)
+                .unwrap_or_default();
+            Err(ParseError::new(
+                Location::new(self.current_offset() + range.start, range.len()),
+                ParseErrorType::JavaScriptDiagnostics { title: error.title },
+                None,
+            ))
+        }
+    }
+
+    fn parse_attrs(&mut self) -> Result<Vec<Attribute<'src>>> {
+        assert_eq!(TokenKind::Lbracket, self.current_token.kind);
+        let lbracket_loc = self.current_token.loc;
+
+        self.lexer.attrs_mode(true);
+        let mut attrs = vec![];
+        self.next_token();
+        while self.current_token.kind != TokenKind::Rbracket {
+            if self.current_token.kind == TokenKind::Eof {
+                return Err(ParseError::new(
+                    lbracket_loc,
+                    ParseErrorType::UnclosedAttrs,
+                    None,
+                ));
+            }
+            let attr = self.parse_attr()?;
+            attrs.push(attr);
+            self.next_token();
+        }
+        self.lexer.attrs_mode(false);
+
+        Ok(attrs)
+    }
+
+    fn parse_attr(&mut self) -> Result<Attribute<'src>> {
+        match dbg!(self.current_token).kind {
+            TokenKind::At => self.parse_event_handler(),
+            TokenKind::Ident(_) => self.parse_generic_attr(),
+            TokenKind::Colon => self.parse_binding(),
+            _ => error!(
+                self,
+                "an attribute name",
+                "colon binding (i.e. `:bind`)",
+                "event handler (i.e. `@event`)"
+            ),
+        }
+    }
+
+    fn parse_event_handler(&mut self) -> Result<Attribute<'src>> {
+        assert_eq!(TokenKind::At, self.current_token.kind);
+
+        let event = expect!(self, Ident(_))?;
+        expect!(self, Equals)?;
+        let expr_text = expect!(self, Mustache(_))?;
+
+        Ok(Attribute::EventHandler(EventHandler::new(
+            event,
+            self.parse_js_expr(expr_text)?,
+        )))
+    }
+
+    fn parse_generic_attr(&mut self) -> Result<Attribute<'src>> {
+        let TokenKind::Ident(key) = self.current_token.kind else {
+            panic!("should be called with Ident");
+        };
+
+        if self.lexer.peek_token().kind != TokenKind::Equals {
+            return Ok(Attribute::KeyValue(key, None));
+        }
+
+        // Equals
+        self.next_token();
+        self.next_token();
+
+        let attr = match self.current_token.kind {
+            TokenKind::Quotes(quotes) => {
+                Attribute::KeyValue(key, Some(AttributeValue::Literal(quotes.into())))
+            }
+            TokenKind::Mustache(mustache) => Attribute::KeyValue(
+                key,
+                Some(AttributeValue::JavaScript(self.parse_js_expr(mustache)?)),
+            ),
+            _ => {
+                return error!(self, "a quoted literal", "a JavaScript expression");
+            }
+        };
+
+        Ok(attr)
+    }
+
+    fn parse_binding(&mut self) -> Result<Attribute<'src>> {
+        assert_eq!(TokenKind::Colon, self.current_token.kind);
+
+        let bind = expect!(self, Ident(_))?;
+        expect!(self, Colon)?;
+
+        Ok(Attribute::Binding(bind))
+    }
+
+    fn parse_special_block(&mut self) -> Result<SpecialBlock<'src, Location>> {
+        let TokenKind::SpecialBlockStart(block_name) = self.current_token.kind else {
+            panic!("should only call with SpecialBlockStart");
+        };
+
+        let block = match block_name {
+            "for" => SpecialBlock::For(self.parse_for_block()?),
+            "if" => SpecialBlock::If(self.parse_if_block()?),
+            "use" => SpecialBlock::Use(self.parse_use_block()?),
+            _ => {
+                return error!(self, "a for block", "an if block", "a use block");
+            }
+        };
+
+        Ok(block)
+    }
+
+    fn parse_for_block(&mut self) -> Result<ForBlock<'src, Location>> {
+        self.lexer.attrs_mode(true);
+        let binding = expect!(self, Ident(_))?;
+        self.lexer.allow(Allowed::IN);
+        expect!(self, In)?;
+        self.lexer.attrs_mode(false);
+
+        let js_text = self.lexer.text_until('}');
+        self.next_token();
+        let iterator = self.parse_js_expr(js_text)?;
+
+        let inner = self.parse_nodes(|tok| match tok.kind {
+            TokenKind::SpecialBlockEnd(end_name) if end_name == "for" => Ok(true),
+            TokenKind::SpecialBlockEnd(_) => Err(ParseError::new(
+                tok.loc,
+                ParseErrorType::InvalidClosingTag("for".to_owned()),
+                None,
+            )),
+            _ => Ok(false),
+        })?;
+
+        Ok(ForBlock::new(binding, None, iterator, inner))
+    }
+
+    fn parse_if_block(&mut self) -> Result<IfBlock<'src, Location>> {
+        let js_text = self.lexer.text_until('}');
+        self.next_token();
+        let condition = self.parse_js_expr(js_text)?;
+
+        let inner = self.parse_nodes(|tok| match tok.kind {
+            TokenKind::SpecialBlockEnd(end_name) if end_name == "if" => Ok(true),
+            TokenKind::SpecialExtender(extender) if extender == "else" => Ok(true),
+            TokenKind::SpecialBlockEnd(_) => Err(ParseError::new(
+                tok.loc,
+                ParseErrorType::InvalidClosingTag("if".to_owned()),
+                None,
+            )),
+            TokenKind::SpecialExtender(_) => Err(ParseError::new(
+                tok.loc,
+                ParseErrorType::InvalidExtender("else"),
+                None,
+            )),
+            _ => Ok(false),
+        })?;
+
+        let else_block = if matches!(self.current_token.kind, TokenKind::SpecialExtender(_)) {
+            self.next_token();
+            let inner = self.parse_nodes(|tok| match tok.kind {
+                TokenKind::SpecialBlockEnd(end_name) if end_name == "if" => Ok(true),
+                TokenKind::SpecialBlockEnd(_) => Err(ParseError::new(
+                    tok.loc,
+                    ParseErrorType::InvalidClosingTag("if".to_owned()),
+                    None,
+                )),
+                _ => Ok(false),
+            })?;
+            Some(inner)
+        } else {
+            None
+        };
+
+        Ok(IfBlock::new(condition, inner, else_block))
+    }
+
+    fn parse_use_block(&mut self) -> Result<UseBlock<'src>> {
+        self.lexer.attrs_mode(true);
+        let path = expect!(self, Quotes(_))?;
+        expect!(self, Rbrace)?;
+        self.lexer.attrs_mode(false);
+
+        Ok(UseBlock::new(path))
+    }
+
+    fn parse_code_blocks(&mut self) -> Result<()> {
+        let mut did_parse = false;
+        while self.current_token.kind == TokenKind::CodeBlockIndicator {
+            did_parse = true;
+            let offset = self.current_offset();
+            let err_convert = |err| |_| ParseError::new(Location::new(offset, 1), err, None);
+            let code = self.parse_code_block()?;
+
+            match code.lang() {
+                _ if code.is_comptime() => {
+                    self.code_blocks
+                        .set_static_wasm(code)
+                        .map_err(err_convert(ParseErrorType::CannotHaveTwoStatics))?;
+                }
+                "js" => {
+                    let syntax_node = self.parse_js_block(code.body())?;
+                    self.code_blocks
+                        .set_script(syntax_node)
+                        .map_err(err_convert(ParseErrorType::CannotHaveTwoScripts))?;
+                }
+                "css" => {
+                    let css_parser = css::Parser::new(code.body());
+                    let ast = css_parser.parse().map_err(|err| {
+                        // TODO: help
+                        let _help = err.help().cloned();
+                        self.error_on_current(ParseErrorType::CssParsingError(err.into()))
+                    })?;
+                    self.code_blocks
+                        .set_css(ast)
+                        .map_err(err_convert(ParseErrorType::CannotHaveTwoStyles))?;
+                }
+                _ => {
+                    match self
+                        .ctx
+                        .preprocessor
+                        .preprocess(code.lang(), code.body())
+                        .map_err(|err| {
+                            self.error_on_current(ParseErrorType::PreprocError(Box::new(err)))
+                        })? {
+                        Override::Js(js_text) => {
+                            let syntax_node = self.parse_js_block(&js_text)?;
+                            self.code_blocks
+                                .set_script(syntax_node)
+                                .map_err(err_convert(ParseErrorType::CannotHaveTwoScripts))?;
+                        }
+                        Override::Css(css_text) => {
+                            let css_parser = css::Parser::new(&css_text);
+                            let ast = css_parser.parse().map_err(|err| {
+                                // TODO: help
+                                let _help = err.help().cloned();
+                                self.error_on_current(ParseErrorType::CssParsingError(err.into()))
+                            })?;
+                            self.code_blocks
+                                .set_css(ast)
+                                .map_err(err_convert(ParseErrorType::CannotHaveTwoStyles))?;
+                        }
+                        Override::None => {
+                            self.code_blocks
+                                .set_wasm(code)
+                                .map_err(err_convert(ParseErrorType::CannotHaveTwoWasmBlocks))?;
+                        }
+                    }
+                }
+            }
+        }
+        if did_parse {
+            self.next_token();
+        }
+
+        Ok(())
+    }
+
+    fn parse_code_block(&mut self) -> Result<Code<'src>> {
+        assert_eq!(TokenKind::CodeBlockIndicator, self.current_token.kind);
+
+        let offset = self.current_offset();
+        self.lexer.attrs_mode(true);
+        let lang = expect!(self, Ident(_))?;
+        let comptime = if self.lexer.peek_token().kind == TokenKind::Colon {
+            self.next_token();
+            let ident = expect!(self, Ident(_))?;
+            if ident != "static" {
+                return error!(self, "the static keyword");
+            }
+            true
+        } else {
+            false
+        };
+
+        let body = self.lexer.text_until_str("---");
+        if self.lexer.peek_token().kind == TokenKind::CodeBlockIndicator {
+            self.next_token();
+        }
+        self.lexer.attrs_mode(false);
+
+        Ok(Code::new(lang, body, offset, comptime))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    macro_rules! nom_test_all_insta {
-        ($func:ident, $inputs:expr) => {
-            for input in $inputs {
-                insta::assert_debug_snapshot!($func(input.into()));
-            }
+    macro_rules! test {
+        ($($input:expr),+) => {
+            $(
+                let lexer = Lexer::new($input);
+                let parser = Parser::new(lexer);
+                let ast = parser.parse();
+                insta::assert_debug_snapshot!(ast);
+             )+
         };
     }
 
     #[test]
     fn can_parse_attribute() {
-        nom_test_all_insta!(
-            attribute,
-            [
-                "hello=\"hello world\"",
-                "hello",
-                "hello   =   \"hello world\"",
-                "hello   =   \"hello world\"",
-                "hello=\"你好\"",
-                "hello={ctx[1]}",
-                "@click={() => x += 1}",
-                "@click   =  \"wrong\"",
-                "@click",
-            ]
+        test!(
+            "#div[hello=\"hello world\"]/div",
+            "#div[hello]/div",
+            "#div[hello   =   \"hello world\"]/div",
+            "#div[hello   =   \"hello world\"]/div",
+            "#div[hello=\"你好\"]/div",
+            "#div[hello={ctx[1]}]/div",
+            "#div[@click={() => x += 1}]/div",
+            "#div[@click   =  \"wrong\"]/div",
+            "#div[@click]/div"
         );
     }
 
     #[test]
     fn can_parse_elements() {
-        nom_test_all_insta!(
-            element,
-            [
-                "#div /div",
-                "#div[hello=\"world\"]/div",
-                "#div[   hello=\"world\"    ] /div",
-                "#div[   hello=\"world    ] /div",
-                "#div[]/div",
-                "#div#li/li/div",
-                "#div #ul    /ul/div",
-                "#div text {mustache} hello #div/div /div",
-                "#div[hello=\"world\"/div",
-                "#div[hello=\"world\"]/notdiv",
-                "#div]/div",
-                "#div",
-                "#span[x=\"green\"]:hello world"
-            ]
+        test!(
+            "#div /div",
+            "#div[hello=\"world\"]/div",
+            "#div[   hello=\"world\"    ] /div",
+            "#div[   hello=\"world    ] /div",
+            "#div[]/div",
+            "#div#li/li/div",
+            "#div #ul    /ul/div",
+            "#div text {mustache} hello #div/div /div",
+            "#div[hello=\"world\"/div",
+            "#div[hello=\"world\"]/notdiv",
+            "#div]/div",
+            "#div",
+            "#span[x=\"green\"]:hello world"
         );
     }
 
     #[test]
     fn can_parse_multiple_elements() {
-        nom_test_all_insta!(
-            nodes,
-            [
-                "#div/div#div hello /div hello",
-                "",
-                "hello",
-                "/div",
-                "#div/div// hello!"
-            ]
+        test!(
+            "#div/div#div hello /div hello",
+            "",
+            "hello",
+            "/div",
+            "#div/div// hello!"
         );
     }
 
     #[test]
     fn can_parse_scripts() {
-        nom_test_all_insta!(parse, ["---js console.log(\"hello\")---",]);
-        nom_test_all_insta!(parse, ["---css body { height: 100vh; } ---"]);
-        nom_test_all_insta!(parse, ["---wasm let x = 3; ---"]);
+        test!(
+            "---js console.log(\"hello\")---",
+            "---css body { height: 100vh; } ---",
+            "---wasm let x = 3; ---"
+        );
     }
 
     #[test]
     fn can_parse_entire_input() {
-        nom_test_all_insta!(
-            parse,
-            [
-                "---js let x = 3; --- #div {x} /div",
-                "#div/notdiv#div2/notdiv2",
-                "#div",
-                "\\/",
-                "#div \\#hello \\{ /div",
-                "/",
-                "#div / /div",
-                "#div[@attr={hello]/div",
-                "#div[@attr=\"hello\"]/div",
-                "#div[@attr]/div",
-                "#p Hi /p Hello, {name}",
-                "---css body { height: 100vh; } ---",
-            ]
-        )
+        test!(
+            "---js let x = 3; --- #div {x} /div",
+            "#div/notdiv#div2/notdiv2",
+            "#div",
+            "\\/",
+            "#div \\#hello \\{ /div",
+            "/",
+            "#div / /div",
+            "#div[@attr={hello]/div",
+            "#div[@attr=\"hello\"]/div",
+            "#div[@attr]/div",
+            "#p Hi /p Hello, {name}",
+            "---css body { height: 100vh; } ---"
+        );
     }
 
     #[test]
     fn mustaches_allow_for_curly_braces() {
-        nom_test_all_insta!(mustache, ["{() => { console.log(\"hi\"); }  }"])
+        test!("{() => { console.log(\"hi\"); }  }");
     }
 
     #[test]
     fn can_parse_special_blocks() {
-        nom_test_all_insta!(
-            parse,
-            [
-                "{#for i in [1, 2, 3]} #p hello /p {/for}",
-                "{#for idx, elem in [1, 2, 3]} #p hello /p {/for}",
-                "{#if x == 3} #p hello /p {/if}",
-                "{#if x == 3} #p hello /p {:else} hello {/if}"
-            ]
-        )
+        test!(
+            "{#for i in [1, 2, 3]} #p hello /p {/for}",
+            "{#if x == 3} #p hello /p {/if}",
+            "{#if x == 3} #p hello /p {:else} hello {/if}"
+        );
     }
 
     #[test]
     fn css_can_appear_after_template() {
-        nom_test_all_insta!(
-            parse,
-            ["#p Hello /p 
-            ---css p { color: blue; } ---"]
-        )
+        test!(
+            "#p Hello /p 
+              ---css p { color: blue; } ---"
+        );
     }
 
     #[test]
     fn can_parse_bindings() {
-        nom_test_all_insta!(attribute, [":hello:", ":invalid"]);
-        nom_test_all_insta!(parse, ["#input[:bind: attr=\"value\"]/input"])
+        test!(
+            "#div[:hello:]/div",
+            "#div[:invalid]/div",
+            "#input[:bind: attr=\"value\"]/input"
+        );
     }
 
     #[test]
     fn css_parse_errors_are_given_offset() {
-        nom_test_all_insta!(parse, ["#p hi /p ---css p { color: red } ---"])
+        test!("#p hi /p ---css p { color: red } ---");
     }
 
     #[test]
     fn javascript_parse_errors_have_proper_location_offsets() {
-        nom_test_all_insta!(parse, ["---js let x = ; ---"])
+        test!("---js let x = ; ---");
     }
 
     #[test]
@@ -875,20 +720,21 @@ mod tests {
         }
 
         let input = "---sass hello --- ---ts typescript? ---";
-        let ast = parse_with_preprocessor(input, &Preproc);
+        let lexer = Lexer::new(input);
+        let parser = Parser::new(lexer).with_ctx(Ctx {
+            preprocessor: &Preproc,
+        });
+        let ast = parser.parse();
         insta::assert_debug_snapshot!(ast);
     }
 
     #[test]
     fn cannot_have_two_code_blocks_of_same_type() {
-        nom_test_all_insta!(
-            parse,
-            [
-                "---js let x = 0; --- ---js let x = 0; ---",
-                "---css p { color: red; } --- ---css p { color: red; } ---",
-                "---rust let x = 0; --- ---rust let x = 0; ---"
-            ]
-        )
+        test!(
+            "---js let x = 0; --- ---js let x = 0; ---",
+            "---css p { color: red; } --- ---css p { color: red; } ---",
+            "---rust let x = 0; --- ---rust let x = 0; ---"
+        );
     }
 
     #[test]
@@ -909,17 +755,21 @@ mod tests {
             }
         }
         let input = "---sass hello --- ---sass sass ---";
-        let ast = parse_with_preprocessor(input, &Preproc);
+        let lexer = Lexer::new(input);
+        let parser = Parser::new(lexer).with_ctx(Ctx {
+            preprocessor: &Preproc,
+        });
+        let ast = parser.parse();
         insta::assert_debug_snapshot!(ast);
     }
 
     #[test]
     fn can_parse_use_decls() {
-        nom_test_all_insta!(parse, ["{#use \"path\"} #p hello /p"]);
+        test!("{#use \"path\"} #p hello /p");
     }
 
     #[test]
     fn can_parse_static_blocks() {
-        nom_test_all_insta!(parse, ["---js:static console.log(\"hello\"); ---"]);
+        test!("---js:static console.log(\"hello\"); ---");
     }
 }

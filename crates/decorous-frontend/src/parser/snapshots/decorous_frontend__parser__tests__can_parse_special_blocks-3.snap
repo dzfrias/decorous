@@ -1,37 +1,32 @@
 ---
 source: crates/decorous-frontend/src/parser/mod.rs
-expression: parse(input.into())
+expression: ast
 ---
 Ok(
     DecorousAst {
         nodes: [
             Node {
                 metadata: Location {
-                    offset: 0,
-                    length: 30,
-                    line: 1,
-                    column: 1,
+                    offset: 2,
+                    length: 42,
                 },
                 node_type: SpecialBlock(
                     If(
                         IfBlock {
-                            expr: EXPR_STMT@1..7
-                              BIN_EXPR@1..7
-                                NAME_REF@1..2
-                                  IDENT@1..2 "x"
-                                WHITESPACE@2..3 " "
-                                EQ2@3..5 "=="
-                                WHITESPACE@5..6 " "
-                                LITERAL@6..7
-                                  NUMBER@6..7 "3"
+                            expr: BIN_EXPR@0..6
+                              NAME_REF@0..1
+                                IDENT@0..1 "x"
+                              WHITESPACE@1..2 " "
+                              EQ2@2..4 "=="
+                              WHITESPACE@4..5 " "
+                              LITERAL@5..6
+                                NUMBER@5..6 "3"
                             ,
                             inner: [
                                 Node {
                                     metadata: Location {
-                                        offset: 13,
-                                        length: 12,
-                                        line: 1,
-                                        column: 14,
+                                        offset: 14,
+                                        length: 10,
                                     },
                                     node_type: Element(
                                         Element {
@@ -40,10 +35,8 @@ Ok(
                                             children: [
                                                 Node {
                                                     metadata: Location {
-                                                        offset: 16,
-                                                        length: 6,
-                                                        line: 1,
-                                                        column: 17,
+                                                        offset: 15,
+                                                        length: 8,
                                                     },
                                                     node_type: Text(
                                                         Text(
@@ -56,7 +49,21 @@ Ok(
                                     ),
                                 },
                             ],
-                            else_block: None,
+                            else_block: Some(
+                                [
+                                    Node {
+                                        metadata: Location {
+                                            offset: 32,
+                                            length: 9,
+                                        },
+                                        node_type: Text(
+                                            Text(
+                                                "hello",
+                                            ),
+                                        ),
+                                    },
+                                ],
+                            ),
                         },
                     ),
                 ),

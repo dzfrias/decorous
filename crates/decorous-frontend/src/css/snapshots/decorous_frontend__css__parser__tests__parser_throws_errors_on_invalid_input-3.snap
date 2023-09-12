@@ -7,8 +7,6 @@ Err(
         fragment: Location {
             offset: 28,
             length: 1,
-            line: 1,
-            column: 28,
         },
         help: Some(
             Help {
