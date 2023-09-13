@@ -235,7 +235,7 @@ impl<'a, T> Element<'a, T> {
     }
 
     pub fn js_valid_tag_name(&self) -> Cow<'a, str> {
-        if self.tag().contains("-") {
+        if self.tag().contains('-') {
             Cow::Owned(self.tag().to_snek_case())
         } else {
             Cow::Borrowed(self.tag())

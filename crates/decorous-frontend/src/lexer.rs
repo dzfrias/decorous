@@ -6,12 +6,19 @@ use crate::location::Location;
 bitflags! {
     #[derive(Debug, Clone, Copy)]
     pub struct Allowed: u32 {
+        #[allow(clippy::unreadable_literal)]
         const COLON    = 0b00000001;
+        #[allow(clippy::unreadable_literal)]
         const LBRACKET = 0b00000010;
+        #[allow(clippy::unreadable_literal)]
         const RBRACKET = 0b00000100;
+        #[allow(clippy::unreadable_literal)]
         const EQUALS   = 0b00001000;
+        #[allow(clippy::unreadable_literal)]
         const AT       = 0b00010000;
+        #[allow(clippy::unreadable_literal)]
         const QUOTES   = 0b00100000;
+        #[allow(clippy::unreadable_literal)]
         const IN       = 0b01000000;
     }
 }

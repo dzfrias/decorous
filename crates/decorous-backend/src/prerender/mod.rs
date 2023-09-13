@@ -120,7 +120,7 @@ pub fn render(
                     component.declared_vars(),
                     *scope_id,
                 )
-            })?
+            })?;
         }
         for node in component.toplevel_nodes() {
             if node.substitute_assign_refs {
@@ -257,8 +257,10 @@ macro_rules! with_id {
     ($id:expr, $state:expr, $exec:expr) => {
         #[allow(unused)]
         if let Some(id) = $state.id_overwrites.get(&$id).cloned() {
+            #[allow(clippy::redundant_closure_call)]
             $exec(&id);
         } else {
+            #[allow(clippy::redundant_closure_call)]
             $exec($id);
         }
     };
@@ -337,7 +339,7 @@ impl<'ast> Render<'ast> for Element<'ast, FragmentMetadata> {
                 Attribute::KeyValue(_, Some(AttributeValue::JavaScript(_)))
                 | Attribute::EventHandler(_)
                 | Attribute::Binding(_) => has_dynamic = true,
-                _ => {}
+                Attribute::KeyValue(_, None | Some(AttributeValue::Literal(_))) => {}
             }
         }
         if meta.parent_id().is_none() && !state.component.declared_vars().css_mustaches().is_empty()
@@ -585,15 +587,13 @@ impl<'ast> Render<'ast> for Attribute<'ast> {
                     let bitmask = 1 << (var_id % 8);
                     out.write_updateln(format_args!(
                         "if (dirty[{dirty_idx}] & {bitmask}) elems[\"{id}\"].value = ctx[{var_id}];"
-                    ))
+                    ));
                 });
             }
             Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js))) => {
                 let js = if *key == "style" && inline_styles_candidate {
                     let style = state.use_style_cache();
-                    let new_js =
-                        rslint_parser::parse_text(&format!("`${{{js}}} {style}`"), 0).syntax();
-                    new_js
+                    rslint_parser::parse_text(&format!("`${{{js}}} {style}`"), 0).syntax()
                 } else {
                     js.clone()
                 };
@@ -603,9 +603,9 @@ impl<'ast> Render<'ast> for Attribute<'ast> {
     }
 }
 
-fn render_dyn_attr<'ast>(
+fn render_dyn_attr(
     meta: &FragmentMetadata,
-    state: &mut State<'ast>,
+    state: &mut State,
     out: &mut Output,
     key: &str,
     js: &SyntaxNode,
@@ -616,7 +616,7 @@ fn render_dyn_attr<'ast>(
         let dirty_indices =
             codegen_utils::calc_dirty(&unbound, state.component.declared_vars(), meta.scope());
         let replaced = codegen_utils::replace_namerefs(
-            &js,
+            js,
             &unbound,
             state.component.declared_vars(),
             meta.scope(),

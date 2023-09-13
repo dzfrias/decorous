@@ -529,10 +529,7 @@ impl<'a> Component<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use itertools::Itertools;
-    use rslint_parser::SmolStr;
 
     use super::*;
     use crate::parser::parse;

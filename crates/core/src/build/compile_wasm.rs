@@ -241,8 +241,7 @@ impl WasmCompiler for MainCompiler<'_> {
         let outdir = fs::canonicalize(&self.args.out).expect("outdir should have been created");
         let wasm_path = fs::read_dir(&outdir)?
             .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-            .filter(|path| matches!(path.extension(), Some(ext) if ext == OsStr::new("wasm")))
-            .next()
+            .find(|path| matches!(path.extension(), Some(ext) if ext == OsStr::new("wasm")))
             .context("no WebAssembly file outputted from static compiler")?;
 
         // Run wasi module
@@ -257,7 +256,7 @@ impl WasmCompiler for MainCompiler<'_> {
                 .stderr(Box::new(stderr.clone()))
                 .build();
             let mut store = Store::new(&engine, wasi);
-            let module = Module::from_file(&engine, &wasm_path)?;
+            let module = Module::from_file(&engine, wasm_path)?;
             linker.module(&mut store, "", &module)?;
             linker
                 .get_default(&mut store, "")?
