@@ -1,17 +1,26 @@
-use std::borrow::Cow;
+use decorous_errors::DynErrStream;
+use std::{borrow::Cow, io};
 use thiserror::Error;
 
 use crate::location::Location;
 
+#[derive(Clone)]
 pub struct Ctx<'a> {
     pub preprocessor: &'a dyn Preprocessor,
-    // TODO: Place to emit errors goes here
+    pub errs: DynErrStream<'a>,
 }
 
 impl Default for Ctx<'_> {
     fn default() -> Self {
         Self {
             preprocessor: &NullPreproc,
+            errs: DynErrStream::new(
+                Box::new(io::stderr()),
+                decorous_errors::Source {
+                    name: "CTX_DEFAULT".to_owned(),
+                    src: "",
+                },
+            ),
         }
     }
 }

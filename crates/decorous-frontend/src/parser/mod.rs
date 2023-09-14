@@ -1,7 +1,9 @@
 mod code_blocks;
 mod ctx;
 pub mod errors;
+mod lexer;
 
+use decorous_errors::Diagnostic;
 use rslint_parser::{parse_module, SyntaxNode};
 
 use crate::{
@@ -11,11 +13,11 @@ use crate::{
     },
     css,
     errors::{ParseError, ParseErrorType},
-    lexer::{Allowed, Lexer, Token, TokenKind},
     location::Location,
     parser::code_blocks::CodeBlocks,
 };
 pub use ctx::*;
+use lexer::{Allowed, Lexer, Token, TokenKind};
 
 type Result<T> = std::result::Result<T, ParseError<Location>>;
 
@@ -52,25 +54,10 @@ macro_rules! error {
     };
 }
 
-pub fn parse(input: &str) -> Result<DecorousAst> {
-    let lexer = Lexer::new(input);
-    let parser = Parser::new(lexer);
-    parser.parse()
-}
-
-pub fn parse_with_preprocessor<'src>(
-    input: &'src str,
-    preprocessor: &dyn Preprocessor,
-) -> Result<DecorousAst<'src>> {
-    let lexer = Lexer::new(input);
-    let parser = Parser::new(lexer).with_ctx(Ctx { preprocessor });
-    parser.parse()
-}
-
 impl<'src, 'ctx> Parser<'src, 'ctx> {
-    pub fn new(lexer: Lexer<'src>) -> Self {
+    pub fn new(src: &'src str) -> Self {
         let mut parser = Self {
-            lexer,
+            lexer: Lexer::new(src),
             current_token: Token {
                 kind: TokenKind::Eof,
                 loc: Location::default(),
@@ -557,9 +544,19 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
             self.next_token();
             let ident = expect!(self, Ident(_))?;
             if ident != "static" {
-                return error!(self, "the static keyword");
+                self.ctx.errs.emit(
+                    Diagnostic::builder("expected the static keyword", self.current_offset())
+                        .note("the static keyword evaluates the code block at compile time")
+                        .add_helper(decorous_errors::Helper {
+                            msg: "you might've wanted to change this to `static`".into(),
+                            span: self.current_token.loc.into(),
+                        })
+                        .build(),
+                );
+                false
+            } else {
+                true
             }
-            true
         } else {
             false
         };
@@ -581,8 +578,7 @@ mod tests {
     macro_rules! test {
         ($($input:expr),+) => {
             $(
-                let lexer = Lexer::new($input);
-                let parser = Parser::new(lexer);
+                let parser = Parser::new($input);
                 let ast = parser.parse();
                 insta::assert_debug_snapshot!(ast);
              )+
@@ -723,9 +719,9 @@ mod tests {
         }
 
         let input = "---sass hello --- ---ts typescript? ---";
-        let lexer = Lexer::new(input);
-        let parser = Parser::new(lexer).with_ctx(Ctx {
+        let parser = Parser::new(input).with_ctx(Ctx {
             preprocessor: &Preproc,
+            ..Default::default()
         });
         let ast = parser.parse();
         insta::assert_debug_snapshot!(ast);
@@ -758,9 +754,9 @@ mod tests {
             }
         }
         let input = "---sass hello --- ---sass sass ---";
-        let lexer = Lexer::new(input);
-        let parser = Parser::new(lexer).with_ctx(Ctx {
+        let parser = Parser::new(input).with_ctx(Ctx {
             preprocessor: &Preproc,
+            ..Default::default()
         });
         let ast = parser.parse();
         insta::assert_debug_snapshot!(ast);

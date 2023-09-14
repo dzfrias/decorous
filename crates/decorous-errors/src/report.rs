@@ -70,24 +70,25 @@ impl From<Severity> for ariadne::ReportKind<'_> {
 }
 
 impl Diagnostic {
-    pub fn builder(
-        msg: impl Into<Cow<'static, str>>,
-        severity: Severity,
-        offset: usize,
-    ) -> DiagnosticBuilder {
-        DiagnosticBuilder::new(msg, severity, offset)
+    pub fn builder(msg: impl Into<Cow<'static, str>>, offset: usize) -> DiagnosticBuilder {
+        DiagnosticBuilder::new(msg, offset)
     }
 }
 
 impl DiagnosticBuilder {
-    pub fn new(msg: impl Into<Cow<'static, str>>, severity: Severity, offset: usize) -> Self {
+    pub fn new(msg: impl Into<Cow<'static, str>>, offset: usize) -> Self {
         Self {
             msg: msg.into(),
-            severity,
+            severity: Severity::Error,
             offset,
             helpers: vec![],
             note: None,
         }
+    }
+
+    pub fn severity(mut self, severity: Severity) -> Self {
+        self.severity = severity;
+        self
     }
 
     pub fn note(mut self, note: impl Into<Cow<'static, str>>) -> Self {

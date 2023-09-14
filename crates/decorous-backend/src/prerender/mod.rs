@@ -636,13 +636,14 @@ fn render_dyn_attr(
 #[cfg(test)]
 mod tests {
     use crate::css_render::render_css;
-    use decorous_frontend::{parse, Component};
+    use decorous_frontend::{Component, Parser};
     use std::fmt::Write;
 
     use super::*;
 
     fn make_component(input: &str) -> Component {
-        Component::new(parse(input).expect("should be valid input"))
+        let parser = Parser::new(input);
+        Component::new(parser.parse().expect("should be valid input"))
     }
 
     macro_rules! test_render {

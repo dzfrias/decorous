@@ -187,12 +187,13 @@ fn render_init_ctx<W: io::Write>(out: &mut W, component: &Component<'_>) -> io::
 #[cfg(test)]
 mod tests {
     use crate::{NullCompiler, NullResolver};
-    use decorous_frontend::parse;
+    use decorous_frontend::Parser;
 
     use super::*;
 
     fn make_component(input: &str) -> Component {
-        Component::new(parse(input).expect("should be valid input"))
+        let parser = Parser::new(input);
+        Component::new(parser.parse().expect("should be valid input"))
     }
 
     macro_rules! test_render {

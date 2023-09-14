@@ -9,7 +9,7 @@ use crate::{
     indicators::{FinishLog, Spinner},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Preproc<'a> {
     config: &'a Config,
     enable_color: bool,

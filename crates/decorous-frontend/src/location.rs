@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use nom_locate::LocatedSpan;
 
 /// Represents a location with respect to an input string. Everything is positioned based on
@@ -53,6 +55,15 @@ impl From<usize> for Location {
         Self {
             offset: value,
             length: 1,
+        }
+    }
+}
+
+impl From<Location> for Range<usize> {
+    fn from(value: Location) -> Self {
+        Self {
+            start: value.offset(),
+            end: value.offset() + value.length(),
         }
     }
 }

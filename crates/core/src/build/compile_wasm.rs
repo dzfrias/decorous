@@ -300,12 +300,9 @@ fn warn_unused_deps(deps: &[String]) -> Result<()> {
     let mut report = Report::new();
     for bin in deps.iter().filter(|b| which(b).is_err()) {
         report.add_diagnostic(
-            DiagnosticBuilder::new(
-                format!("script dependency not found: {bin}"),
-                Severity::Warning,
-                0,
-            )
-            .build(),
+            DiagnosticBuilder::new(format!("script dependency not found: {bin}"), 0)
+                .severity(Severity::Warning)
+                .build(),
         );
     }
     if !report.is_empty() {

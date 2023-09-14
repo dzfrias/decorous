@@ -5,32 +5,42 @@ use std::{
 };
 
 use decorous_backend::{dom_render::render, Options, UseInfo, UseResolver};
-use decorous_frontend::{parse_with_preprocessor, Component};
+use decorous_errors::{ErrStream, Source};
+use decorous_frontend::{Component, Ctx, Parser};
 
-use crate::{
-    build::{compile_wasm::MainCompiler, preprocessor::Preproc},
-    cli::Build,
-    config::Config,
-};
+use crate::build::{compile_wasm::MainCompiler, global_ctx::GlobalCtx, preprocessor::Preproc};
 
-#[derive(Debug)]
 pub struct Resolver<'a> {
-    pub config: &'a Config,
-    pub args: &'a Build,
-    pub enable_color: bool,
+    pub global_ctx: &'a GlobalCtx<'a>,
     pub compiler: &'a MainCompiler<'a>,
 }
 
 impl UseResolver for Resolver<'_> {
     fn resolve(&self, path: &Path) -> io::Result<UseInfo> {
         let contents = fs::read_to_string(path)?;
-        // TODO: Error handling. Make everything a report
-        let ast = parse_with_preprocessor(&contents, &Preproc::new(self.config, self.enable_color))
-            .unwrap();
+        let stem = path.file_stem().unwrap().to_string_lossy();
+
+        let preproc = Preproc::new(self.global_ctx.config, self.global_ctx.args.color);
+        let parser = Parser::new(&contents).with_ctx(Ctx {
+            preprocessor: &preproc,
+            errs: ErrStream::new(
+                Box::new(io::stderr()),
+                Source {
+                    name: stem.to_string(),
+                    src: &contents,
+                },
+            ),
+        });
+        let ast = match parser.parse() {
+            Ok(ast) => ast,
+            Err(err) => {
+                self.global_ctx.errs.emit(err.into());
+                todo!("fix result of resolve()");
+            }
+        };
         let component = Component::new(ast);
 
-        let stem = path.file_stem().unwrap().to_string_lossy();
-        let name: PathBuf = format!("{}_{stem}.mjs", self.args.out).into();
+        let name: PathBuf = format!("{}_{stem}.mjs", self.global_ctx.args.out).into();
         let mut f = BufWriter::new(File::create(&name)?);
         render(
             &component,

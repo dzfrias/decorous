@@ -1,7 +1,6 @@
 use std::{borrow::Cow, fmt, ops::Range};
 
-use decorous_errors::{DiagnosticBuilder, Severity};
-use nom_locate::LocatedSpan;
+use decorous_errors::{Diagnostic, DiagnosticBuilder, Helper};
 use thiserror::Error;
 
 use crate::{css, location::Location, PreprocessError};
@@ -44,8 +43,6 @@ pub enum ParseErrorType {
     CssParsingError(Box<css::error::ParseError<Location>>),
     #[error("{0}")]
     PreprocError(Box<PreprocessError>),
-    #[error("byte processing error: {}", 0.to_string())]
-    Nom(nom::error::ErrorKind),
 }
 
 /// A parsing error, with extra metadata. The root of this struct is in
@@ -64,74 +61,33 @@ pub struct ParseError<T> {
     err_type: ParseErrorType,
 }
 
-/// An error help message, commonly created alongside a [`ParseError`].
-#[derive(Debug, Clone, PartialEq)]
-pub struct Help {
-    corresponding_span: Option<Range<usize>>,
-    message: &'static str,
-}
-
-/// A full report of [`ParseError`]s.
-///
-/// This is usually produced along the [`parse`](crate::parse) function.
-#[derive(Debug, Clone)]
-pub struct Report(pub decorous_errors::Report);
-
-impl From<ParseError<LocatedSpan<&str>>> for Report {
-    fn from(err: ParseError<LocatedSpan<&str>>) -> Self {
-        let mut diagnostic = DiagnosticBuilder::new(
-            err.to_string(),
-            Severity::Error,
-            err.fragment().location_offset(),
-        )
-        .build();
-        if let Some(help) = err.help() {
+impl Into<Diagnostic> for ParseError<Location> {
+    fn into(self) -> Diagnostic {
+        let mut diagnostic =
+            DiagnosticBuilder::new(self.to_string(), self.fragment().offset()).build();
+        if let Some(help) = self.help() {
             diagnostic.note = Some(Cow::Borrowed(help.message()));
             if let Some(span) = help.corresponding_span() {
-                diagnostic.helpers.push(decorous_errors::Helper {
+                diagnostic.helpers.push(Helper {
                     msg: Cow::Borrowed("from here"),
                     span: span.clone(),
                 });
             }
         }
-        diagnostic.helpers.push(decorous_errors::Helper {
+        diagnostic.helpers.push(Helper {
             msg: Cow::Borrowed("here"),
-            span: err.fragment().location_offset()..err.fragment().location_offset() + 1,
+            span: self.fragment().offset()..self.fragment().offset() + self.fragment().length(),
         });
-        let mut report = decorous_errors::Report::new();
-        report.add_diagnostic(diagnostic);
-        Report(report)
+
+        diagnostic
     }
 }
 
-impl nom::error::ParseError<LocatedSpan<&str>> for Report {
-    fn from_error_kind(fragment: LocatedSpan<&str>, kind: nom::error::ErrorKind) -> Self {
-        Self::from(ParseError {
-            fragment,
-            err_type: ParseErrorType::Nom(kind),
-            help: None,
-        })
-    }
-
-    fn append(input: LocatedSpan<&str>, kind: nom::error::ErrorKind, mut other: Self) -> Self {
-        other.0.add_diagnostic(
-            DiagnosticBuilder::new(
-                ParseErrorType::Nom(kind).to_string(),
-                Severity::Error,
-                input.location_offset(),
-            )
-            .build(),
-        );
-        other
-    }
-
-    fn from_char(input: LocatedSpan<&str>, c: char) -> Self {
-        Self::from(ParseError {
-            fragment: input,
-            err_type: ParseErrorType::ExpectedCharacter(c),
-            help: None,
-        })
-    }
+/// An error help message, commonly created alongside a [`ParseError`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct Help {
+    corresponding_span: Option<Range<usize>>,
+    message: &'static str,
 }
 
 impl<T> ParseError<T> {

@@ -510,12 +510,9 @@ impl<'a> Component<'a> {
             .filter(|v| !GLOBALS.contains(&v.as_str()))
         {
             self.report.add_diagnostic(
-                DiagnosticBuilder::new(
-                    format!("possibly unbound variable: {unbound}"),
-                    Severity::Warning,
-                    0,
-                )
-                .build(),
+                DiagnosticBuilder::new(format!("possibly unbound variable: {unbound}"), 0)
+                    .severity(Severity::Warning)
+                    .build(),
             );
         }
     }
@@ -532,11 +529,12 @@ mod tests {
     use itertools::Itertools;
 
     use super::*;
-    use crate::parser::parse;
+    use crate::Parser;
 
     fn make_component(source: &str) -> Component<'_> {
-        let ast = parse(source);
-        Component::new(ast.unwrap())
+        let parser = Parser::new(source);
+        let ast = parser.parse().unwrap();
+        Component::new(ast)
     }
 
     // #[test]

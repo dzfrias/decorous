@@ -102,12 +102,13 @@ fn write_value<T: io::Write>(
 
 #[cfg(test)]
 mod tests {
-    use decorous_frontend::parse;
+    use decorous_frontend::Parser;
 
     use super::*;
 
     fn make_component(input: &str) -> Component {
-        Component::new(parse(input).expect("should be valid input"))
+        let parser = Parser::new(input);
+        Component::new(parser.parse().expect("should be valid input"))
     }
 
     #[test]

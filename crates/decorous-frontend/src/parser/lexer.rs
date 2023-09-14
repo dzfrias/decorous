@@ -138,10 +138,6 @@ impl<'src> Lexer<'src> {
         self.allowed |= allow;
     }
 
-    pub fn disallow_all(&mut self) {
-        self.allowed = Allowed::empty();
-    }
-
     pub fn peek_token(&mut self) -> Token<'src> {
         let harpoon = self.harpoon.clone();
         let tok = self.next_token();

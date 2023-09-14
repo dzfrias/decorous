@@ -1,7 +1,7 @@
 use std::fs;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use decorous_frontend::parse;
+use criterion::{criterion_group, criterion_main, Criterion};
+use decorous_frontend::Parser;
 
 fn parse_bench(c: &mut Criterion) {
     let inputs =
@@ -15,7 +15,12 @@ fn parse_bench(c: &mut Criterion) {
             .expect("should have stem")
             .to_string_lossy();
         let id = format!("parse: {name}");
-        c.bench_function(&id, |b| b.iter(|| parse(black_box(&contents))));
+        c.bench_function(&id, |b| {
+            b.iter(|| {
+                let parser = Parser::new(&contents);
+                let _ = parser.parse();
+            })
+        });
     }
 }
 
