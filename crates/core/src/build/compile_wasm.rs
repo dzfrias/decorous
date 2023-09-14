@@ -11,7 +11,7 @@ use std::{
 
 use anyhow::{bail, Context, Error, Result};
 use decorous_backend::{CodeInfo, JsDecl, JsEnv, WasmCompiler};
-use decorous_errors::{DiagnosticBuilder, Report, Severity};
+use decorous_errors::{DiagnosticBuilder, Severity};
 use itertools::Itertools;
 use scopeguard::defer;
 use tempdir::TempDir;
@@ -22,30 +22,28 @@ use wasmtime_wasi::sync::WasiCtxBuilder;
 use which::which;
 
 use crate::{
-    cli::{Build, OptimizationLevel},
-    config::{Config, ScriptOrFile, WasmFeature},
+    build::global_ctx::GlobalCtx,
+    cli::OptimizationLevel,
+    config::{ScriptOrFile, WasmFeature},
     indicators::{FinishLog, Spinner},
     utils,
 };
 
-#[derive(Debug)]
 pub struct MainCompiler<'a> {
-    config: &'a Config,
-    args: &'a Build,
+    global_ctx: &'a GlobalCtx<'a>,
     comptime: Cell<bool>,
 }
 
 impl<'a> MainCompiler<'a> {
-    pub fn new(config: &'a Config, args: &'a Build) -> Self {
+    pub fn new(global_ctx: &'a GlobalCtx<'a>) -> Self {
         Self {
-            config,
-            args,
+            global_ctx,
             comptime: false.into(),
         }
     }
 
     fn get_python(&self) -> Option<Cow<'_, Path>> {
-        if let Some(py) = &self.config.python {
+        if let Some(py) = &self.global_ctx.config.python {
             return Some(Cow::Borrowed(py));
         }
 
@@ -55,6 +53,16 @@ impl<'a> MainCompiler<'a> {
                 which("python3").map_or(None, |bin| Some(bin.into()))
             }
             Err(_) => None,
+        }
+    }
+
+    fn warn_unused_deps(&self, deps: &[String]) {
+        for bin in deps.iter().filter(|b| which(b).is_err()) {
+            self.global_ctx.errs.emit(
+                DiagnosticBuilder::new(format!("script dependency not found: {bin}"), 0)
+                    .severity(Severity::Warning)
+                    .build(),
+            );
         }
     }
 }
@@ -70,11 +78,12 @@ impl WasmCompiler for MainCompiler<'_> {
         out: &mut dyn io::Write,
     ) -> Result<(), Error> {
         let config = self
+            .global_ctx
             .config
             .compilers
             .get(lang)
             .with_context(|| format!("unsupported language: {lang}"))?;
-        warn_unused_deps(&config.deps)?;
+        self.warn_unused_deps(&config.deps);
         let dir = TempDir::new(lang).context("error creating temp dir for compiler")?;
         let path: PathBuf = dir.path().join(format!(
             "__tmp.{}",
@@ -97,14 +106,15 @@ impl WasmCompiler for MainCompiler<'_> {
             });
         }
 
-        match fs::create_dir(&self.args.out) {
+        match fs::create_dir(&self.global_ctx.args.out) {
             Ok(()) => {}
             Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
-                fs::remove_dir_all(&self.args.out).context("error removing previous outdir")?;
+                fs::remove_dir_all(&self.global_ctx.args.out)
+                    .context("error removing previous outdir")?;
             }
             Err(err) => bail!(err),
         }
-        let outdir = fs::canonicalize(&self.args.out).unwrap();
+        let outdir = fs::canonicalize(&self.global_ctx.args.out).unwrap();
 
         let python = self
             .get_python()
@@ -127,8 +137,8 @@ impl WasmCompiler for MainCompiler<'_> {
             }
         }
 
-        let input_path =
-            fs::canonicalize(&self.args.input).context("error getting abs path of input")?;
+        let input_path = fs::canonicalize(&self.global_ctx.args.input)
+            .context("error getting abs path of input")?;
         let cache_path = if config.use_cache {
             gen_cache(&input_path)?
         } else {
@@ -137,7 +147,7 @@ impl WasmCompiler for MainCompiler<'_> {
         let script_out = Command::new(python.as_ref())
             .arg(file_loc.as_ref())
             .env("DECOR_INPUT", &path)
-            .env("DECOR_OUT", &self.args.out)
+            .env("DECOR_OUT", &self.global_ctx.args.out)
             .env("DECOR_OUT_DIR", outdir)
             .env("DECOR_EXPORTS", exports.iter().join(" "))
             .env("DECOR_CACHE", &cache_path)
@@ -146,7 +156,7 @@ impl WasmCompiler for MainCompiler<'_> {
                 self.comptime.get().then_some("1").unwrap_or_default(),
             )
             .current_dir(dir.path())
-            .args(&self.args.build_args)
+            .args(&self.global_ctx.args.build_args)
             .output()?;
         let (status, stdout, stderr) = (script_out.status, script_out.stdout, script_out.stderr);
         if cache_path != Path::new("")
@@ -173,25 +183,25 @@ impl WasmCompiler for MainCompiler<'_> {
                 .with_main_message("WebAssembly")
                 .with_sub_message(format!("{lang}{}", {
                     let mut args = String::new();
-                    if !self.args.build_args.is_empty() {
+                    if !self.global_ctx.args.build_args.is_empty() {
                         args.push('`');
-                        args.push_str(&self.args.build_args.join(" "));
+                        args.push_str(&self.global_ctx.args.build_args.join(" "));
                         args.insert_str(0, " `");
                         args.push('`');
                     }
                     args
                 }))
-                .with_file(&self.args.out)
-                .enable_color(self.args.color)
+                .with_file(&self.global_ctx.args.out)
+                .enable_color(self.global_ctx.args.color)
                 .to_string(),
         );
 
-        let wasm_files = fs::read_dir(&self.args.out)?
+        let wasm_files = fs::read_dir(&self.global_ctx.args.out)?
             .filter_map(|entry| entry.ok().map(|entry| entry.path()))
             .filter(|path| matches!(path.extension(), Some(ext) if ext == OsStr::new("wasm")))
             .collect_vec();
 
-        if let Some(opt) = self.args.optimize {
+        if let Some(opt) = self.global_ctx.args.optimize {
             for path in &wasm_files {
                 let spinner = Spinner::new(format!("Optimizing WebAssembly ({opt})..."));
                 optimize(path, opt, &config.features).context("problem optimizing WebAssembly")?;
@@ -200,13 +210,13 @@ impl WasmCompiler for MainCompiler<'_> {
                         .with_main_message("optimized WebAssembly")
                         .with_sub_message(opt.to_string())
                         .with_file(path)
-                        .enable_color(self.args.color)
+                        .enable_color(self.global_ctx.args.color)
                         .to_string(),
                 );
             }
         }
 
-        if self.args.strip {
+        if self.global_ctx.args.strip {
             for path in &wasm_files {
                 let spinner = Spinner::new("Stripping WebAssembly...");
                 strip(path).context("problem stripping WebAssembly binary")?;
@@ -214,7 +224,7 @@ impl WasmCompiler for MainCompiler<'_> {
                     FinishLog::default()
                         .with_main_message("stripped WebAssembly")
                         .with_file(path)
-                        .enable_color(self.args.color)
+                        .enable_color(self.global_ctx.args.color)
                         .to_string(),
                 );
             }
@@ -238,7 +248,8 @@ impl WasmCompiler for MainCompiler<'_> {
         self.compile(info, &mut NullWrite)?;
         self.comptime.set(false);
 
-        let outdir = fs::canonicalize(&self.args.out).expect("outdir should have been created");
+        let outdir =
+            fs::canonicalize(&self.global_ctx.args.out).expect("outdir should have been created");
         let wasm_path = fs::read_dir(&outdir)?
             .filter_map(|entry| entry.ok().map(|entry| entry.path()))
             .find(|path| matches!(path.extension(), Some(ext) if ext == OsStr::new("wasm")))
@@ -292,22 +303,6 @@ fn strip(file: impl AsRef<Path>) -> Result<()> {
         module.customs.delete(id);
     }
     module.emit_wasm_file(file)?;
-
-    Ok(())
-}
-
-fn warn_unused_deps(deps: &[String]) -> Result<()> {
-    let mut report = Report::new();
-    for bin in deps.iter().filter(|b| which(b).is_err()) {
-        report.add_diagnostic(
-            DiagnosticBuilder::new(format!("script dependency not found: {bin}"), 0)
-                .severity(Severity::Warning)
-                .build(),
-        );
-    }
-    if !report.is_empty() {
-        decorous_errors::fmt::report(&report, "", "")?;
-    }
 
     Ok(())
 }

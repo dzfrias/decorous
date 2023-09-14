@@ -5,7 +5,7 @@ mod globals;
 
 use std::{borrow::Cow, path::Path};
 
-use decorous_errors::{DiagnosticBuilder, Report, Severity};
+use decorous_errors::{DiagnosticBuilder, DynErrStream, Severity};
 use itertools::Itertools;
 #[cfg(not(debug_assertions))]
 use rand::Rng;
@@ -34,8 +34,8 @@ pub struct Component<'a> {
     toplevel_nodes: Vec<ToplevelNodeData>,
     hoist: Vec<SyntaxNode>,
     exports: Vec<SmolStr>,
-    report: Report,
     uses: Vec<&'a Path>,
+    errs: DynErrStream<'a>,
 
     component_id: u8,
     current_id: u32,
@@ -52,20 +52,20 @@ pub struct ToplevelNodeData {
 
 // Public methods of component
 impl<'a> Component<'a> {
-    pub fn new(ast: DecorousAst<'a>) -> Self {
+    pub fn new(ast: DecorousAst<'a>, errs: DynErrStream<'a>) -> Self {
         let mut c = Self {
             fragment_tree: vec![],
             declared_vars: DeclaredVariables::new(),
             toplevel_nodes: vec![],
             hoist: vec![],
             exports: vec![],
-            report: Report::new(),
             current_id: 0,
             #[cfg(not(debug_assertions))]
             component_id: rand::thread_rng().gen(),
             #[cfg(debug_assertions)]
             component_id: 0,
             uses: vec![],
+            errs,
 
             css: None,
             comptime: None,
@@ -110,10 +110,6 @@ impl<'a> Component<'a> {
 
     pub fn exports(&self) -> &[SmolStr] {
         self.exports.as_ref()
-    }
-
-    pub fn report(&self) -> &Report {
-        &self.report
     }
 
     pub fn uses(&self) -> &[&Path] {
@@ -509,7 +505,7 @@ impl<'a> Component<'a> {
             .iter()
             .filter(|v| !GLOBALS.contains(&v.as_str()))
         {
-            self.report.add_diagnostic(
+            self.errs.emit(
                 DiagnosticBuilder::new(format!("possibly unbound variable: {unbound}"), 0)
                     .severity(Severity::Warning)
                     .build(),
@@ -526,6 +522,7 @@ impl<'a> Component<'a> {
 
 #[cfg(test)]
 mod tests {
+    use decorous_errors::Source;
     use itertools::Itertools;
 
     use super::*;
@@ -534,7 +531,13 @@ mod tests {
     fn make_component(source: &str) -> Component<'_> {
         let parser = Parser::new(source);
         let ast = parser.parse().unwrap();
-        Component::new(ast)
+        Component::new(
+            ast,
+            decorous_errors::stderr(Source {
+                src: source,
+                name: "TEST".to_owned(),
+            }),
+        )
     }
 
     // #[test]
@@ -716,12 +719,5 @@ mod tests {
         );
         assert!(component.toplevel_nodes().is_empty());
         insta::assert_debug_snapshot!(component.hoist());
-    }
-
-    #[test]
-    fn warn_on_unbound_variable_that_is_not_a_global() {
-        let component = make_component("#button[@click={() => console.log(x)}]:Hello");
-        assert!(component.toplevel_nodes().is_empty());
-        insta::assert_debug_snapshot!(component.report());
     }
 }

@@ -636,6 +636,7 @@ fn render_dyn_attr(
 #[cfg(test)]
 mod tests {
     use crate::css_render::render_css;
+    use decorous_errors::Source;
     use decorous_frontend::{Component, Parser};
     use std::fmt::Write;
 
@@ -643,7 +644,13 @@ mod tests {
 
     fn make_component(input: &str) -> Component {
         let parser = Parser::new(input);
-        Component::new(parser.parse().expect("should be valid input"))
+        Component::new(
+            parser.parse().expect("should be valid input"),
+            decorous_errors::stderr(Source {
+                src: input,
+                name: "TEST".to_owned(),
+            }),
+        )
     }
 
     macro_rules! test_render {

@@ -15,7 +15,7 @@ use decorous_backend::{
     css_render::render_css as render_css_backend, dom_render::render as dom_render,
     prerender::render as prerender, Options,
 };
-use decorous_errors::{DiagnosticBuilder, DynErrStream, Report, Severity, Source};
+use decorous_errors::{DiagnosticBuilder, DynErrStream, Severity, Source};
 use decorous_frontend::{Component, Ctx, Parser};
 use handlebars::{no_escape, Handlebars};
 use notify::{
@@ -62,7 +62,7 @@ fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
         },
     );
     let global_ctx = GlobalCtx { config, args, errs };
-    let compiler = MainCompiler::new(config, args);
+    let compiler = MainCompiler::new(&global_ctx);
     let metadata = Options {
         name: {
             &args
@@ -154,31 +154,26 @@ fn render_css(global_ctx: &GlobalCtx, component: &Component<'_>) -> Result<(), a
 }
 
 fn warn_on_unused_wasm(global_ctx: &GlobalCtx, component: &Component<'_>) -> Result<()> {
-    let mut report = Report::new();
     if global_ctx.args.strip && component.wasm().is_none() {
-        report.add_diagnostic(
+        global_ctx.errs.emit(
             DiagnosticBuilder::new("no WebAssembly to strip", 0)
                 .severity(Severity::Warning)
                 .build(),
         );
     }
     if !global_ctx.args.build_args.is_empty() && component.wasm().is_none() {
-        report.add_diagnostic(
+        global_ctx.errs.emit(
             DiagnosticBuilder::new("no WebAssembly to compile - build args do nothing", 0)
                 .severity(Severity::Warning)
                 .build(),
         );
     }
     if global_ctx.args.optimize.is_some() && component.wasm().is_none() {
-        report.add_diagnostic(
+        global_ctx.errs.emit(
             DiagnosticBuilder::new("no WebAssembly to optimize", 0)
                 .severity(Severity::Warning)
                 .build(),
         );
-    }
-    if !report.is_empty() {
-        let input_name = global_ctx.args.input.to_string_lossy();
-        decorous_errors::fmt::report(&report, &input_name, "...")?;
     }
 
     Ok(())
@@ -275,22 +270,14 @@ fn render_index_html(
     Ok(())
 }
 
-fn parse_component<'a>(input: &'a str, global_ctx: &GlobalCtx) -> Result<Component<'a>> {
-    let file_name = global_ctx.args.input.to_string_lossy();
+fn parse_component<'a>(input: &'a str, global_ctx: &GlobalCtx<'a>) -> Result<Component<'a>> {
     let preproc = Preproc::new(global_ctx.config, global_ctx.args.color);
     let parser = Parser::new(input).with_ctx(Ctx {
         preprocessor: &preproc,
         errs: global_ctx.errs.clone(),
     });
     let component = match parser.parse() {
-        Ok(ast) => {
-            let c = Component::new(ast);
-            // TODO: Use error stream, would make this useless
-            if !c.report().is_empty() {
-                decorous_errors::fmt::report(c.report(), &file_name, input)?;
-            }
-            Ok(c)
-        }
+        Ok(ast) => Component::new(ast, global_ctx.errs.clone()),
         Err(err) => {
             let diagnostic = err.into();
             global_ctx.errs.emit(diagnostic);
@@ -303,5 +290,5 @@ fn parse_component<'a>(input: &'a str, global_ctx: &GlobalCtx) -> Result<Compone
             .with_main_message("parsed")
             .enable_color(global_ctx.args.color)
     );
-    component
+    Ok(component)
 }

@@ -1,4 +1,9 @@
-use std::{cell::RefCell, io::Write, rc::Rc};
+use std::{
+    cell::RefCell,
+    fmt::Debug,
+    io::{self, Write},
+    rc::Rc,
+};
 
 use crate::{Diagnostic, Severity};
 
@@ -83,4 +88,16 @@ impl<'src, W: Write> ErrStreamInner<'src, W> {
             .expect("in memory write should not fail");
         let _ = self.inner.borrow_mut().write_all(&out);
     }
+}
+
+impl<W> Debug for ErrStream<'_, W> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ErrStream").finish()?;
+
+        Ok(())
+    }
+}
+
+pub fn stderr(source: Source) -> DynErrStream {
+    DynErrStream::new(Box::new(io::stderr()), source)
 }

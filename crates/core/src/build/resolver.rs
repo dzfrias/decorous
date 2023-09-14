@@ -38,7 +38,7 @@ impl UseResolver for Resolver<'_> {
                 todo!("fix result of resolve()");
             }
         };
-        let component = Component::new(ast);
+        let component = Component::new(ast, self.global_ctx.errs.clone());
 
         let name: PathBuf = format!("{}_{stem}.mjs", self.global_ctx.args.out).into();
         let mut f = BufWriter::new(File::create(&name)?);

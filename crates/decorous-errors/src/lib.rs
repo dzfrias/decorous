@@ -1,6 +1,5 @@
-pub mod fmt;
-mod report;
+mod diagnostic;
 mod stream;
 
-pub use report::*;
+pub use diagnostic::*;
 pub use stream::*;

@@ -1,34 +1,4 @@
-use smallvec::SmallVec;
 use std::{borrow::Cow, ops::Range};
-
-#[derive(Debug, Clone, Default)]
-pub struct Report {
-    diagnostics: SmallVec<[Diagnostic; 1]>,
-}
-
-impl Report {
-    pub fn new() -> Self {
-        Self {
-            diagnostics: SmallVec::new(),
-        }
-    }
-
-    pub fn diagnostics(&self) -> &[Diagnostic] {
-        self.diagnostics.as_ref()
-    }
-
-    pub fn len(&self) -> usize {
-        self.diagnostics.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    pub fn add_diagnostic(&mut self, diagnostic: Diagnostic) {
-        self.diagnostics.push(diagnostic);
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Diagnostic {
@@ -108,20 +78,6 @@ impl DiagnosticBuilder {
             helpers: self.helpers,
             offset: self.offset,
             note: self.note,
-        }
-    }
-}
-
-impl Extend<Diagnostic> for Report {
-    fn extend<T: IntoIterator<Item = Diagnostic>>(&mut self, iter: T) {
-        self.diagnostics.extend(iter);
-    }
-}
-
-impl FromIterator<Diagnostic> for Report {
-    fn from_iter<T: IntoIterator<Item = Diagnostic>>(iter: T) -> Self {
-        Self {
-            diagnostics: iter.into_iter().collect(),
         }
     }
 }
