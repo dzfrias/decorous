@@ -77,6 +77,7 @@ fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
             global_ctx: &global_ctx,
             compiler: &compiler,
         },
+        errs: global_ctx.errs.clone(),
     };
 
     let component = parse_component(&input, &global_ctx)?;

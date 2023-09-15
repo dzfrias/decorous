@@ -8,6 +8,7 @@ use std::{
 use crate::{
     codegen_utils,
     dom_render::{render_fragment as dom_render_fragment, State as DomRenderState},
+    render_error::Result,
     Options,
 };
 use decorous_frontend::{
@@ -25,16 +26,16 @@ pub fn render(
     out: &mut impl io::Write,
     html_out: &mut impl io::Write,
     metadata: &Options,
-) -> io::Result<()> {
+) -> Result<()> {
     if let Some(wasm) = component.wasm() {
-        let _ = metadata.wasm_compiler.compile(
+        metadata.wasm_compiler.compile(
             crate::CodeInfo {
                 lang: wasm.lang(),
                 body: wasm.body(),
                 exports: component.exports(),
             },
             out,
-        );
+        )?;
     }
 
     let mut output = Output::default();

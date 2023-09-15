@@ -6,24 +6,23 @@ use itertools::Itertools;
 use rslint_parser::AstNode;
 use std::{borrow::Cow, io};
 
-use crate::{codegen_utils, Options};
+use crate::{codegen_utils, render_error::Result, Options};
 pub(crate) use render_fragment::{render_fragment, State};
 
 pub fn render<T: io::Write>(
     component: &Component,
     render_to: &mut T,
     metadata: &Options,
-) -> io::Result<()> {
+) -> Result<()> {
     if let Some(wasm) = component.wasm() {
-        // TODO: Error
-        let _ = metadata.wasm_compiler.compile(
+        metadata.wasm_compiler.compile(
             crate::CodeInfo {
                 lang: wasm.lang(),
                 body: wasm.body(),
                 exports: component.exports(),
             },
             render_to,
-        );
+        )?
     }
 
     for use_decl in component.uses() {
@@ -192,23 +191,20 @@ mod tests {
 
     use super::*;
 
-    fn make_component(input: &str) -> Component {
-        let parser = Parser::new(input);
-        Component::new(
-            parser.parse().expect("should be valid input"),
-            decorous_errors::stderr(Source {
-                src: input,
-                name: "TEST".to_owned(),
-            }),
-        )
-    }
-
     macro_rules! test_render {
         ($input:expr$(, $metadata:expr)?) => {
-            let component = make_component($input);
+            let parser = Parser::new($input);
+            let errs = decorous_errors::stderr(Source {
+                src: $input,
+                name: "TEST".to_owned(),
+            });
+            let component = Component::new(
+                parser.parse().expect("should be valid input"),
+                errs.clone(),
+            );
             let mut out = vec![];
             #[allow(unused)]
-            let mut metadata = Options { name: "test", modularize: false, use_resolver: &NullResolver, wasm_compiler: &NullCompiler };
+            let mut metadata = Options { name: "test", modularize: false, use_resolver: &NullResolver, wasm_compiler: &NullCompiler, errs: errs.clone() };
             $(
                 metadata = $metadata;
              )?
@@ -319,13 +315,18 @@ mod tests {
 
     #[test]
     fn can_render_modularize() {
+        let src = "---js let x = 0; --- #p {x} /p";
         test_render!(
-            "---js let x = 0; --- #p {x} /p",
+            src,
             Options {
                 name: "test",
                 modularize: true,
                 wasm_compiler: &NullCompiler,
-                use_resolver: &NullResolver
+                use_resolver: &NullResolver,
+                errs: decorous_errors::stderr(Source {
+                    name: "TEST".to_owned(),
+                    src
+                })
             }
         );
     }

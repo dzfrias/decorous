@@ -50,6 +50,7 @@ impl UseResolver for Resolver<'_> {
                 modularize: true,
                 wasm_compiler: self.compiler,
                 use_resolver: self,
+                errs: self.global_ctx.errs.clone(),
             },
         )?;
 
