@@ -1,7 +1,5 @@
 use std::ops::Range;
 
-use nom_locate::LocatedSpan;
-
 /// Represents a location with respect to an input string. Everything is positioned based on
 /// **utf-8** character lengths, **not** code points.
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
@@ -13,13 +11,6 @@ pub struct Location {
 impl Location {
     pub fn new(offset: usize, length: usize) -> Self {
         Self { offset, length }
-    }
-
-    pub fn from_spans<'a>(span1: LocatedSpan<&'a str>, span2: LocatedSpan<&'a str>) -> Self {
-        Self {
-            offset: span1.location_offset(),
-            length: span2.location_offset() - span1.location_offset(),
-        }
     }
 
     /// Constructs a new location from a span. The only information needed here is the offset
@@ -38,15 +29,6 @@ impl Location {
 
     pub fn length(&self) -> usize {
         self.length
-    }
-}
-
-impl<'a> From<LocatedSpan<&'a str>> for Location {
-    fn from(span: LocatedSpan<&'a str>) -> Self {
-        Self {
-            offset: span.location_offset(),
-            length: 1,
-        }
     }
 }
 
