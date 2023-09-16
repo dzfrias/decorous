@@ -5,28 +5,21 @@ use std::{borrow::Cow, collections::HashMap, io};
 use crate::{
     codegen_utils, css_render,
     render_out::{write_html, write_js},
-    CodeInfo, Linker, Options, RenderBackend, RenderOut, Result,
+    CodeInfo, Ctx, RenderBackend, RenderOut, Result,
 };
 use decorous_frontend::{utils, Component};
 use heck::ToSnekCase;
 use render_ast::*;
 use rslint_parser::AstNode;
 
-pub struct Prerenderer {
-    linker: Linker,
-}
+pub struct Prerenderer;
 
 impl RenderBackend for Prerenderer {
-    fn add_linker(&mut self, linker: Linker) {
-        self.linker = linker;
-    }
+    type Options = ();
 
-    fn render<T: RenderOut>(
-        &self,
-        component: &Component,
-        mut out: T,
-        ctx: &Options<'_>,
-    ) -> Result<()> {
+    fn with_options(&mut self, _options: Self::Options) {}
+
+    fn render<T: RenderOut>(&self, component: &Component, mut out: T, ctx: &Ctx<'_>) -> Result<()> {
         if let Some(wasm) = component.wasm() {
             let wasm_prelude = ctx.wasm_compiler.compile(CodeInfo {
                 lang: wasm.lang(),
@@ -162,9 +155,7 @@ dirty.fill(0);"
 
 impl Prerenderer {
     pub fn new() -> Self {
-        Self {
-            linker: Linker::default(),
-        }
+        Self
     }
 
     fn write_update<T: RenderOut>(
@@ -296,7 +287,7 @@ mod tests {
                 let component = make_component($input);
                 let mut out = TestOut::default();
                 let renderer = Prerenderer::new();
-                renderer.render(&component, &mut out, &Options::default()).unwrap();
+                renderer.render(&component, &mut out, &Ctx::default()).unwrap();
                 let mut output = format!("{}\n---\n{}", String::from_utf8(out.js).unwrap(), String::from_utf8(out.html).unwrap());
                 if !out.css.is_empty() {
                     write!(output, "\n---\n{}", String::from_utf8(out.css).unwrap()).unwrap();

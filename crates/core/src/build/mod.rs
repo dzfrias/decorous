@@ -13,10 +13,12 @@ use std::{
 
 use anyhow::{ensure, Context, Result};
 use decorous_backend::{
-    dom_render::CsrRenderer, prerender::Prerenderer, HtmlInfo, Options, RenderBackend, RenderOut,
+    dom_render::{CsrOptions, CsrRenderer},
+    prerender::Prerenderer,
+    Ctx as RenderCtx, HtmlInfo, RenderBackend, RenderOut,
 };
 use decorous_errors::{DiagnosticBuilder, DynErrStream, Severity, Source};
-use decorous_frontend::{Component, Ctx, Parser};
+use decorous_frontend::{Component, Ctx as ParseCtx, Parser};
 use notify::{
     event::{DataChange, ModifyKind},
     EventKind, RecommendedWatcher, RecursiveMode, Watcher,
@@ -61,7 +63,7 @@ fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
     );
     let global_ctx = GlobalCtx { config, args, errs };
     let compiler = MainCompiler::new(&global_ctx);
-    let metadata = Options {
+    let metadata = RenderCtx {
         name: {
             &args
                 .input
@@ -76,7 +78,6 @@ fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
         } else {
             None
         },
-        modularize: args.modularize,
         wasm_compiler: &compiler,
         use_resolver: &Resolver {
             global_ctx: &global_ctx,
@@ -161,7 +162,7 @@ fn warn_on_unused_wasm(global_ctx: &GlobalCtx, component: &Component<'_>) -> Res
 fn render_all(
     global_ctx: &GlobalCtx,
     component: &Component<'_>,
-    metadata: &Options<'_>,
+    metadata: &RenderCtx<'_>,
 ) -> Result<()> {
     let js_name = if global_ctx.args.modularize {
         format!("{}.mjs", global_ctx.args.out)
@@ -222,8 +223,11 @@ fn render_all(
     };
     match global_ctx.args.render_method {
         RenderMethod::Csr => {
-            let prerenderer = CsrRenderer::new();
-            prerenderer.render(component, &mut out, metadata)?;
+            let mut csr_renderer = CsrRenderer::new();
+            csr_renderer.with_options(CsrOptions {
+                modularize: global_ctx.args.modularize,
+            });
+            csr_renderer.render(component, &mut out, metadata)?;
         }
         RenderMethod::Prerender => {
             let prerenderer = Prerenderer::new();
@@ -268,7 +272,7 @@ fn render_all(
 
 fn parse_component<'a>(input: &'a str, global_ctx: &GlobalCtx<'a>) -> Result<Component<'a>> {
     let preproc = Preproc::new(global_ctx.config, global_ctx.args.color);
-    let parser = Parser::new(input).with_ctx(Ctx {
+    let parser = Parser::new(input).with_ctx(ParseCtx {
         preprocessor: &preproc,
         errs: global_ctx.errs.clone(),
     });

@@ -9,28 +9,35 @@ use std::{borrow::Cow, io};
 use crate::{
     codegen_utils, css_render,
     render_out::{write_html, write_js},
-    CodeInfo, Linker, Options, RenderBackend, RenderOut, Result,
+    CodeInfo, Ctx, RenderBackend, RenderOut, Result,
 };
 pub(crate) use render_fragment::{render_fragment, State};
 
+#[derive(Debug, Default)]
+pub struct CsrOptions {
+    pub modularize: bool,
+}
+
 pub struct CsrRenderer {
-    linker: Linker,
+    opts: CsrOptions,
 }
 
 impl CsrRenderer {
     pub fn new() -> Self {
         Self {
-            linker: Linker::default(),
+            opts: CsrOptions::default(),
         }
     }
 }
 
 impl RenderBackend for CsrRenderer {
-    fn add_linker(&mut self, linker: Linker) {
-        self.linker = linker;
+    type Options = CsrOptions;
+
+    fn with_options(&mut self, options: Self::Options) {
+        self.opts = options;
     }
 
-    fn render<T: RenderOut>(&self, component: &Component, mut out: T, ctx: &Options) -> Result<()> {
+    fn render<T: RenderOut>(&self, component: &Component, mut out: T, ctx: &Ctx) -> Result<()> {
         if let Some(css) = component.css() {
             let mut css_out = vec![];
             css_render::render_css(css, &mut css_out, component)?;
@@ -96,7 +103,7 @@ impl RenderBackend for CsrRenderer {
 
         render_init_ctx(&mut out.js_handle(), component)?;
 
-        if ctx.modularize {
+        if self.opts.modularize {
             write_js!(out, "export default function initialize(target) {{")?;
         }
 
@@ -116,7 +123,7 @@ impl RenderBackend for CsrRenderer {
         render_fragment(component.fragment_tree(), state, &mut out.js_handle())?;
 
         write_js!(out, "const ctx = __init_ctx();")?;
-        if ctx.modularize {
+        if self.opts.modularize {
             write_js!(out, "const fragment = create_main_block(target);")?;
         } else {
             write_js!(
@@ -141,7 +148,7 @@ dirty.fill(0);
 }}"
         )?;
 
-        if ctx.modularize {
+        if self.opts.modularize {
             write_js!(out, "}}")?;
         }
 
@@ -229,7 +236,6 @@ mod tests {
     use crate::{NullCompiler, NullResolver};
     use decorous_errors::Source;
     use decorous_frontend::Parser;
-    use rslint_parser::SmolStr;
 
     #[derive(Default)]
     struct TestOut {
@@ -257,30 +263,24 @@ mod tests {
     }
 
     macro_rules! test_render {
-        ($input:expr$(, $metadata:expr)?) => {
+        ($input:expr) => {
+            test_render!($input, Ctx::default(), CsrOptions::default())
+        };
+        ($input:expr, $metadata:expr) => {
+            test_render!($input, $metadata, CsrOptions::default())
+        };
+        ($input:expr, $metadata:expr, $opts:expr) => {
             let parser = Parser::new($input);
             let errs = decorous_errors::stderr(Source {
                 src: $input,
                 name: "TEST".to_owned(),
             });
-            let component = Component::new(
-                parser.parse().expect("should be valid input"),
-                errs.clone(),
-            );
+            let component =
+                Component::new(parser.parse().expect("should be valid input"), errs.clone());
             let mut out = TestOut::default();
-            let mut linker = Linker::default();
-            for use_decl in component.uses() {
-                let name = SmolStr::new(use_decl.to_string_lossy());
-                linker.define(name, use_decl.to_string_lossy().to_string());
-            }
-            #[allow(unused)]
-            let mut metadata = Options { errs: errs.clone(), ..Default::default() };
-            $(
-                metadata = $metadata;
-             )?
             let mut renderer = CsrRenderer::new();
-            renderer.add_linker(linker);
-            renderer.render(&component, &mut out, &metadata).unwrap();
+            renderer.with_options($opts);
+            renderer.render(&component, &mut out, &$metadata).unwrap();
 
             insta::assert_snapshot!(String::from_utf8(out.js).unwrap());
         };
@@ -385,9 +385,8 @@ mod tests {
         let src = "---js let x = 0; --- #p {x} /p";
         test_render!(
             src,
-            Options {
+            Ctx {
                 name: "test",
-                modularize: true,
                 wasm_compiler: &NullCompiler,
                 use_resolver: &NullResolver,
                 errs: decorous_errors::stderr(Source {
@@ -395,7 +394,8 @@ mod tests {
                     src
                 }),
                 index_html: None,
-            }
+            },
+            CsrOptions { modularize: true }
         );
     }
 

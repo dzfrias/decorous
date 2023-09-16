@@ -6,10 +6,11 @@ use std::{
 
 use anyhow::anyhow;
 use decorous_backend::{
-    dom_render::CsrRenderer, JsFile, Options, RenderBackend, Result, UseInfo, UseResolver,
+    dom_render::{CsrOptions, CsrRenderer},
+    Ctx as RenderCtx, JsFile, RenderBackend, Result, UseInfo, UseResolver,
 };
 use decorous_errors::{ErrStream, Source};
-use decorous_frontend::{Component, Ctx, Parser};
+use decorous_frontend::{Component, Ctx as ParseCtx, Parser};
 
 use crate::build::{compile_wasm::MainCompiler, global_ctx::GlobalCtx, preprocessor::Preproc};
 
@@ -24,7 +25,7 @@ impl UseResolver for Resolver<'_> {
         let stem = path.file_stem().unwrap().to_string_lossy();
 
         let preproc = Preproc::new(self.global_ctx.config, self.global_ctx.args.color);
-        let parser = Parser::new(&contents).with_ctx(Ctx {
+        let parser = Parser::new(&contents).with_ctx(ParseCtx {
             preprocessor: &preproc,
             errs: ErrStream::new(
                 Box::new(io::stderr()),
@@ -39,13 +40,13 @@ impl UseResolver for Resolver<'_> {
 
         let name: PathBuf = format!("{}_{stem}.mjs", self.global_ctx.args.out).into();
         let mut f = BufWriter::new(File::create(&name)?);
-        let renderer = CsrRenderer::new();
+        let mut renderer = CsrRenderer::new();
+        renderer.with_options(CsrOptions { modularize: true });
         renderer.render(
             &component,
             JsFile::new(&mut f),
-            &Options {
+            &RenderCtx {
                 name: &stem,
-                modularize: true,
                 wasm_compiler: self.compiler,
                 use_resolver: self,
                 errs: self.global_ctx.errs.clone(),
