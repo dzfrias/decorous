@@ -9,6 +9,7 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
+
 function __update(dirty, initial) {
   if (initial) elems["0"].setAttribute("style", `background: green; --decor-0: ${color}; `);
   if (initial) elems[1].data = color;

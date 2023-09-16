@@ -7,22 +7,20 @@ use std::{
     borrow::Cow,
     fs::{self, File},
     io::{self, BufWriter, Write},
+    path::{Path, PathBuf},
     time::Instant,
 };
 
 use anyhow::{ensure, Context, Result};
 use decorous_backend::{
-    css_render::render_css as render_css_backend, dom_render::render as dom_render,
-    prerender::render as prerender, Options,
+    dom_render::CsrRenderer, prerender::Prerenderer, HtmlInfo, Options, RenderBackend, RenderOut,
 };
 use decorous_errors::{DiagnosticBuilder, DynErrStream, Severity, Source};
 use decorous_frontend::{Component, Ctx, Parser};
-use handlebars::{no_escape, Handlebars};
 use notify::{
     event::{DataChange, ModifyKind},
     EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
-use serde_json::json;
 
 use crate::{
     build::{global_ctx::GlobalCtx, resolver::Resolver},
@@ -71,6 +69,13 @@ fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
                 .expect("file name should never be .. or /, if read was successful")
                 .to_string_lossy()
         },
+        index_html: if global_ctx.args.html {
+            Some(HtmlInfo {
+                basename: global_ctx.args.out.clone(),
+            })
+        } else {
+            None
+        },
         modularize: args.modularize,
         wasm_compiler: &compiler,
         use_resolver: &Resolver {
@@ -83,9 +88,6 @@ fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
     let component = parse_component(&input, &global_ctx)?;
     warn_on_unused_wasm(&global_ctx, &component)?;
     render_all(&global_ctx, &component, &metadata)?;
-    if component.css().is_some() {
-        render_css(&global_ctx, &component)?;
-    }
 
     {
         let mut log = FinishLog::default();
@@ -130,30 +132,6 @@ fn watch(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn render_css(global_ctx: &GlobalCtx, component: &Component<'_>) -> Result<(), anyhow::Error> {
-    let Some(css) = component.css() else {
-        return Ok(());
-    };
-    let name = format!("{}.css", global_ctx.args.out);
-    render_css_backend(
-        css,
-        &mut BufWriter::new(
-            File::create(&name).with_context(|| format!("problem creating {name}"))?,
-        ),
-        component,
-    )
-    .context("problem rendering css")?;
-    println!(
-        "{}",
-        FinishLog::default()
-            .with_main_message("CSS")
-            .enable_color(global_ctx.args.color)
-            .with_file(format!("{}.css", global_ctx.args.out))
-    );
-
-    Ok(())
-}
-
 fn warn_on_unused_wasm(global_ctx: &GlobalCtx, component: &Component<'_>) -> Result<()> {
     if global_ctx.args.strip && component.wasm().is_none() {
         global_ctx.errs.emit(
@@ -190,41 +168,84 @@ fn render_all(
     } else {
         format!("{}.js", global_ctx.args.out)
     };
-    let mut out = BufWriter::new(File::create(&js_name).context("error creating out file")?);
-    match global_ctx.args.render_method {
-        RenderMethod::Csr => {
-            dom_render(component, &mut out, metadata).context("error during rendering")?;
-            if global_ctx.args.html {
-                render_index_html(global_ctx, component, metadata, &js_name, None)?;
+
+    pub struct Out<'a> {
+        js: BufWriter<File>,
+        html: Option<BufWriter<File>>,
+        css: Option<BufWriter<File>>,
+        base: &'a str,
+        index_html: bool,
+    }
+
+    impl RenderOut for Out<'_> {
+        fn write_js(&mut self, buf: &[u8]) -> io::Result<()> {
+            self.js.write_all(buf)
+        }
+
+        fn write_css(&mut self, buf: &[u8]) -> io::Result<()> {
+            match &mut self.css {
+                Some(css) => css.write_all(buf),
+                None => {
+                    let f = File::create(format!("{}.css", self.base))?;
+                    self.css = Some(BufWriter::new(f));
+                    self.css.as_mut().unwrap().write_all(buf)
+                }
             }
         }
-        RenderMethod::Prerender => {
-            if global_ctx.args.html {
-                let mut html_out = vec![];
-                prerender(component, &mut out, &mut html_out, metadata)
-                    .context("error during rendering")?;
-                render_index_html(global_ctx, component, metadata, &js_name, unsafe {
-                    Some(std::str::from_utf8_unchecked(&html_out))
-                })?;
-            } else {
-                let html_name = format!("{}.html", global_ctx.args.out);
-                let mut html_out = &mut BufWriter::new(
-                    File::create(&html_name)
-                        .with_context(|| format!("problem creating {}", html_name))?,
-                );
-                prerender(component, &mut out, &mut html_out, metadata)
-                    .context("error during rendering")?;
-                println!(
-                    "{}",
-                    FinishLog::default()
-                        .with_main_message("HTML")
-                        .with_sub_message("prerender")
-                        .with_file(&html_name)
-                        .enable_color(global_ctx.args.color)
-                );
+
+        fn write_html(&mut self, buf: &[u8]) -> io::Result<()> {
+            match &mut self.html {
+                Some(html) => html.write_all(buf),
+                None => {
+                    let f = if self.index_html {
+                        File::create("index.html")?
+                    } else {
+                        File::create(format!("{}.html", self.base))?
+                    };
+                    self.html = Some(BufWriter::new(f));
+                    self.html.as_mut().unwrap().write_all(buf)
+                }
             }
+        }
+
+        fn js_handle(&mut self) -> &mut dyn io::Write {
+            &mut self.js
         }
     }
+
+    let mut out = Out {
+        js: BufWriter::new(File::create(&js_name)?),
+        html: None,
+        css: None,
+        base: &global_ctx.args.out,
+        index_html: global_ctx.args.html,
+    };
+    match global_ctx.args.render_method {
+        RenderMethod::Csr => {
+            let prerenderer = CsrRenderer::new();
+            prerenderer.render(component, &mut out, metadata)?;
+        }
+        RenderMethod::Prerender => {
+            let prerenderer = Prerenderer::new();
+            prerenderer.render(component, &mut out, metadata)?;
+        }
+    }
+
+    if out.html.is_some() {
+        let html_name = if global_ctx.args.html {
+            Cow::Borrowed(Path::new("index.html"))
+        } else {
+            Cow::Owned(PathBuf::from(format!("{}.html", global_ctx.args.out)))
+        };
+        println!(
+            "{}",
+            FinishLog::default()
+                .with_main_message("HTML")
+                .with_file(&html_name)
+                .enable_color(global_ctx.args.color)
+        );
+    }
+
     println!(
         "{}",
         FinishLog::default()
@@ -233,40 +254,14 @@ fn render_all(
             .enable_color(global_ctx.args.color)
             .with_file(js_name)
     );
-    out.flush()
-        .context("problem flushing buffered writer while rendering")?;
 
-    Ok(())
-}
-
-fn render_index_html(
-    global_ctx: &GlobalCtx,
-    component: &Component,
-    meta: &Options<'_>,
-    js_name: &str,
-    to_render: Option<&str>,
-) -> Result<()> {
-    let mut handlebars = Handlebars::new();
-    handlebars.register_escape_fn(no_escape);
-    handlebars.register_template_string("index", include_str!("./templates/template.html"))?;
-
-    let out = File::create("index.html").context("problem creating index.html")?;
-    let body = json!({
-        "script": js_name,
-        "css": component.css().is_some().then(|| format!("{}.css", global_ctx.args.out)),
-        "name": meta.name,
-        "html": to_render,
-    });
-
-    handlebars.render_template_to_write(include_str!("./templates/template.html"), &body, out)?;
-
-    println!(
-        "{}",
-        FinishLog::default()
-            .with_main_message("HTML")
-            .with_file("index.html")
-            .enable_color(global_ctx.args.color)
-    );
+    if let Some(mut html) = out.html {
+        html.flush()?;
+    }
+    if let Some(mut css) = out.css {
+        css.flush()?;
+    }
+    out.js.flush()?;
 
     Ok(())
 }

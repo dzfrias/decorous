@@ -22,6 +22,7 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
+
 function __init_ctx() {
   return [undefined];
 }

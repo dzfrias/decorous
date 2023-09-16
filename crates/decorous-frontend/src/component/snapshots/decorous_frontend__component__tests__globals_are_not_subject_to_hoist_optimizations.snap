@@ -81,10 +81,8 @@ Component {
         ,
     ],
     exports: [],
-    report: Report {
-        diagnostics: [],
-    },
     uses: [],
+    errs: ErrStream,
     component_id: 0,
     current_id: 1,
     css: None,

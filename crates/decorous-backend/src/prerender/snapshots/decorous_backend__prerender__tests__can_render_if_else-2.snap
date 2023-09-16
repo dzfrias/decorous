@@ -37,6 +37,7 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
+
 function __update(dirty, initial) {
   if (x == 0) {
     if (elems["0_block"] && elems["0_on"]) {

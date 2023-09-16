@@ -9,6 +9,7 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
+
 function __init_ctx() {
   let __closure2 = () => { __schedule_update(0, x = 3); __schedule_update(1, y = 3); };
   let x = 0;
@@ -37,6 +38,7 @@ function __schedule_update(ctx_idx, val) {
     dirty.fill(0);
   });
 }
+
 
 ---
 <p><span id="1"></span> and <span id="3"></span> and <span id="5"></span></p> <button id="7">Hi</button>

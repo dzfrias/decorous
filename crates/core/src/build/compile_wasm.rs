@@ -75,8 +75,7 @@ impl WasmCompiler for MainCompiler<'_> {
             body,
             exports,
         }: CodeInfo,
-        out: &mut dyn io::Write,
-    ) -> Result<(), Error> {
+    ) -> Result<String, Error> {
         let config = self
             .global_ctx
             .config
@@ -176,7 +175,7 @@ impl WasmCompiler for MainCompiler<'_> {
             );
         }
 
-        out.write_all(&stdout)?;
+        let stdout = String::from_utf8(stdout).context("error converting script out to utf-8")?;
 
         spinner.finish(
             FinishLog::default()
@@ -230,22 +229,12 @@ impl WasmCompiler for MainCompiler<'_> {
             }
         }
 
-        Ok(())
+        Ok(stdout)
     }
 
     fn compile_comptime(&self, info: CodeInfo) -> Result<JsEnv> {
-        struct NullWrite;
-        impl io::Write for NullWrite {
-            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-                Ok(buf.len())
-            }
-            fn flush(&mut self) -> io::Result<()> {
-                Ok(())
-            }
-        }
-
         self.comptime.set(true);
-        self.compile(info, &mut NullWrite)?;
+        self.compile(info)?;
         self.comptime.set(false);
 
         let outdir =

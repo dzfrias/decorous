@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use anyhow::Error;
 use rslint_parser::SmolStr;
 
@@ -21,15 +19,15 @@ pub struct JsDecl {
 
 /// The trait for anything that takes WebAssembly input and compiles it to JavaScript.
 pub trait WasmCompiler {
-    fn compile(&self, info: CodeInfo, out: &mut dyn Write) -> Result<(), Error>;
+    fn compile(&self, info: CodeInfo) -> Result<String, Error>;
     fn compile_comptime(&self, info: CodeInfo) -> Result<JsEnv, Error>;
 }
 
 pub struct NullCompiler;
 
 impl WasmCompiler for NullCompiler {
-    fn compile(&self, _info: CodeInfo, _out: &mut dyn Write) -> Result<(), Error> {
-        Ok(())
+    fn compile(&self, _info: CodeInfo) -> Result<String, Error> {
+        Ok(String::new())
     }
 
     fn compile_comptime(&self, _info: CodeInfo) -> Result<JsEnv, Error> {
@@ -41,8 +39,8 @@ impl<T> WasmCompiler for &T
 where
     T: WasmCompiler,
 {
-    fn compile(&self, info: CodeInfo, out: &mut dyn Write) -> Result<(), Error> {
-        (*self).compile(info, out)
+    fn compile(&self, info: CodeInfo) -> Result<String, Error> {
+        (*self).compile(info)
     }
 
     fn compile_comptime(&self, info: CodeInfo) -> Result<JsEnv, Error> {

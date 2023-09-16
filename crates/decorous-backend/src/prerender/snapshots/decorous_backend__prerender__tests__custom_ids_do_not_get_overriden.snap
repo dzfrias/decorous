@@ -9,6 +9,7 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
+
 function __init_ctx() {
   let __closure0 = () => console.log(1 + 1);
   elems["custom"].addEventListener("click", () => console.log(1 + 1));

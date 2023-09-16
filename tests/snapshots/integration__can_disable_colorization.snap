@@ -3,5 +3,5 @@ source: tests/tests.rs
 expression: filtered_stdout
 ---
 DONE parsed
-DONE HTML: prerender (out.html)
+DONE HTML (out.html)
 DONE JavaScript: prerender (out.js)

@@ -9,6 +9,7 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
+
 function __init_ctx() {
   __decor_hello_world(elems["2"].parentNode, elems["2"])
   return [];

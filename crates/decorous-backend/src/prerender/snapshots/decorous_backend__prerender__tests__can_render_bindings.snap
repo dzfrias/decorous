@@ -9,6 +9,7 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
+
 function __init_ctx() {
   let x = 0;
   elems["0"].value = x;
@@ -35,6 +36,7 @@ function __schedule_update(ctx_idx, val) {
     dirty.fill(0);
   });
 }
+
 
 ---
 <input id="0"></input>

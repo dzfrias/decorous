@@ -23,6 +23,7 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
+
 function __update(dirty, initial) {
   if (x == 0) { if (elems["0_block"]) { elems["0_block"].u(dirty); } else { elems["0_block"] = create_0_block(elems["0"].parentNode, elems["0"]); } } else if (elems["0_block"]) { elems["0_block"].d(); elems["0_block"] = null; }
 }

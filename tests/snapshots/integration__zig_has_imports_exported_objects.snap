@@ -18,6 +18,7 @@ expression: all
   </body>
 </html>
 
+
 ---input.decor---
 ---zig
 extern fn print(i32) void;

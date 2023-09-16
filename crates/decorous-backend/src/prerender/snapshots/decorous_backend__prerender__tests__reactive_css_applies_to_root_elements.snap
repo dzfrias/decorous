@@ -8,6 +8,7 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
+
 function __update(dirty, initial) {
   if (initial) elems["0"].setAttribute("style", `--decor-0: ${color}; `);
 }

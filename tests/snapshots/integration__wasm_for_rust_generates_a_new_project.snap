@@ -194,6 +194,7 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
+
 function __init_ctx() {
   let __closure0 = () => console.log(wasm.add(1, 2));
   elems["1"].addEventListener("click", () => console.log(wasm.add(1, 2)));

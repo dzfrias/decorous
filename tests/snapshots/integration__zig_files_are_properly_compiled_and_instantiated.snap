@@ -12,9 +12,10 @@ expression: all
   </head>
   <body>
     <script type="module" src="out.js"></script>
-    <div id="input"></div>
+    
   </body>
 </html>
+
 
 ---input.decor---
 ---zig

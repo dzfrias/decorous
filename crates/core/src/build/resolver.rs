@@ -4,7 +4,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use decorous_backend::{dom_render::render, Options, UseInfo, UseResolver};
+use anyhow::anyhow;
+use decorous_backend::{
+    dom_render::CsrRenderer, JsFile, Options, RenderBackend, Result, UseInfo, UseResolver,
+};
 use decorous_errors::{ErrStream, Source};
 use decorous_frontend::{Component, Ctx, Parser};
 
@@ -16,7 +19,7 @@ pub struct Resolver<'a> {
 }
 
 impl UseResolver for Resolver<'_> {
-    fn resolve(&self, path: &Path) -> io::Result<UseInfo> {
+    fn resolve(&self, path: &Path) -> Result<UseInfo> {
         let contents = fs::read_to_string(path)?;
         let stem = path.file_stem().unwrap().to_string_lossy();
 
@@ -31,26 +34,22 @@ impl UseResolver for Resolver<'_> {
                 },
             ),
         });
-        let ast = match parser.parse() {
-            Ok(ast) => ast,
-            Err(err) => {
-                self.global_ctx.errs.emit(err.into());
-                todo!("fix result of resolve()");
-            }
-        };
+        let ast = parser.parse().map_err(|err| anyhow!(err))?;
         let component = Component::new(ast, self.global_ctx.errs.clone());
 
         let name: PathBuf = format!("{}_{stem}.mjs", self.global_ctx.args.out).into();
         let mut f = BufWriter::new(File::create(&name)?);
-        render(
+        let renderer = CsrRenderer::new();
+        renderer.render(
             &component,
-            &mut f,
+            JsFile::new(&mut f),
             &Options {
                 name: &stem,
                 modularize: true,
                 wasm_compiler: self.compiler,
                 use_resolver: self,
                 errs: self.global_ctx.errs.clone(),
+                index_html: None,
             },
         )?;
 

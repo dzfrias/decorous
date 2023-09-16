@@ -9,6 +9,7 @@ function replace(node) {
   node.replaceWith(text);
   return text;
 }
+
 function __update(dirty, initial) {
   if (initial) elems["0"].setAttribute("class", x + 3);
   if (initial) elems[2].data = x;

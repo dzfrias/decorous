@@ -6,92 +6,129 @@ use itertools::Itertools;
 use rslint_parser::AstNode;
 use std::{borrow::Cow, io};
 
-use crate::{codegen_utils, render_error::Result, Options};
+use crate::{
+    codegen_utils, css_render,
+    render_out::{write_html, write_js},
+    CodeInfo, Linker, Options, RenderBackend, RenderOut, Result,
+};
 pub(crate) use render_fragment::{render_fragment, State};
 
-pub fn render<T: io::Write>(
-    component: &Component,
-    render_to: &mut T,
-    metadata: &Options,
-) -> Result<()> {
-    if let Some(wasm) = component.wasm() {
-        metadata.wasm_compiler.compile(
-            crate::CodeInfo {
+pub struct CsrRenderer {
+    linker: Linker,
+}
+
+impl CsrRenderer {
+    pub fn new() -> Self {
+        Self {
+            linker: Linker::default(),
+        }
+    }
+}
+
+impl RenderBackend for CsrRenderer {
+    fn add_linker(&mut self, linker: Linker) {
+        self.linker = linker;
+    }
+
+    fn render<T: RenderOut>(&self, component: &Component, mut out: T, ctx: &Options) -> Result<()> {
+        if let Some(css) = component.css() {
+            let mut css_out = vec![];
+            css_render::render_css(css, &mut css_out, component)?;
+            out.write_css(&css_out)?;
+        }
+
+        if let Some(info) = &ctx.index_html {
+            if component.css().is_some() {
+                write_html!(
+                    out,
+                    include_str!("./templates/index_css.html"),
+                    name = ctx.name,
+                    script = format!("{}.js", info.basename),
+                    css = format!("{}.css", info.basename),
+                )?;
+            } else {
+                write_html!(
+                    out,
+                    include_str!("./templates/index.html"),
+                    name = ctx.name,
+                    script = format!("{}.js", info.basename),
+                )?;
+            }
+        }
+
+        if let Some(wasm) = component.wasm() {
+            let wasm_prelude = ctx.wasm_compiler.compile(CodeInfo {
                 lang: wasm.lang(),
                 body: wasm.body(),
                 exports: component.exports(),
-            },
-            render_to,
-        )?
-    }
-
-    for use_decl in component.uses() {
-        let Some(stem) = use_decl.file_stem() else {
-            continue;
+            })?;
+            out.write_js(wasm_prelude.as_bytes())?;
         };
-        let use_info = metadata.use_resolver.resolve(use_decl)?;
-        writeln!(
-            render_to,
-            "import __decor_{} from \"./{}\";",
-            stem.to_string_lossy().to_snek_case(),
-            use_info.loc.display(),
-        )?;
-    }
-    // Hoisted syntax nodes should come first
-    for hoist in component.hoist() {
-        writeln!(render_to, "{hoist}")?;
-    }
 
-    if let Some(comptime) = component.comptime() {
-        match metadata.wasm_compiler.compile_comptime(crate::CodeInfo {
-            lang: comptime.lang(),
-            body: comptime.body(),
-            exports: component.exports(),
-        }) {
-            Ok(env) => {
-                for decl in env.items() {
-                    writeln!(render_to, "const {} = {};", decl.name, decl.value)?;
-                }
-            }
-            Err(_err) => todo!("error"),
+        for use_decl in component.uses() {
+            let Some(stem) = use_decl.file_stem() else {
+                continue;
+            };
+            let use_info = ctx.use_resolver.resolve(use_decl)?;
+            write_js!(
+                out,
+                "import __decor_{} from \"./{}\";",
+                stem.to_string_lossy().to_snek_case(),
+                use_info.loc.display(),
+            )?;
         }
-    }
 
-    render_init_ctx(render_to, component)?;
+        // Hoisted syntax nodes should come first
+        for hoist in component.hoist() {
+            write_js!(out, "{hoist}")?;
+        }
 
-    if metadata.modularize {
-        writeln!(render_to, "export default function initialize(target) {{")?;
-    }
+        if let Some(comptime) = component.comptime() {
+            let env = ctx.wasm_compiler.compile_comptime(CodeInfo {
+                lang: comptime.lang(),
+                body: comptime.body(),
+                exports: component.exports(),
+            })?;
+            for decl in env.items() {
+                write_js!(out, "const {} = {};", decl.name, decl.value)?;
+            }
+        }
 
-    writeln!(
-        render_to,
-        "const dirty = new Uint8Array(new ArrayBuffer({}));",
-        // Ceiling division to get the amount of bytes needed in the ArrayBuffer
-        ((component.declared_vars().len() + 7) / 8)
-    )?;
+        render_init_ctx(&mut out.js_handle(), component)?;
 
-    let state = State {
-        name: "main".into(),
-        component,
-        root: None,
-        uses: vec![],
-    };
-    render_fragment(component.fragment_tree(), state, render_to)?;
+        if ctx.modularize {
+            write_js!(out, "export default function initialize(target) {{")?;
+        }
 
-    writeln!(render_to, "const ctx = __init_ctx();")?;
-    if metadata.modularize {
-        writeln!(render_to, "const fragment = create_main_block(target);")?;
-    } else {
-        writeln!(
-            render_to,
-            "const fragment = create_main_block(document.getElementById(\"{}\"));",
-            metadata.name
+        write_js!(
+            out,
+            "const dirty = new Uint8Array(new ArrayBuffer({}));",
+            // Ceiling division to get the amount of bytes needed in the ArrayBuffer
+            ((component.declared_vars().len() + 7) / 8)
         )?;
-    }
-    writeln!(render_to, "let updating = false;")?;
-    writeln!(
-        render_to,
-        "function __schedule_update(ctx_idx, val) {{
+
+        let state = State {
+            name: "main".into(),
+            component,
+            root: None,
+            uses: vec![],
+        };
+        render_fragment(component.fragment_tree(), state, &mut out.js_handle())?;
+
+        write_js!(out, "const ctx = __init_ctx();")?;
+        if ctx.modularize {
+            write_js!(out, "const fragment = create_main_block(target);")?;
+        } else {
+            write_js!(
+                out,
+                "const fragment = create_main_block(document.getElementById(\"{}\"));",
+                ctx.name
+            )?;
+        }
+        write_js!(out, "let updating = false;")?;
+        write_js!(
+            out,
+            "function __schedule_update(ctx_idx, val) {{
 ctx[ctx_idx] = val;
 dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
 if (updating) return;
@@ -102,13 +139,14 @@ updating = false;
 dirty.fill(0);
 }});
 }}"
-    )?;
+        )?;
 
-    if metadata.modularize {
-        writeln!(render_to, "}}")?;
+        if ctx.modularize {
+            write_js!(out, "}}")?;
+        }
+
+        Ok(())
     }
-
-    Ok(())
 }
 
 fn render_init_ctx<W: io::Write>(out: &mut W, component: &Component<'_>) -> io::Result<()> {
@@ -185,11 +223,38 @@ fn render_init_ctx<W: io::Write>(out: &mut W, component: &Component<'_>) -> io::
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
+    use super::*;
     use crate::{NullCompiler, NullResolver};
     use decorous_errors::Source;
     use decorous_frontend::Parser;
+    use rslint_parser::SmolStr;
 
-    use super::*;
+    #[derive(Default)]
+    struct TestOut {
+        js: Vec<u8>,
+        css: Vec<u8>,
+        html: Vec<u8>,
+    }
+
+    impl RenderOut for TestOut {
+        fn write_html(&mut self, buf: &[u8]) -> io::Result<()> {
+            self.html.write_all(buf)
+        }
+
+        fn write_css(&mut self, buf: &[u8]) -> io::Result<()> {
+            self.css.write_all(buf)
+        }
+
+        fn write_js(&mut self, buf: &[u8]) -> io::Result<()> {
+            self.js.write_all(buf)
+        }
+
+        fn js_handle(&mut self) -> &mut dyn io::Write {
+            &mut self.js
+        }
+    }
 
     macro_rules! test_render {
         ($input:expr$(, $metadata:expr)?) => {
@@ -202,20 +267,22 @@ mod tests {
                 parser.parse().expect("should be valid input"),
                 errs.clone(),
             );
-            let mut out = vec![];
+            let mut out = TestOut::default();
+            let mut linker = Linker::default();
+            for use_decl in component.uses() {
+                let name = SmolStr::new(use_decl.to_string_lossy());
+                linker.define(name, use_decl.to_string_lossy().to_string());
+            }
             #[allow(unused)]
-            let mut metadata = Options { name: "test", modularize: false, use_resolver: &NullResolver, wasm_compiler: &NullCompiler, errs: errs.clone() };
+            let mut metadata = Options { errs: errs.clone(), ..Default::default() };
             $(
                 metadata = $metadata;
              )?
-            render(
-                &component,
-                &mut out,
-                &metadata
-            )
-            .unwrap();
+            let mut renderer = CsrRenderer::new();
+            renderer.add_linker(linker);
+            renderer.render(&component, &mut out, &metadata).unwrap();
 
-            insta::assert_snapshot!(String::from_utf8(out).unwrap());
+            insta::assert_snapshot!(String::from_utf8(out.js).unwrap());
         };
     }
 
@@ -326,7 +393,8 @@ mod tests {
                 errs: decorous_errors::stderr(Source {
                     name: "TEST".to_owned(),
                     src
-                })
+                }),
+                index_html: None,
             }
         );
     }
