@@ -18,11 +18,11 @@ use crate::{css::ast::Css, location::Location};
 /// complex transformations that require ownership.
 #[derive(Debug)]
 pub struct DecorousAst<'a> {
-    nodes: Vec<Node<'a, Location>>,
-    script: Option<SyntaxNode>,
-    css: Option<Css>,
-    wasm: Option<Code<'a>>,
-    comptime: Option<Code<'a>>,
+    pub nodes: Vec<Node<'a, Location>>,
+    pub script: Option<SyntaxNode>,
+    pub css: Option<Css>,
+    pub wasm: Option<Code<'a>>,
+    pub comptime: Option<Code<'a>>,
 }
 
 /// A node of the [AST](DecorousAst).
@@ -31,8 +31,8 @@ pub struct DecorousAst<'a> {
 /// actual node data, retrieved by [`node_type()`](`Self::node_type()`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<'a, T> {
-    metadata: T,
-    node_type: NodeType<'a, T>,
+    pub metadata: T,
+    pub node_type: NodeType<'a, T>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -91,9 +91,9 @@ impl<'a> std::ops::Deref for Comment<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Element<'a, T> {
-    tag: &'a str,
-    attrs: Vec<Attribute<'a>>,
-    children: Vec<Node<'a, T>>,
+    pub tag: &'a str,
+    pub attrs: Vec<Attribute<'a>>,
+    pub children: Vec<Node<'a, T>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -105,22 +105,22 @@ pub enum SpecialBlock<'a, T> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ForBlock<'a, T> {
-    binding: &'a str,
-    index: Option<&'a str>,
-    expr: SyntaxNode,
-    inner: Vec<Node<'a, T>>,
+    pub binding: &'a str,
+    pub index: Option<&'a str>,
+    pub expr: SyntaxNode,
+    pub inner: Vec<Node<'a, T>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IfBlock<'a, T> {
-    expr: SyntaxNode,
-    inner: Vec<Node<'a, T>>,
-    else_block: Option<Vec<Node<'a, T>>>,
+    pub expr: SyntaxNode,
+    pub inner: Vec<Node<'a, T>>,
+    pub else_block: Option<Vec<Node<'a, T>>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UseBlock<'a> {
-    path: &'a str,
+    pub path: &'a Path,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -132,8 +132,8 @@ pub enum Attribute<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EventHandler<'a> {
-    event: &'a str,
-    expr: SyntaxNode,
+    pub event: &'a str,
+    pub expr: SyntaxNode,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -150,95 +150,39 @@ pub enum CollapsedChildrenType<'a> {
 
 #[derive(Debug)]
 pub struct Code<'a> {
-    lang: &'a str,
-    body: &'a str,
-    offset: usize,
-    comptime: bool,
+    pub lang: &'a str,
+    pub body: &'a str,
+    pub offset: usize,
+    pub comptime: bool,
 }
-
-impl<'a> Code<'a> {
-    pub fn new(lang: &'a str, body: &'a str, offset: usize, comptime: bool) -> Self {
-        Self {
-            lang,
-            body,
-            offset,
-            comptime,
-        }
-    }
-
-    pub fn lang(&self) -> &'a str {
-        self.lang
-    }
-
-    pub fn body(&self) -> &'a str {
-        self.body
-    }
-
-    pub fn offset(&self) -> usize {
-        self.offset
-    }
-
-    pub fn is_comptime(&self) -> bool {
-        self.comptime
-    }
-}
-
 impl<'a, T> Element<'a, T> {
-    pub fn new(tag: &'a str, attrs: Vec<Attribute<'a>>, children: Vec<Node<'a, T>>) -> Self {
-        Self {
-            tag,
-            attrs,
-            children,
-        }
-    }
-
-    pub fn tag(&self) -> &'a str {
-        self.tag
-    }
-
-    pub fn children(&self) -> &[Node<'a, T>] {
-        self.children.as_ref()
-    }
-
-    pub fn attrs(&self) -> &[Attribute<'a>] {
-        self.attrs.as_ref()
-    }
-
-    pub fn children_mut(&mut self) -> &mut Vec<Node<'a, T>> {
-        &mut self.children
-    }
-
     pub fn descendents(&'a self) -> NodeIter<'a, T> {
-        NodeIter::new(self.children())
+        NodeIter::new(&self.children)
     }
 
     pub fn descendents_mut<F>(&'a mut self, f: &mut F)
     where
         F: FnMut(&mut Node<'a, T>),
     {
-        for child in self.children_mut() {
+        for child in &mut self.children {
             f(child);
-            if let NodeType::Element(elem) = child.node_type_mut() {
+            if let NodeType::Element(elem) = &mut child.node_type {
                 elem.descendents_mut(f);
             }
         }
     }
 
     pub fn has_immediate_mustache(&self) -> bool {
-        self.children()
+        self.children
             .iter()
-            .any(|child| matches!(child.node_type(), NodeType::Mustache(_)))
-    }
-
-    pub fn attrs_mut(&mut self) -> &mut Vec<Attribute<'a>> {
-        &mut self.attrs
+            .any(|child| matches!(child.node_type, NodeType::Mustache(_)))
     }
 
     pub fn js_valid_tag_name(&self) -> Cow<'a, str> {
-        if self.tag().contains('-') {
-            Cow::Owned(self.tag().to_snek_case())
+        if self.tag.contains('-') {
+            Cow::Owned(self.tag.to_snek_case())
         } else {
-            Cow::Borrowed(self.tag())
+            Cow::Borrowed(&self.tag)
         }
     }
 }
@@ -249,26 +193,6 @@ impl<'a, T> Node<'a, T> {
             metadata,
             node_type: ty,
         }
-    }
-
-    /// Obtain an shared reference to the node's type. See [`NodeType`] for more.
-    pub fn node_type(&self) -> &NodeType<'a, T> {
-        &self.node_type
-    }
-
-    /// Obtain an exclusive reference to the node's type. See [`NodeType`] for more.
-    pub fn node_type_mut(&mut self) -> &mut NodeType<'a, T> {
-        &mut self.node_type
-    }
-
-    /// Obtain a shared reference to the metadata of the node.
-    pub fn metadata(&self) -> &T {
-        &self.metadata
-    }
-
-    /// Obtain an exclusive reference to the metadata of the node.
-    pub fn metadata_mut(&mut self) -> &mut T {
-        &mut self.metadata
     }
 
     /// Recursively cast each the metadata field of each node into a new type. The provided
@@ -334,166 +258,22 @@ impl<'a, T> Node<'a, T> {
     }
 }
 
-impl<'a, T> ForBlock<'a, T> {
-    pub fn new(
-        binding: &'a str,
-        index: Option<&'a str>,
-        expr: SyntaxNode,
-        inner: Vec<Node<'a, T>>,
-    ) -> Self {
-        Self {
-            binding,
-            index,
-            expr,
-            inner,
-        }
-    }
-
-    pub fn binding(&self) -> &str {
-        self.binding
-    }
-
-    pub fn index(&self) -> Option<&str> {
-        self.index
-    }
-
-    pub fn expr(&self) -> &SyntaxNode {
-        &self.expr
-    }
-
-    pub fn inner(&self) -> &[Node<'_, T>] {
-        self.inner.as_ref()
-    }
-
-    pub fn inner_mut(&mut self) -> &mut Vec<Node<'a, T>> {
-        &mut self.inner
-    }
-}
-
-impl<'a> UseBlock<'a> {
-    pub fn new(path: &'a str) -> Self {
-        Self { path }
-    }
-
-    pub fn path(&self) -> &'a Path {
-        Path::new(self.path)
-    }
-}
-
-impl<'a> EventHandler<'a> {
-    pub fn new(event: &'a str, expr: SyntaxNode) -> Self {
-        Self { event, expr }
-    }
-
-    pub fn event(&self) -> &str {
-        self.event
-    }
-
-    pub fn expr(&self) -> &SyntaxNode {
-        &self.expr
-    }
-}
-
 impl<'a, T> IfBlock<'a, T> {
-    pub fn new(
-        expr: SyntaxNode,
-        inner: Vec<Node<'a, T>>,
-        else_block: Option<Vec<Node<'a, T>>>,
-    ) -> Self {
-        Self {
-            expr,
-            inner,
-            else_block,
-        }
-    }
-
     pub fn inner_recursive(&'a self) -> NodeIter<'a, T> {
-        NodeIter::new(self.inner())
+        NodeIter::new(&self.inner)
     }
 
     pub fn else_recursive(&'a self) -> Option<NodeIter<'a, T>> {
-        self.else_block()
+        self.else_block
+            .as_ref()
             .map(|else_block| NodeIter::new(else_block))
-    }
-
-    pub fn expr(&self) -> &SyntaxNode {
-        &self.expr
-    }
-
-    pub fn inner(&self) -> &[Node<'a, T>] {
-        self.inner.as_ref()
-    }
-
-    pub fn else_block(&self) -> Option<&[Node<'a, T>]> {
-        self.else_block.as_deref()
-    }
-
-    pub fn inner_mut(&mut self) -> &mut Vec<Node<'a, T>> {
-        &mut self.inner
-    }
-
-    pub fn else_block_mut(&mut self) -> Option<&mut [Node<'a, T>]> {
-        self.else_block.as_deref_mut()
     }
 }
 
 impl<'a> DecorousAst<'a> {
-    pub fn new(
-        nodes: Vec<Node<'a, Location>>,
-        script: Option<SyntaxNode>,
-        css: Option<Css>,
-        wasm: Option<Code<'a>>,
-        comptime: Option<Code<'a>>,
-    ) -> Self {
-        Self {
-            nodes,
-            script,
-            css,
-            wasm,
-            comptime,
-        }
-    }
-
-    /// Obtain a shared reference to the template AST.
-    pub fn nodes(&self) -> &[Node<'_, Location>] {
-        self.nodes.as_ref()
-    }
-
-    /// Gives a shared reference to the JavaScript AST, if it exists. The `DecorousAst` will have
-    /// no JavaScript AST if no `<script>` tag is specified in the template.
-    pub fn script(&self) -> Option<&SyntaxNode> {
-        self.script.as_ref()
-    }
-
-    /// Gives a a shared reference to the CSS AST, if it exists. The `DecorousAst` will have
-    /// no CSS AST if no `<style>` tag is specified in the template.
-    pub fn css(&self) -> Option<&Css> {
-        self.css.as_ref()
-    }
-
     /// Creates a recursive iterator over the nodes of the template.
     pub fn iter_nodes(&'a self) -> NodeIter<'a, Location> {
-        NodeIter::new(self.nodes())
-    }
-
-    pub fn into_components(
-        self,
-    ) -> (
-        Vec<Node<'a, Location>>,
-        Option<SyntaxNode>,
-        Option<Css>,
-        Option<Code<'a>>,
-        Option<Code<'a>>,
-    ) {
-        (self.nodes, self.script, self.css, self.wasm, self.comptime)
-    }
-
-    pub fn wasm(&self) -> Option<&Code<'a>> {
-        self.wasm.as_ref()
-    }
-
-    pub fn comptime(&self) -> Option<&Code<'a>> {
-        self.comptime.as_ref()
+        NodeIter::new(&self.nodes)
     }
 }
 
@@ -504,11 +284,11 @@ where
 {
     for node in nodes {
         body_func(node);
-        if let NodeType::Element(elem) = node.node_type() {
+        if let NodeType::Element(elem) = &node.node_type {
             if !predicate(elem) {
                 continue;
             }
-            traverse_with(elem.children(), predicate, body_func);
+            traverse_with(&elem.children, predicate, body_func);
         }
     }
 }
@@ -519,8 +299,8 @@ where
 {
     for node in nodes {
         f(node);
-        if let NodeType::Element(elem) = node.node_type_mut() {
-            traverse_mut(elem.children_mut(), f);
+        if let NodeType::Element(elem) = &mut node.node_type {
+            traverse_mut(&mut elem.children, f);
         }
     }
 }
@@ -543,8 +323,8 @@ impl<'a, T> Iterator for NodeIter<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.stack.pop().map(|node| {
-            if let NodeType::Element(elem) = node.node_type() {
-                self.stack.extend(elem.children().iter().rev());
+            if let NodeType::Element(elem) = &node.node_type {
+                self.stack.extend(elem.children.iter().rev());
             }
 
             node
@@ -554,7 +334,7 @@ impl<'a, T> Iterator for NodeIter<'a, T> {
 
 impl<'a, T> fmt::Display for Node<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.node_type() {
+        match &self.node_type {
             NodeType::Text(t) => write!(f, "{t}"),
             NodeType::Comment(Comment(c)) => write!(f, "<!--{c}-->"),
             NodeType::Element(elem) => write!(f, "{elem}"),
@@ -569,12 +349,12 @@ impl<'a, T> fmt::Display for Element<'a, T> {
         write!(
             f,
             "<{}{}{}>{}</{0}>",
-            self.tag(),
-            (!self.children().is_empty())
+            self.tag,
+            (!self.children.is_empty())
                 .then_some(" ")
                 .unwrap_or_default(),
-            self.attrs().iter().join(" "),
-            self.children()
+            self.attrs.iter().join(" "),
+            self.children
                 .iter()
                 .map(|elem| format!("  {elem}"))
                 .join("")
@@ -604,7 +384,7 @@ impl<'a> fmt::Display for AttributeValue<'a> {
 
 impl<'a> fmt::Display for EventHandler<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "on:{}={{{}}}", self.event(), self.expr())
+        write!(f, "on:{}={{{}}}", self.event, self.expr)
     }
 }
 
@@ -623,8 +403,8 @@ impl<'a, T> fmt::Display for IfBlock<'a, T> {
         write!(
             f,
             "{{#if {}}}\n{}\n{{/if}}",
-            self.expr(),
-            self.inner().iter().map(|elem| format!("  {elem}")).join(""),
+            self.expr,
+            self.inner.iter().map(|elem| format!("  {elem}")).join(""),
         )
     }
 }
@@ -634,18 +414,18 @@ impl<'a, T> fmt::Display for ForBlock<'a, T> {
         write!(
             f,
             "{{#for {} in {}}}\n{}\n{{/for}}",
-            self.index().map_or_else(
-                || self.binding().to_owned(),
+            self.index.map_or_else(
+                || self.binding.to_owned(),
                 |idx| format!("{idx}, {}", self.binding)
             ),
-            self.expr(),
-            self.inner().iter().map(|elem| format!("  {elem}")).join(""),
+            self.expr,
+            self.inner.iter().map(|elem| format!("  {elem}")).join(""),
         )
     }
 }
 
 impl<'a> fmt::Display for UseBlock<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{#use \"{}\"}}", self.path().display())
+        write!(f, "{{#use \"{}\"}}", self.path.display())
     }
 }

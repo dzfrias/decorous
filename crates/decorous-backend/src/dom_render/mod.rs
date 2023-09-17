@@ -65,8 +65,8 @@ impl RenderBackend for CsrRenderer {
 
         if let Some(wasm) = component.wasm() {
             let wasm_prelude = ctx.wasm_compiler.compile(CodeInfo {
-                lang: wasm.lang(),
-                body: wasm.body(),
+                lang: wasm.lang,
+                body: wasm.body,
                 exports: component.exports(),
             })?;
             out.write_js(wasm_prelude.as_bytes())?;
@@ -92,8 +92,8 @@ impl RenderBackend for CsrRenderer {
 
         if let Some(comptime) = component.comptime() {
             let env = ctx.wasm_compiler.compile_comptime(CodeInfo {
-                lang: comptime.lang(),
-                body: comptime.body(),
+                lang: comptime.lang,
+                body: comptime.body,
                 exports: component.exports(),
             })?;
             for decl in env.items() {

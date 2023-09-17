@@ -132,11 +132,11 @@ impl Render for Node<'_, FragmentMetadata> {
     type Metadata = ();
 
     fn render(&self, state: &mut State, out: &mut Output, _meta: &Self::Metadata) {
-        match self.node_type() {
-            NodeType::Text(t) => t.render(state, out, self.metadata()),
-            NodeType::Mustache(m) => m.render(state, out, self.metadata()),
-            NodeType::Element(elem) => elem.render(state, out, self.metadata()),
-            NodeType::SpecialBlock(block) => block.render(state, out, self.metadata()),
+        match &self.node_type {
+            NodeType::Text(t) => t.render(state, out, &self.metadata),
+            NodeType::Mustache(m) => m.render(state, out, &self.metadata),
+            NodeType::Element(elem) => elem.render(state, out, &self.metadata),
+            NodeType::SpecialBlock(block) => block.render(state, out, &self.metadata),
             NodeType::Comment(_) => {}
         }
     }
@@ -216,7 +216,7 @@ impl Render for Element<'_, FragmentMetadata> {
         // Decl
         out.write_declln(format_args!(
             "const e{id} = document.createElement(\"{}\");",
-            self.tag()
+            self.tag
         ));
         match collapse_children(self) {
             Some(CollapsedChildrenType::Text(t)) => {
@@ -229,12 +229,12 @@ impl Render for Element<'_, FragmentMetadata> {
                 out.write_declln(format_args!("e{id}.innerHTML = `{html}`;"));
             }
             None => {
-                for child in self.children() {
+                for child in &self.children {
                     child.render(state, out, &());
                 }
             }
         }
-        for attr in self.attrs() {
+        for attr in &self.attrs {
             attr.render(state, out, meta);
         }
 
@@ -260,8 +260,8 @@ impl Render for ForBlock<'_, FragmentMetadata> {
     fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
 
-        let _ = render_fragment(
-            self.inner(),
+        render_fragment(
+            &self.inner,
             State {
                 name: id.to_string().into(),
                 root: Some(id),
@@ -269,7 +269,8 @@ impl Render for ForBlock<'_, FragmentMetadata> {
                 ..*state
             },
             out,
-        );
+        )
+        .expect("write to memory should not fail");
 
         // Decl
         out.write_declln(format_args!(
@@ -277,9 +278,9 @@ impl Render for ForBlock<'_, FragmentMetadata> {
         ));
 
         // Mount
-        let unbound = utils::get_unbound_refs(self.expr());
+        let unbound = utils::get_unbound_refs(&self.expr);
         let expr = codegen_utils::replace_namerefs(
-            self.expr(),
+            &self.expr,
             &unbound,
             state.component.declared_vars(),
             meta.scope(),
@@ -290,7 +291,7 @@ impl Render for ForBlock<'_, FragmentMetadata> {
             .all_scopes()
             .get(&id)
             .unwrap()
-            .get(self.binding())
+            .get(self.binding)
             .unwrap();
         out.write_mountln(format_args!("mount(target, e{id}_anchor, anchor);"));
         out.write_mountln(format_args!("let e{id}_blocks = [];\nlet i = 0;\nfor (const v of ({expr})) {{ ctx[{var_idx}] = v; e{id}_blocks[i] = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); i += 1; }}"));
@@ -307,7 +308,7 @@ impl Render for UseBlock<'_> {
     type Metadata = FragmentMetadata;
 
     fn render(&self, state: &mut State, _out: &mut Output, _meta: &Self::Metadata) {
-        let Some(name) = self.path().file_stem() else {
+        let Some(name) = self.path.file_stem() else {
             return;
         };
 
@@ -320,16 +321,16 @@ impl Render for IfBlock<'_, FragmentMetadata> {
 
     fn render(&self, state: &mut State, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
-        let unbound = utils::get_unbound_refs(self.expr());
+        let unbound = utils::get_unbound_refs(&self.expr);
         let replacement = codegen_utils::replace_namerefs(
-            self.expr(),
+            &self.expr,
             &unbound,
             state.component.declared_vars(),
             meta.scope(),
         );
 
         let _ = render_fragment(
-            self.inner(),
+            &self.inner,
             State {
                 name: id.to_string().into(),
                 root: Some(id),
@@ -338,7 +339,7 @@ impl Render for IfBlock<'_, FragmentMetadata> {
             },
             out,
         );
-        if let Some(else_block) = self.else_block() {
+        if let Some(else_block) = &self.else_block {
             let _ = render_fragment(
                 else_block,
                 State {
@@ -359,7 +360,7 @@ impl Render for IfBlock<'_, FragmentMetadata> {
         // Mount
         out.write_mountln(format_args!("mount(target, e{id}_anchor, anchor);"));
 
-        if self.else_block().is_some() {
+        if self.else_block.is_some() {
             out.write_mountln(format_args!("let e{id};\nlet e{id}_on = false;\nif ({replacement}) {{ e{id} = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); e{id}_on = true; }} else {{ e{id} = create_{id}_else_block(e{id}_anchor.parentNode, e{id}_anchor); }}"));
             out.write_updateln(format_args!("if ({replacement}) {{ if (e{id} && e{id}_on) {{ e{id}.u(dirty); }} else {{ e{id}_on = true; e{id}.d(); e{id} = create_{id}_block(e{id}_anchor.parentNode, e{id}_anchor); }} }} else if (e{id}_on) {{ e{id}_on = false; e{id}.d(); e{id} = create_{id}_else_block(e{id}_anchor.parentNode, e{id}_anchor); }}"));
         } else {
@@ -412,9 +413,9 @@ impl Render for Attribute<'_> {
             }
 
             Self::EventHandler(event_handler) => {
-                let unbound = utils::get_unbound_refs(event_handler.expr());
+                let unbound = utils::get_unbound_refs(&event_handler.expr);
                 let replaced = codegen_utils::replace_namerefs(
-                    event_handler.expr(),
+                    &event_handler.expr,
                     &unbound,
                     state.component.declared_vars(),
                     meta.scope(),
@@ -446,7 +447,7 @@ impl Render for Attribute<'_> {
                 if scope_args.is_empty() {
                     out.write_declln(format_args!(
                         "e{id}.addEventListener(\"{}\", {replaced})",
-                        event_handler.event()
+                        event_handler.event
                     ));
 
                     return;
@@ -458,7 +459,7 @@ impl Render for Attribute<'_> {
                     out.write_declln(format_args!("const arg{i} = ctx[{arg_idx}];"));
                     force_write!(added_args, "arg{i},");
                 }
-                out.write_declln(format_args!("e{id}.addEventListener(\"{}\", (...args) => {replaced}({added_args} ...args));", event_handler.event()));
+                out.write_declln(format_args!("e{id}.addEventListener(\"{}\", (...args) => {replaced}({added_args} ...args));", event_handler.event));
             }
 
             Self::Binding(binding) => {
@@ -538,16 +539,16 @@ fn collapse_whitespace(s: &str) -> Cow<str> {
 fn collapse_children<'a>(
     elem: &'a Element<'a, FragmentMetadata>,
 ) -> Option<CollapsedChildrenType<'a>> {
-    if elem.children().len() == 1 {
-        if let NodeType::Text(t) = *elem.children().first().unwrap().node_type() {
+    if elem.children.len() == 1 {
+        if let NodeType::Text(t) = *&elem.children.first().unwrap().node_type {
             return Some(CollapsedChildrenType::Text(&t));
         }
     }
-    if !elem.children().is_empty()
-        && elem.descendents().all(|node| match node.node_type() {
+    if !elem.children.is_empty()
+        && elem.descendents().all(|node| match &node.node_type {
             NodeType::Text(_) | NodeType::Comment(_) => true,
             // For elements, check if any attributes have mustache tags
-            NodeType::Element(elem) => elem.attrs().iter().all(|attr| match attr {
+            NodeType::Element(elem) => elem.attrs.iter().all(|attr| match attr {
                 Attribute::KeyValue(_, None) => true,
                 Attribute::KeyValue(_, Some(val)) => {
                     matches!(val, AttributeValue::Literal(_))
@@ -557,7 +558,7 @@ fn collapse_children<'a>(
             NodeType::Mustache(_) | NodeType::SpecialBlock(_) => false,
         })
     {
-        return Some(CollapsedChildrenType::Html(elem.children().iter().join("")));
+        return Some(CollapsedChildrenType::Html(elem.children.iter().join("")));
     }
 
     None

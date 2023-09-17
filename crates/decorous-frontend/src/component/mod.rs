@@ -123,18 +123,17 @@ impl<'a> Component<'a> {
 
 // Private methods of Component
 impl<'a> Component<'a> {
-    fn compute(&mut self, ast: DecorousAst<'a>) {
-        let (mut nodes, script, css, wasm, comptime) = ast.into_components();
-        if let Some(script) = script {
+    fn compute(&mut self, mut ast: DecorousAst<'a>) {
+        if let Some(script) = ast.script {
             self.extract_toplevel_data(script);
         }
-        if let Some(mut css) = css {
-            self.isolate_css(&mut css, &mut nodes);
+        if let Some(mut css) = ast.css {
+            self.isolate_css(&mut css, &mut ast.nodes);
             self.css = Some(css);
         }
-        self.wasm = wasm;
-        self.comptime = comptime;
-        self.build_fragment_tree(nodes);
+        self.wasm = ast.wasm;
+        self.comptime = ast.comptime;
+        self.build_fragment_tree(ast.nodes);
     }
 
     fn isolate_css(&mut self, css: &mut Css, nodes: &mut [Node<'a, Location>]) {
@@ -169,11 +168,11 @@ impl<'a> Component<'a> {
 
     fn assign_node_classes(&self, nodes: &mut [Node<'_, Location>]) {
         traverse_mut(nodes, &mut |node| {
-            let NodeType::Element(elem) = node.node_type_mut() else {
+            let NodeType::Element(elem) = &mut node.node_type else {
                 return;
             };
             let mut has_class = false;
-            for attr in elem.attrs_mut() {
+            for attr in &mut elem.attrs {
                 match attr {
                     Attribute::KeyValue(key, None) if key == &"class" => {
                         *attr = Attribute::KeyValue(
@@ -210,7 +209,7 @@ impl<'a> Component<'a> {
                 }
             }
             if !has_class {
-                elem.attrs_mut().push(Attribute::KeyValue(
+                elem.attrs.push(Attribute::KeyValue(
                     "class",
                     Some(AttributeValue::Literal(Cow::Owned(format!(
                         "decor-{}",
@@ -331,13 +330,10 @@ impl<'a> Component<'a> {
             let mut current_scope_id = None;
             let mut node = node.cast_meta(&mut |node| {
                 let id = self.generate_elem_id();
-                let fragment = FragmentMetadata::new(id, None, *node.metadata(), current_scope_id);
+                let fragment = FragmentMetadata::new(id, None, node.metadata, current_scope_id);
                 // Set scope after generating metadata because a {#for}'s scope can't contain
                 // itself
-                if matches!(
-                    node.node_type(),
-                    NodeType::SpecialBlock(SpecialBlock::For(_))
-                ) {
+                if matches!(node.node_type, NodeType::SpecialBlock(SpecialBlock::For(_))) {
                     current_scope_id = Some(id);
                 }
                 fragment
@@ -356,17 +352,17 @@ impl<'a> Component<'a> {
         parent_id: Option<u32>,
         scope_stack: &mut Vec<Scope>,
     ) {
-        node.metadata_mut().set_parent_id(parent_id);
+        node.metadata.set_parent_id(parent_id);
 
-        let id = node.metadata().id();
-        let scope = node.metadata().scope();
-        match node.node_type_mut() {
+        let id = node.metadata.id();
+        let scope = node.metadata.scope();
+        match &mut node.node_type {
             NodeType::Element(elem) => {
-                for attr in elem.attrs() {
+                for attr in &elem.attrs {
                     match attr {
                         Attribute::EventHandler(handler) => {
                             if let Some(arrow_expr) = handler
-                                .expr()
+                                .expr
                                 .first_child()
                                 .and_then(|child| child.try_to::<ArrowExpr>())
                             {
@@ -381,17 +377,17 @@ impl<'a> Component<'a> {
                     }
                 }
 
-                elem.children_mut().iter_mut().for_each(|child| {
+                elem.children.iter_mut().for_each(|child| {
                     self.get_special_vars(child, Some(id), scope_stack);
                 });
             }
 
             NodeType::SpecialBlock(block) => match block {
                 SpecialBlock::If(if_block) => {
-                    if_block.inner_mut().iter_mut().for_each(|child| {
+                    if_block.inner.iter_mut().for_each(|child| {
                         self.get_special_vars(child, Some(id), scope_stack);
                     });
-                    if let Some(else_block) = if_block.else_block_mut() {
+                    if let Some(else_block) = &mut if_block.else_block {
                         for n in else_block.iter_mut() {
                             self.get_special_vars(n, Some(id), scope_stack);
                         }
@@ -401,15 +397,15 @@ impl<'a> Component<'a> {
                     scope_stack.push(Scope::new());
                     let var_id = self.declared_vars.generate_id();
                     for scope in scope_stack.iter_mut() {
-                        scope.add(SmolStr::new(for_block.binding()), var_id);
+                        scope.add(SmolStr::new(for_block.binding), var_id);
                     }
-                    for_block.inner_mut().iter_mut().for_each(|child| {
+                    for_block.inner.iter_mut().for_each(|child| {
                         self.get_special_vars(child, Some(id), scope_stack);
                     });
                     let scope = scope_stack.pop().unwrap();
                     self.declared_vars.insert_scope(id, scope);
                 }
-                SpecialBlock::Use(use_block) => self.uses.push(use_block.path()),
+                SpecialBlock::Use(use_block) => self.uses.push(use_block.path),
             },
 
             _ => {}
@@ -426,17 +422,17 @@ impl<'a> Component<'a> {
         );
 
         for node in self.descendents() {
-            match node.node_type() {
+            match &node.node_type {
                 NodeType::Element(elem) => {
-                    for attr in elem.attrs() {
+                    for attr in &elem.attrs {
                         match attr {
                             Attribute::Binding(binding) => {
                                 // Bindings are mutable
                                 graph.mark_mutated(binding);
                             }
                             Attribute::EventHandler(evt_handler) => {
-                                graph.mark_used_from_node(evt_handler.expr());
-                                graph.mark_mutated_from_node(evt_handler.expr());
+                                graph.mark_used_from_node(&evt_handler.expr);
+                                graph.mark_mutated_from_node(&evt_handler.expr);
                             }
                             Attribute::KeyValue(_, Some(AttributeValue::JavaScript(js))) => {
                                 graph.mark_used_from_node(js);
@@ -447,12 +443,12 @@ impl<'a> Component<'a> {
                     }
                 }
                 NodeType::SpecialBlock(SpecialBlock::If(block)) => {
-                    graph.mark_used_from_node(block.expr());
-                    graph.mark_mutated_from_node(block.expr());
+                    graph.mark_used_from_node(&block.expr);
+                    graph.mark_mutated_from_node(&block.expr);
                 }
                 NodeType::SpecialBlock(SpecialBlock::For(block)) => {
-                    graph.mark_used_from_node(block.expr());
-                    graph.mark_mutated_from_node(block.expr());
+                    graph.mark_used_from_node(&block.expr);
+                    graph.mark_mutated_from_node(&block.expr);
                 }
                 NodeType::Mustache(js) => {
                     graph.mark_used_from_node(js);

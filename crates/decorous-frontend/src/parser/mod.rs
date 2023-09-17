@@ -3,6 +3,8 @@ mod ctx;
 pub mod errors;
 mod lexer;
 
+use std::path::Path;
+
 use decorous_errors::Diagnostic;
 use rslint_parser::{parse_module, SyntaxNode};
 
@@ -87,7 +89,13 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
 
         let (script, css, wasm, comptime) = self.code_blocks.into_parts();
 
-        Ok(DecorousAst::new(nodes, script, css, wasm, comptime))
+        Ok(DecorousAst {
+            nodes,
+            script,
+            css,
+            wasm,
+            comptime,
+        })
     }
 
     fn next_token(&mut self) {
@@ -143,7 +151,7 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
             let mut node = self.parse_node()?;
             if is_first {
                 // If the first node is a text node with a leading space, strip it
-                if let NodeType::Text(Text(t)) = node.node_type_mut() {
+                if let NodeType::Text(Text(t)) = &mut node.node_type {
                     *t = t.strip_prefix(' ').unwrap_or(t);
                     // Avoid pushing the node as a child if it's empty
                     if t.is_empty() {
@@ -156,7 +164,7 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
             nodes.push(node);
         }
 
-        if let Some(NodeType::Text(Text(t))) = nodes.last_mut().map(|node| node.node_type_mut()) {
+        if let Some(NodeType::Text(Text(t))) = nodes.last_mut().map(|node| &mut node.node_type) {
             if t.chars().all(|c| c.is_whitespace()) {
                 nodes.pop();
             } else {
@@ -190,14 +198,14 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
             // Plus one because of the colon token
             let loc = self.current_offset() + 1;
             let text = expect!(self, Text(_))?;
-            return Ok(Element::new(
-                tag_name,
+            return Ok(Element {
+                tag: tag_name,
                 attrs,
-                vec![Node::new(
+                children: vec![Node::new(
                     NodeType::Text(Text(text.trim_end())),
                     Location::new(loc, text.len()),
                 )],
-            ));
+            });
         }
 
         let children = self.parse_nodes(|tok| {
@@ -224,7 +232,11 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
             Ok(false)
         })?;
 
-        Ok(Element::new(tag_name, attrs, children))
+        Ok(Element {
+            tag: tag_name,
+            attrs,
+            children,
+        })
     }
 
     fn parse_mustache(&mut self) -> Result<Mustache> {
@@ -328,10 +340,10 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
         expect!(self, Equals)?;
         let expr_text = expect!(self, Mustache(_))?;
 
-        Ok(Attribute::EventHandler(EventHandler::new(
+        Ok(Attribute::EventHandler(EventHandler {
             event,
-            self.parse_js_expr(expr_text)?,
-        )))
+            expr: self.parse_js_expr(expr_text)?,
+        }))
     }
 
     fn parse_generic_attr(&mut self) -> Result<Attribute<'src>> {
@@ -410,7 +422,12 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
             _ => Ok(false),
         })?;
 
-        Ok(ForBlock::new(binding, None, iterator, inner))
+        Ok(ForBlock {
+            binding,
+            index: None,
+            expr: iterator,
+            inner,
+        })
     }
 
     fn parse_if_block(&mut self) -> Result<IfBlock<'src, Location>> {
@@ -450,7 +467,11 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
             None
         };
 
-        Ok(IfBlock::new(condition, inner, else_block))
+        Ok(IfBlock {
+            expr: condition,
+            inner,
+            else_block,
+        })
     }
 
     fn parse_use_block(&mut self) -> Result<UseBlock<'src>> {
@@ -459,7 +480,9 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
         expect!(self, Rbrace)?;
         self.lexer.attrs_mode(false);
 
-        Ok(UseBlock::new(path))
+        Ok(UseBlock {
+            path: Path::new(path),
+        })
     }
 
     fn parse_code_blocks(&mut self) -> Result<()> {
@@ -470,20 +493,20 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
             let err_convert = |err| |_| ParseError::new(Location::new(offset, 1), err, None);
             let code = self.parse_code_block()?;
 
-            match code.lang() {
-                _ if code.is_comptime() => {
+            match code.lang {
+                _ if code.comptime => {
                     self.code_blocks
                         .set_static_wasm(code)
                         .map_err(err_convert(ParseErrorType::CannotHaveTwoStatics))?;
                 }
                 "js" => {
-                    let syntax_node = self.parse_js_block(code.body())?;
+                    let syntax_node = self.parse_js_block(code.body)?;
                     self.code_blocks
                         .set_script(syntax_node)
                         .map_err(err_convert(ParseErrorType::CannotHaveTwoScripts))?;
                 }
                 "css" => {
-                    let css_parser = css::Parser::new(code.body());
+                    let css_parser = css::Parser::new(code.body);
                     let ast = css_parser.parse().map_err(|err| {
                         // TODO: help
                         let _help = err.help().cloned();
@@ -497,7 +520,7 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
                     match self
                         .ctx
                         .preprocessor
-                        .preprocess(code.lang(), code.body())
+                        .preprocess(code.lang, code.body)
                         .map_err(|err| {
                             self.error_on_current(ParseErrorType::PreprocError(Box::new(err)))
                         })? {
@@ -567,7 +590,12 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
         }
         self.lexer.attrs_mode(false);
 
-        Ok(Code::new(lang, body, offset, comptime))
+        Ok(Code {
+            lang,
+            body,
+            offset,
+            comptime,
+        })
     }
 }
 

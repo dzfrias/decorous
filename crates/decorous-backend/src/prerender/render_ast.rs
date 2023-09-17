@@ -99,12 +99,12 @@ impl<'ast> Render<'ast> for Node<'ast, FragmentMetadata> {
     type Metadata = ();
 
     fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, _meta: &Self::Metadata) {
-        match self.node_type() {
-            NodeType::Element(elem) => elem.render(state, out, self.metadata()),
-            NodeType::Text(t) => t.render(state, out, self.metadata()),
-            NodeType::Comment(c) => c.render(state, out, self.metadata()),
-            NodeType::SpecialBlock(block) => block.render(state, out, self.metadata()),
-            NodeType::Mustache(m) => m.render(state, out, self.metadata()),
+        match &self.node_type {
+            NodeType::Element(elem) => elem.render(state, out, &self.metadata),
+            NodeType::Text(t) => t.render(state, out, &self.metadata),
+            NodeType::Comment(c) => c.render(state, out, &self.metadata),
+            NodeType::SpecialBlock(block) => block.render(state, out, &self.metadata),
+            NodeType::Mustache(m) => m.render(state, out, &self.metadata),
         }
     }
 }
@@ -137,11 +137,11 @@ impl<'ast> Render<'ast> for Element<'ast, FragmentMetadata> {
             return;
         }
 
-        out.write_html(format_args!("<{}", self.tag()));
+        out.write_html(format_args!("<{}", self.tag));
         let mut overwritten = false;
         let mut has_dynamic = false;
         let mut has_style = false;
-        for attr in self.attrs() {
+        for attr in &self.attrs {
             attr.render(state, out, meta);
             match attr {
                 Attribute::KeyValue(key, Some(AttributeValue::Literal(literal)))
@@ -182,10 +182,10 @@ impl<'ast> Render<'ast> for Element<'ast, FragmentMetadata> {
             out.write_html(format_args!(" id=\"{id}\""));
         }
         out.write_html(">");
-        for child in self.children() {
+        for child in &self.children {
             child.render(state, out, &());
         }
-        out.write_html(format_args!("</{}>", self.tag()));
+        out.write_html(format_args!("</{}>", self.tag));
     }
 }
 
@@ -243,7 +243,7 @@ impl<'ast> Render<'ast> for UseBlock<'ast> {
     type Metadata = FragmentMetadata;
 
     fn render(&'ast self, state: &mut State<'ast>, _out: &mut Output, _meta: &Self::Metadata) {
-        let Some(name) = self.path().file_stem() else {
+        let Some(name) = self.path.file_stem() else {
             return;
         };
 
@@ -265,9 +265,9 @@ impl<'ast> Render<'ast> for IfBlock<'ast, FragmentMetadata> {
 
     fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
-        let unbound = utils::get_unbound_refs(self.expr());
+        let unbound = utils::get_unbound_refs(&self.expr);
         let replaced = codegen_utils::replace_namerefs(
-            self.expr(),
+            &self.expr,
             &unbound,
             state.component.declared_vars(),
             meta.scope(),
@@ -287,9 +287,9 @@ impl<'ast> Render<'ast> for IfBlock<'ast, FragmentMetadata> {
             root: Some(meta.id()),
             uses: vec![],
         };
-        let _ = dom_render_fragment(self.inner(), state.clone(), &mut out.hoists);
+        let _ = dom_render_fragment(&self.inner, state.clone(), &mut out.hoists);
 
-        if let Some(else_block) = self.else_block() {
+        if let Some(else_block) = &self.else_block {
             out.write_element(format_args!("{id}_on"), "true");
             out.write_updateln(format_args!(
                 include_str!("./templates/if.js"),
@@ -315,9 +315,9 @@ impl<'ast> Render<'ast> for ForBlock<'ast, FragmentMetadata> {
 
     fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
-        let unbound = utils::get_unbound_refs(self.expr());
+        let unbound = utils::get_unbound_refs(&self.expr);
         let replaced = codegen_utils::replace_namerefs(
-            self.expr(),
+            &self.expr,
             &unbound,
             state.component.declared_vars(),
             meta.scope(),
@@ -328,7 +328,7 @@ impl<'ast> Render<'ast> for ForBlock<'ast, FragmentMetadata> {
             .all_scopes()
             .get(&meta.id())
             .expect("BUG: for block should have an assigned scope")
-            .get(self.binding())
+            .get(self.binding)
             .expect("BUG: for block's scope should contain the binding");
 
         out.write_html(format_args!("<span id=\"{id}\"></span>"));
@@ -344,7 +344,7 @@ impl<'ast> Render<'ast> for ForBlock<'ast, FragmentMetadata> {
             root: Some(meta.id()),
             uses: vec![],
         };
-        let _ = dom_render_fragment(self.inner(), state, &mut out.hoists);
+        let _ = dom_render_fragment(&self.inner, state, &mut out.hoists);
 
         out.write_updateln(format_args!("let i = 0; for (const v of ({replaced})) {{ ctx[{var_idx}] = v; if (i >= elems[\"{id}_block\"].length) {{ elems[\"{id}_block\"][i] = create_{id}_block(elems[\"{id}\"].parentNode, elems[\"{id}\"]); }} elems[\"{id}_block\"][i].u(dirty); i += 1; }} elems[\"{id}_block\"].slice(i).forEach((b) => b.d()); elems[\"{id}_block\"].length = i;"));
     }
@@ -374,8 +374,8 @@ impl<'ast> Render<'ast> for Attribute<'ast> {
             Attribute::EventHandler(evt_handler) => {
                 with_id!(id, state, |id| {
                     let replaced = codegen_utils::replace_assignments(
-                        evt_handler.expr(),
-                        &utils::get_unbound_refs(evt_handler.expr()),
+                        &evt_handler.expr,
+                        &utils::get_unbound_refs(&evt_handler.expr),
                         state.component.declared_vars(),
                         None,
                     );
@@ -383,7 +383,7 @@ impl<'ast> Render<'ast> for Attribute<'ast> {
                     out.write_element(id, format_args!("document.getElementById(\"{id}\")"));
                     out.write_ctx_initln(format_args!(
                         "elems[\"{id}\"].addEventListener(\"{}\", {replaced});",
-                        evt_handler.event()
+                        evt_handler.event
                     ));
                 });
             }
