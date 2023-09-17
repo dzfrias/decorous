@@ -518,6 +518,8 @@ impl<'a> Component<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use decorous_errors::Source;
     use itertools::Itertools;
 
@@ -536,23 +538,23 @@ mod tests {
         )
     }
 
-    // #[test]
-    // fn can_extract_toplevel_variables() {
-    //     let component = make_component(
-    //         "---js let x, z = (3, 2); let y = 55; let [...l] = thing--- #button[@click={() => { x = 0; z = 0; l = 0; y = 0; }}]:Click me",
-    //     );
-    //     assert_eq!(
-    //         &(&[
-    //             (SmolStr::from("x"), 0),
-    //             (SmolStr::from("z"), 1),
-    //             (SmolStr::from("y"), 2),
-    //             (SmolStr::from("l"), 3)
-    //         ]
-    //         .into_iter()
-    //         .collect::<HashMap<SmolStr, u32>>()),
-    //         &component.declared_vars.all_vars()
-    //     );
-    // }
+    #[test]
+    fn can_extract_toplevel_variables() {
+        let component = make_component(
+            "---js let x, z = (3, 2); let y = 55; let [...l] = thing--- #button[@click={() => { x = 0; z = 0; l = 0; y = 0; }}]:Click me",
+        );
+        assert_eq!(
+            &(&[
+                (SmolStr::from("x"), 0),
+                (SmolStr::from("z"), 1),
+                (SmolStr::from("y"), 2),
+                (SmolStr::from("l"), 3)
+            ]
+            .into_iter()
+            .collect::<HashMap<SmolStr, u32>>()),
+            &component.declared_vars.all_vars()
+        );
+    }
 
     #[test]
     fn can_build_fragment_tree() {
