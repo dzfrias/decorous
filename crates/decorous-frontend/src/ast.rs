@@ -182,7 +182,7 @@ impl<'a, T> Element<'a, T> {
         if self.tag.contains('-') {
             Cow::Owned(self.tag.to_snek_case())
         } else {
-            Cow::Borrowed(&self.tag)
+            Cow::Borrowed(self.tag)
         }
     }
 }

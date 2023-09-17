@@ -18,6 +18,7 @@ pub struct CsrOptions {
     pub modularize: bool,
 }
 
+#[derive(Default)]
 pub struct CsrRenderer {
     opts: CsrOptions,
 }

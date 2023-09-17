@@ -61,11 +61,11 @@ pub struct ParseError<T> {
     err_type: ParseErrorType,
 }
 
-impl Into<Diagnostic> for ParseError<Location> {
-    fn into(self) -> Diagnostic {
+impl From<ParseError<Location>> for Diagnostic {
+    fn from(value: ParseError<Location>) -> Self {
         let mut diagnostic =
-            DiagnosticBuilder::new(self.to_string(), self.fragment().offset()).build();
-        if let Some(help) = self.help() {
+            DiagnosticBuilder::new(value.to_string(), value.fragment().offset()).build();
+        if let Some(help) = value.help() {
             diagnostic.note = Some(Cow::Borrowed(help.message()));
             if let Some(span) = help.corresponding_span() {
                 diagnostic.helpers.push(Helper {
@@ -76,7 +76,7 @@ impl Into<Diagnostic> for ParseError<Location> {
         }
         diagnostic.helpers.push(Helper {
             msg: Cow::Borrowed("here"),
-            span: self.fragment().offset()..self.fragment().offset() + self.fragment().length(),
+            span: value.fragment().offset()..value.fragment().offset() + value.fragment().length(),
         });
 
         diagnostic

@@ -540,7 +540,7 @@ fn collapse_children<'a>(
     elem: &'a Element<'a, FragmentMetadata>,
 ) -> Option<CollapsedChildrenType<'a>> {
     if elem.children.len() == 1 {
-        if let NodeType::Text(t) = *&elem.children.first().unwrap().node_type {
+        if let NodeType::Text(t) = elem.children.first().unwrap().node_type {
             return Some(CollapsedChildrenType::Text(&t));
         }
     }

@@ -12,6 +12,7 @@ use heck::ToSnekCase;
 use render_ast::*;
 use rslint_parser::AstNode;
 
+#[derive(Default)]
 pub struct Prerenderer;
 
 impl RenderBackend for Prerenderer {
@@ -126,7 +127,7 @@ impl RenderBackend for Prerenderer {
             || !component.declared_vars().is_empty()
             || !component.toplevel_nodes().is_empty()
         {
-            self.write_ctx_init(&mut out, component, &output.ctx_init)?;
+            write_ctx_init(&mut out, component, &output.ctx_init)?;
 
             write_js!(out, "const ctx = __init_ctx();")?;
             if has_reactive_variables {
@@ -136,7 +137,7 @@ impl RenderBackend for Prerenderer {
 
         if !output.updates.is_empty() || !component.declared_vars().all_reactive_blocks().is_empty()
         {
-            self.write_update(&mut out, component, &output.updates)?;
+            write_update(&mut out, component, &output.updates)?;
             write_js!(
                 out,
                 "dirty.fill(255);
@@ -157,84 +158,80 @@ impl Prerenderer {
     pub fn new() -> Self {
         Self
     }
+}
 
-    fn write_update<T: RenderOut>(
-        &self,
-        out: &mut T,
-        component: &Component,
-        body: &[u8],
-    ) -> io::Result<()> {
-        write_js!(out, "function __update(dirty, initial) {{")?;
-        for (block, id) in component.declared_vars().all_reactive_blocks() {
-            let unbound = utils::get_unbound_refs(block);
-            let dirty = codegen_utils::calc_dirty(&unbound, component.declared_vars(), None);
-            write_js!(out, "  if ({dirty}) {{ ctx[{id}](); }}")?;
-        }
-
-        out.write_js(body)?;
-        write_js!(out, "}}")?;
-
-        Ok(())
+fn write_ctx_init<T: RenderOut>(
+    out: &mut T,
+    component: &Component<'_>,
+    body: &[u8],
+) -> io::Result<()> {
+    write_js!(out, "function __init_ctx() {{")?;
+    for (arrow_expr, (idx, scope_id)) in component.declared_vars().all_arrow_exprs() {
+        write_js!(out, "  let __closure{idx} = {};", {
+            codegen_utils::replace_assignments(
+                arrow_expr.syntax(),
+                &utils::get_unbound_refs(arrow_expr.syntax()),
+                component.declared_vars(),
+                *scope_id,
+            )
+        })?;
     }
-
-    fn write_ctx_init<T: RenderOut>(
-        &self,
-        out: &mut T,
-        component: &Component,
-        body: &[u8],
-    ) -> io::Result<()> {
-        write_js!(out, "function __init_ctx() {{")?;
-        for (arrow_expr, (idx, scope_id)) in component.declared_vars().all_arrow_exprs() {
-            write_js!(out, "  let __closure{idx} = {};", {
-                codegen_utils::replace_assignments(
-                    arrow_expr.syntax(),
-                    &utils::get_unbound_refs(arrow_expr.syntax()),
-                    component.declared_vars(),
-                    *scope_id,
-                )
-            })?;
-        }
-        for node in component.toplevel_nodes() {
-            if node.substitute_assign_refs {
-                let replacement = codegen_utils::replace_assignments(
-                    &node.node,
-                    &utils::get_unbound_refs(&node.node),
-                    component.declared_vars(),
-                    None,
-                );
-                let _ = write_js!(out, "  {replacement}");
-            } else {
-                let _ = write_js!(out, "  {}", node.node);
-            }
-        }
-        out.write_js(body)?;
-        for (block, id) in component.declared_vars().all_reactive_blocks() {
-            let replaced = codegen_utils::replace_assignments(
-                block,
-                &utils::get_unbound_refs(block),
+    for node in component.toplevel_nodes() {
+        if node.substitute_assign_refs {
+            let replacement = codegen_utils::replace_assignments(
+                &node.node,
+                &utils::get_unbound_refs(&node.node),
                 component.declared_vars(),
                 None,
             );
-            write_js!(out, "  let __reactive{id} = () => {{ {replaced} }};")?;
+            let _ = write_js!(out, "  {replacement}");
+        } else {
+            let _ = write_js!(out, "  {}", node.node);
         }
-
-        let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
-        for (name, idx) in component.declared_vars().all_vars() {
-            ctx[*idx as usize] = Cow::Borrowed(name);
-        }
-        for (idx, _) in component.declared_vars().all_arrow_exprs().values() {
-            ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
-        }
-        for idx in component.declared_vars().all_bindings().values() {
-            ctx[*idx as usize] = Cow::Owned(format!("__binding{idx}"));
-        }
-        for idx in component.declared_vars().all_reactive_blocks().values() {
-            ctx[*idx as usize] = Cow::Owned(format!("__reactive{idx}"));
-        }
-        write_js!(out, "  return [{}];\n}}", ctx.join(","))?;
-
-        Ok(())
     }
+    out.write_js(body)?;
+    for (block, id) in component.declared_vars().all_reactive_blocks() {
+        let replaced = codegen_utils::replace_assignments(
+            block,
+            &utils::get_unbound_refs(block),
+            component.declared_vars(),
+            None,
+        );
+        write_js!(out, "  let __reactive{id} = () => {{ {replaced} }};")?;
+    }
+
+    let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
+    for (name, idx) in component.declared_vars().all_vars() {
+        ctx[*idx as usize] = Cow::Borrowed(name);
+    }
+    for (idx, _) in component.declared_vars().all_arrow_exprs().values() {
+        ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
+    }
+    for idx in component.declared_vars().all_bindings().values() {
+        ctx[*idx as usize] = Cow::Owned(format!("__binding{idx}"));
+    }
+    for idx in component.declared_vars().all_reactive_blocks().values() {
+        ctx[*idx as usize] = Cow::Owned(format!("__reactive{idx}"));
+    }
+    write_js!(out, "  return [{}];\n}}", ctx.join(","))?;
+
+    Ok(())
+}
+
+fn write_update<T: RenderOut>(
+    out: &mut T,
+    component: &Component<'_>,
+    body: &[u8],
+) -> io::Result<()> {
+    write_js!(out, "function __update(dirty, initial) {{")?;
+    for (block, id) in component.declared_vars().all_reactive_blocks() {
+        let unbound = utils::get_unbound_refs(block);
+        let dirty = codegen_utils::calc_dirty(&unbound, component.declared_vars(), None);
+        write_js!(out, "  if ({dirty}) {{ ctx[{id}](); }}")?;
+    }
+    out.write_js(body)?;
+    write_js!(out, "}}")?;
+    Ok(())
 }
 
 #[cfg(test)]
