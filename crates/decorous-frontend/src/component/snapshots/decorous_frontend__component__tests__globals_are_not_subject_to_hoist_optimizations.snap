@@ -82,10 +82,10 @@ Component {
     ],
     exports: [],
     uses: [],
-    errs: ErrStream,
-    component_id: 0,
-    current_id: 1,
     css: None,
     wasm: None,
     comptime: None,
+    component_id: 0,
+    errs: ErrStream,
+    current_id: 1,
 }

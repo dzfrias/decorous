@@ -1,12 +1,11 @@
 mod declared_vars;
-mod dep_graph;
 mod fragment;
 mod globals;
+mod passes;
 
-use std::{borrow::Cow, path::Path};
+use std::path::Path;
 
-use decorous_errors::{DiagnosticBuilder, DynErrStream, Severity};
-use itertools::Itertools;
+use decorous_errors::DynErrStream;
 #[cfg(not(debug_assertions))]
 use rand::Rng;
 use rslint_parser::{
@@ -15,12 +14,9 @@ use rslint_parser::{
 };
 
 use crate::{
-    ast::{
-        traverse_mut, Attribute, AttributeValue, Code, DecorousAst, Node, NodeIter, NodeType,
-        SpecialBlock,
-    },
-    component::{dep_graph::DepGraph, globals::GLOBALS},
-    css::{self, ast::Css},
+    ast::{Attribute, Code, DecorousAst, Node, NodeIter, NodeType, SpecialBlock},
+    component::passes::{DepAnalysisPass, IsolateCssPass, Pass},
+    css::ast::Css,
     location::Location,
     utils,
 };
@@ -29,19 +25,19 @@ pub use fragment::FragmentMetadata;
 
 #[derive(Debug)]
 pub struct Component<'a> {
-    fragment_tree: Vec<Node<'a, FragmentMetadata>>,
-    declared_vars: DeclaredVariables,
-    toplevel_nodes: Vec<ToplevelNodeData>,
-    hoist: Vec<SyntaxNode>,
-    exports: Vec<SmolStr>,
-    uses: Vec<&'a Path>,
-    errs: DynErrStream<'a>,
+    pub fragment_tree: Vec<Node<'a, FragmentMetadata>>,
+    pub declared_vars: DeclaredVariables,
+    pub toplevel_nodes: Vec<ToplevelNodeData>,
+    pub hoist: Vec<SyntaxNode>,
+    pub exports: Vec<SmolStr>,
+    pub uses: Vec<&'a Path>,
+    pub css: Option<Css>,
+    pub wasm: Option<Code<'a>>,
+    pub comptime: Option<Code<'a>>,
+    pub component_id: u8,
 
-    component_id: u8,
+    errs: DynErrStream<'a>,
     current_id: u32,
-    css: Option<Css>,
-    wasm: Option<Code<'a>>,
-    comptime: Option<Code<'a>>,
 }
 
 #[derive(Debug)]
@@ -72,7 +68,12 @@ impl<'a> Component<'a> {
             wasm: None,
         };
         c.compute(ast);
-        c.perform_dep_analysis();
+
+        let isolate_pass = IsolateCssPass::new();
+        let dep_pass = DepAnalysisPass::new();
+        isolate_pass.run(&mut c);
+        dep_pass.run(&mut c);
+
         c
     }
 
@@ -80,7 +81,7 @@ impl<'a> Component<'a> {
         &self.declared_vars
     }
 
-    pub fn fragment_tree(&self) -> &[Node<'_, FragmentMetadata>] {
+    pub fn fragment_tree(&self) -> &[Node<'a, FragmentMetadata>] {
         self.fragment_tree.as_ref()
     }
 
@@ -104,7 +105,7 @@ impl<'a> Component<'a> {
         self.css.as_ref()
     }
 
-    pub fn wasm(&self) -> Option<&Code<'_>> {
+    pub fn wasm(&self) -> Option<&Code<'a>> {
         self.wasm.as_ref()
     }
 
@@ -123,130 +124,14 @@ impl<'a> Component<'a> {
 
 // Private methods of Component
 impl<'a> Component<'a> {
-    fn compute(&mut self, mut ast: DecorousAst<'a>) {
+    fn compute(&mut self, ast: DecorousAst<'a>) {
         if let Some(script) = ast.script {
             self.extract_toplevel_data(script);
         }
-        if let Some(mut css) = ast.css {
-            self.isolate_css(&mut css, &mut ast.nodes);
-            self.css = Some(css);
-        }
+        self.css = ast.css;
         self.wasm = ast.wasm;
         self.comptime = ast.comptime;
         self.build_fragment_tree(ast.nodes);
-    }
-
-    fn isolate_css(&mut self, css: &mut Css, nodes: &mut [Node<'a, Location>]) {
-        self.modify_selectors(css.rules_mut());
-        self.assign_css_mustaches(css.rules_mut());
-        self.assign_node_classes(nodes);
-    }
-
-    fn assign_css_mustaches(&mut self, rules: &[css::ast::Rule]) {
-        use css::ast::*;
-        for rule in rules {
-            let rule = match rule {
-                Rule::At(at_rule) => {
-                    if let Some(contents) = at_rule.contents() {
-                        self.assign_css_mustaches(contents);
-                    }
-                    continue;
-                }
-                Rule::Regular(rule) => rule,
-            };
-
-            for decl in rule.declarations() {
-                for mustache in decl.values().iter().filter_map(|val| match val {
-                    Value::Mustache(m) => Some(m),
-                    Value::Css(_) => None,
-                }) {
-                    self.declared_vars.insert_css_mustache(mustache.clone());
-                }
-            }
-        }
-    }
-
-    fn assign_node_classes(&self, nodes: &mut [Node<'_, Location>]) {
-        traverse_mut(nodes, &mut |node| {
-            let NodeType::Element(elem) = &mut node.node_type else {
-                return;
-            };
-            let mut has_class = false;
-            for attr in &mut elem.attrs {
-                match attr {
-                    Attribute::KeyValue(key, None) if key == &"class" => {
-                        *attr = Attribute::KeyValue(
-                            "class",
-                            Some(AttributeValue::Literal(Cow::Owned(format!(
-                                "decor-{}",
-                                self.component_id
-                            )))),
-                        );
-                        has_class = true;
-                    }
-                    Attribute::KeyValue(key, Some(AttributeValue::Literal(lit)))
-                        if key == &"class" =>
-                    {
-                        *attr = Attribute::KeyValue(
-                            "class",
-                            Some(AttributeValue::Literal(Cow::Owned(format!(
-                                "{} decor-{}",
-                                lit, self.component_id
-                            )))),
-                        );
-                        has_class = true;
-                    }
-                    Attribute::KeyValue(key, Some(AttributeValue::JavaScript(js)))
-                        if key == &"class" =>
-                    {
-                        let new_js = format!("`${{{js}}} decor-{}`", self.component_id);
-                        let parsed = rslint_parser::parse_text(&new_js, 0).syntax();
-                        *attr =
-                            Attribute::KeyValue("class", Some(AttributeValue::JavaScript(parsed)));
-                        has_class = true;
-                    }
-                    _ => {}
-                }
-            }
-            if !has_class {
-                elem.attrs.push(Attribute::KeyValue(
-                    "class",
-                    Some(AttributeValue::Literal(Cow::Owned(format!(
-                        "decor-{}",
-                        self.component_id
-                    )))),
-                ));
-            }
-        });
-    }
-
-    fn modify_selectors(&mut self, rules: &mut [css::ast::Rule]) {
-        use css::ast::*;
-        for rule in rules {
-            let rule = match rule {
-                Rule::At(at_rule) => {
-                    if let Some(contents) = at_rule.contents_mut() {
-                        self.modify_selectors(contents);
-                    }
-                    continue;
-                }
-                Rule::Regular(rule) => rule,
-            };
-
-            let selector = rule.selector_mut();
-            for sel in selector {
-                for part in sel.parts_mut() {
-                    let new_text = if let Some(t) = part.text() {
-                        format!("{t}.decor-{}", self.component_id)
-                    } else {
-                        format!(".decor-{}", self.component_id)
-                    };
-                    if let Some(s) = part.text_mut() {
-                        *s = new_text.into();
-                    }
-                }
-            }
-        }
     }
 
     fn extract_toplevel_data(&mut self, script: SyntaxNode) {
@@ -409,103 +294,6 @@ impl<'a> Component<'a> {
             },
 
             _ => {}
-        }
-    }
-
-    fn perform_dep_analysis(&mut self) {
-        let mut graph = DepGraph::new(
-            &self
-                .toplevel_nodes()
-                .iter()
-                .filter_map(|toplevel| toplevel.node.try_to::<Decl>())
-                .collect_vec(),
-        );
-
-        for node in self.descendents() {
-            match &node.node_type {
-                NodeType::Element(elem) => {
-                    for attr in &elem.attrs {
-                        match attr {
-                            Attribute::Binding(binding) => {
-                                // Bindings are mutable
-                                graph.mark_mutated(binding);
-                            }
-                            Attribute::EventHandler(evt_handler) => {
-                                graph.mark_used_from_node(&evt_handler.expr);
-                                graph.mark_mutated_from_node(&evt_handler.expr);
-                            }
-                            Attribute::KeyValue(_, Some(AttributeValue::JavaScript(js))) => {
-                                graph.mark_used_from_node(js);
-                                graph.mark_mutated_from_node(js);
-                            }
-                            Attribute::KeyValue(_, _) => {}
-                        }
-                    }
-                }
-                NodeType::SpecialBlock(SpecialBlock::If(block)) => {
-                    graph.mark_used_from_node(&block.expr);
-                    graph.mark_mutated_from_node(&block.expr);
-                }
-                NodeType::SpecialBlock(SpecialBlock::For(block)) => {
-                    graph.mark_used_from_node(&block.expr);
-                    graph.mark_mutated_from_node(&block.expr);
-                }
-                NodeType::Mustache(js) => {
-                    graph.mark_used_from_node(js);
-                    graph.mark_mutated_from_node(js);
-                }
-                NodeType::Text(_)
-                | NodeType::Comment(_)
-                | NodeType::SpecialBlock(SpecialBlock::Use(_)) => {}
-            }
-        }
-
-        for mustache in self.declared_vars().css_mustaches().keys() {
-            graph.mark_used_from_node(mustache);
-            graph.mark_mutated_from_node(mustache);
-        }
-
-        for toplevel in self.toplevel_nodes() {
-            graph.mark_mutated_from_node(&toplevel.node);
-        }
-
-        for v in graph.get_unused() {
-            for var in &v.declared_vars {
-                self.declared_vars.remove_var(var);
-            }
-            let pos = self
-                .toplevel_nodes()
-                .iter()
-                .position(|node| &node.node == v.decl.syntax())
-                .expect("VarDecl should be in toplevel nodes");
-            self.toplevel_nodes.remove(pos);
-        }
-
-        for v in graph.get_unmutated() {
-            for var in &v.declared_vars {
-                self.declared_vars.remove_var(var);
-            }
-            let Some(pos) = self
-                .toplevel_nodes()
-                .iter()
-                .position(|node| &node.node == v.decl.syntax())
-            else {
-                continue;
-            };
-            self.toplevel_nodes.remove(pos);
-            self.hoist.push(v.decl.syntax().clone());
-        }
-
-        for unbound in graph
-            .get_unbound()
-            .iter()
-            .filter(|v| !GLOBALS.contains(&v.as_str()))
-        {
-            self.errs.emit(
-                DiagnosticBuilder::new(format!("possibly unbound variable: {unbound}"), 0)
-                    .severity(Severity::Warning)
-                    .build(),
-            );
         }
     }
 
