@@ -28,7 +28,7 @@ impl<'a> Parser<'a> {
             rules.push(self.parse_rule()?);
             self.skip_whitespace();
         }
-        Ok(Css::new(rules))
+        Ok(Css { rules })
     }
 
     fn parse_rule(&mut self) -> Result<Rule> {
@@ -46,7 +46,10 @@ impl<'a> Parser<'a> {
         }
         self.expect_consume('}')?;
 
-        Ok(Rule::Regular(RegularRule::new(selector, declarations)))
+        Ok(Rule::Regular(RegularRule {
+            selector,
+            declarations,
+        }))
     }
 
     fn parse_at_rule(&mut self) -> Result<AtRule> {
@@ -73,7 +76,11 @@ impl<'a> Parser<'a> {
             .text();
         if self.harpoon.peek_is(';') {
             debug_assert_eq!(Some(';'), self.harpoon.consume());
-            return Ok(AtRule::new(name.into(), additional.into(), None));
+            return Ok(AtRule {
+                name: name.into(),
+                additional: additional.into(),
+                contents: None,
+            });
         }
 
         self.expect_consume('{')?;
@@ -85,7 +92,11 @@ impl<'a> Parser<'a> {
         }
         self.expect_consume('}')?;
 
-        Ok(AtRule::new(name.into(), additional.into(), Some(rules)))
+        Ok(AtRule {
+            name: name.into(),
+            additional: additional.into(),
+            contents: Some(rules),
+        })
     }
 
     fn parse_selector(&mut self) -> Result<Vec<Selector>> {
@@ -97,7 +108,7 @@ impl<'a> Parser<'a> {
                 parts.push(self.parse_selector_part()?);
                 self.skip_whitespace();
             }
-            selectors.push(Selector::new(parts));
+            selectors.push(Selector { parts })
         }
         while self.harpoon.peek_is(',') {
             debug_assert_eq!(Some(','), self.harpoon.consume());
@@ -106,7 +117,7 @@ impl<'a> Parser<'a> {
                 parts.push(self.parse_selector_part()?);
                 self.skip_whitespace();
             }
-            selectors.push(Selector::new(parts));
+            selectors.push(Selector { parts })
         }
 
         Ok(selectors)
@@ -160,7 +171,10 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(SelectorPart::new(text.map(|t| t.into()), pseudoes))
+        Ok(SelectorPart {
+            text: text.map(|t| t.into()),
+            pseudoes,
+        })
     }
 
     fn parse_declaration(&mut self) -> Result<Declaration> {
@@ -185,7 +199,10 @@ impl<'a> Parser<'a> {
                 "declaration needs a closing semicolon",
             )),
         )?;
-        Ok(Declaration::new(name.into(), values))
+        Ok(Declaration {
+            name: name.into(),
+            values,
+        })
     }
 
     fn expect_consume(&mut self, expected: char) -> Result<()> {

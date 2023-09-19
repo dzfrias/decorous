@@ -21,7 +21,7 @@ impl IsolateCssPass {
         for rule in rules {
             let rule = match rule {
                 Rule::At(at_rule) => {
-                    if let Some(contents) = at_rule.contents_mut() {
+                    if let Some(contents) = &mut at_rule.contents {
                         self.run_css_passes(contents, declared_vars);
                     }
                     continue;
@@ -35,15 +35,14 @@ impl IsolateCssPass {
     }
 
     fn modify_selectors(&self, rule: &mut RegularRule) {
-        let selector = rule.selector_mut();
-        for sel in selector {
-            for part in sel.parts_mut() {
-                let new_text = if let Some(t) = part.text() {
+        for sel in &mut rule.selector {
+            for part in &mut sel.parts {
+                let new_text = if let Some(t) = &part.text {
                     format!("{t}.decor-{}", self.component_id)
                 } else {
                     format!(".decor-{}", self.component_id)
                 };
-                if let Some(s) = part.text_mut() {
+                if let Some(s) = &mut part.text {
                     *s = new_text.into();
                 }
             }
@@ -52,8 +51,8 @@ impl IsolateCssPass {
 
     // TODO: Move to somewhere else? declared vars should be formed by now
     fn assign_css_mustaches(&self, rule: &mut RegularRule, declared_vars: &mut DeclaredVariables) {
-        for decl in rule.declarations() {
-            for mustache in decl.values().iter().filter_map(|val| match val {
+        for decl in &rule.declarations {
+            for mustache in decl.values.iter().filter_map(|val| match val {
                 Value::Mustache(m) => Some(m),
                 Value::Css(_) => None,
             }) {
@@ -124,7 +123,7 @@ impl Pass for IsolateCssPass {
                 return;
             };
             self.component_id = component.component_id;
-            self.run_css_passes(css.rules_mut(), &mut component.declared_vars);
+            self.run_css_passes(&mut css.rules, &mut component.declared_vars);
         }
 
         self.assign_node_classes(component)

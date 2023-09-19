@@ -6,7 +6,7 @@ use superfmt::{ContextBuilder, Formatter};
 
 pub fn render_css<T: io::Write>(css: &Css, out: &mut T, component: &Component) -> io::Result<()> {
     let mut formatter = Formatter::new(out);
-    for rule in css.rules() {
+    for rule in &css.rules {
         write_rule(rule, &mut formatter, component)?;
     }
     Ok(())
@@ -19,13 +19,9 @@ fn write_rule<T: io::Write>(
 ) -> io::Result<()> {
     match rule {
         Rule::At(at_rule) => {
-            if let Some(contents) = at_rule.contents() {
+            if let Some(contents) = &at_rule.contents {
                 formatter
-                    .write(format_args!(
-                        "@{} {} ",
-                        at_rule.name(),
-                        at_rule.additional()
-                    ))?
+                    .write(format_args!("@{} {} ", at_rule.name, at_rule.additional))?
                     .begin_context(
                         ContextBuilder::new()
                             .starts_with("{\n")
@@ -38,16 +34,12 @@ fn write_rule<T: io::Write>(
                 }
                 formatter.pop_ctx()?;
             } else {
-                formatter.writeln(format_args!(
-                    "@{} {};",
-                    at_rule.name(),
-                    at_rule.additional()
-                ))?;
+                formatter.writeln(format_args!("@{} {};", at_rule.name, at_rule.additional))?;
             }
         }
         Rule::Regular(regular) => {
             formatter
-                .write(regular.selector().iter().join(", "))?
+                .write(regular.selector.iter().join(", "))?
                 .begin_context(
                     ContextBuilder::default()
                         .prepend("  ")
@@ -55,7 +47,7 @@ fn write_rule<T: io::Write>(
                         .ends_with("}\n")
                         .build(),
                 )?;
-            for decl in regular.declarations() {
+            for decl in &regular.declarations {
                 write_decl(decl, formatter, component)?;
             }
             formatter.pop_ctx()?;
@@ -70,8 +62,8 @@ fn write_decl<T: io::Write>(
     f: &mut Formatter<'_, T>,
     component: &Component,
 ) -> io::Result<()> {
-    f.write(format_args!("{}: ", decl.name()))?;
-    for val in decl.values() {
+    f.write(format_args!("{}: ", decl.name))?;
+    for val in &decl.values {
         write_value(val, f, component)?;
     }
     f.write(";\n")?;
