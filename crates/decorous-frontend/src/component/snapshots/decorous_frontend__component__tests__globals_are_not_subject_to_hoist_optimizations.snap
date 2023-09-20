@@ -86,6 +86,10 @@ Component {
     wasm: None,
     comptime: None,
     component_id: 0,
-    errs: ErrStream,
+    ctx: Ctx {
+        preprocessor: "preproc",
+        preprocessor: "exec",
+        errs: ErrStream,
+    },
     current_id: 1,
 }

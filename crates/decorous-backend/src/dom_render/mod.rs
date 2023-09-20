@@ -91,17 +91,6 @@ impl RenderBackend for CsrRenderer {
             write_js!(out, "{hoist}")?;
         }
 
-        if let Some(comptime) = component.comptime() {
-            let env = ctx.wasm_compiler.compile_comptime(CodeInfo {
-                lang: comptime.lang,
-                body: comptime.body,
-                exports: component.exports(),
-            })?;
-            for decl in env.items() {
-                write_js!(out, "const {} = {};", decl.name, decl.value)?;
-            }
-        }
-
         render_init_ctx(&mut out.js_handle(), component)?;
 
         if self.opts.modularize {
@@ -276,8 +265,11 @@ mod tests {
                 src: $input,
                 name: "TEST".to_owned(),
             });
-            let component =
-                Component::new(parser.parse().expect("should be valid input"), errs.clone());
+            let ctx = decorous_frontend::Ctx {
+                errs,
+                ..Default::default()
+            };
+            let component = Component::new(parser.parse().expect("should be valid input"), ctx);
             let mut out = TestOut::default();
             let mut renderer = CsrRenderer::new();
             renderer.with_options($opts);

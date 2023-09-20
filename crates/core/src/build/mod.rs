@@ -86,7 +86,16 @@ fn compile(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
         errs: global_ctx.errs.clone(),
     };
 
-    let component = parse_component(&input, &global_ctx)?;
+    let preproc = Preproc::new(config, args.color);
+    let component = parse_component(
+        &input,
+        &global_ctx,
+        ParseCtx {
+            executor: &compiler,
+            preprocessor: &preproc,
+            errs: global_ctx.errs.clone(),
+        },
+    )?;
     warn_on_unused_wasm(&global_ctx, &component)?;
     render_all(&global_ctx, &component, &metadata)?;
 
@@ -270,14 +279,14 @@ fn render_all(
     Ok(())
 }
 
-fn parse_component<'a>(input: &'a str, global_ctx: &GlobalCtx<'a>) -> Result<Component<'a>> {
-    let preproc = Preproc::new(global_ctx.config, global_ctx.args.color);
-    let parser = Parser::new(input).with_ctx(ParseCtx {
-        preprocessor: &preproc,
-        errs: global_ctx.errs.clone(),
-    });
+fn parse_component<'a>(
+    input: &'a str,
+    global_ctx: &GlobalCtx<'a>,
+    ctx: ParseCtx<'a>,
+) -> Result<Component<'a>> {
+    let parser = Parser::new(input).with_ctx(ctx.clone());
     let component = match parser.parse() {
-        Ok(ast) => Component::new(ast, global_ctx.errs.clone()),
+        Ok(ast) => Component::new(ast, ctx),
         Err(err) => {
             let diagnostic = err.into();
             global_ctx.errs.emit(diagnostic);

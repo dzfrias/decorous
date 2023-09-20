@@ -5,7 +5,6 @@ mod passes;
 
 use std::path::Path;
 
-use decorous_errors::DynErrStream;
 #[cfg(not(debug_assertions))]
 use rand::Rng;
 use rslint_parser::{
@@ -15,10 +14,10 @@ use rslint_parser::{
 
 use crate::{
     ast::{Attribute, Code, DecorousAst, Node, NodeIter, NodeType, SpecialBlock},
-    component::passes::{DepAnalysisPass, IsolateCssPass, Pass},
+    component::passes::{DepAnalysisPass, IsolateCssPass, Pass, StaticPass},
     css::ast::Css,
     location::Location,
-    utils,
+    utils, Ctx,
 };
 pub use declared_vars::{DeclaredVariables, Scope};
 pub use fragment::FragmentMetadata;
@@ -36,7 +35,7 @@ pub struct Component<'a> {
     pub comptime: Option<Code<'a>>,
     pub component_id: u8,
 
-    errs: DynErrStream<'a>,
+    ctx: Ctx<'a>,
     current_id: u32,
 }
 
@@ -48,7 +47,7 @@ pub struct ToplevelNodeData {
 
 // Public methods of component
 impl<'a> Component<'a> {
-    pub fn new(ast: DecorousAst<'a>, errs: DynErrStream<'a>) -> Self {
+    pub fn new(ast: DecorousAst<'a>, ctx: Ctx<'a>) -> Self {
         let mut c = Self {
             fragment_tree: vec![],
             declared_vars: DeclaredVariables::new(),
@@ -61,7 +60,7 @@ impl<'a> Component<'a> {
             #[cfg(debug_assertions)]
             component_id: 0,
             uses: vec![],
-            errs,
+            ctx,
 
             css: None,
             comptime: None,
@@ -69,9 +68,12 @@ impl<'a> Component<'a> {
         };
         c.compute(ast);
 
+        // TODO: move this to separate struct for running passes, should return anyhow::Result
         let isolate_pass = IsolateCssPass::new();
+        let static_pass = StaticPass::new();
         let dep_pass = DepAnalysisPass::new();
         isolate_pass.run(&mut c);
+        static_pass.run(&mut c);
         dep_pass.run(&mut c);
 
         c
@@ -319,10 +321,13 @@ mod tests {
         let ast = parser.parse().unwrap();
         Component::new(
             ast,
-            decorous_errors::stderr(Source {
-                src: source,
-                name: "TEST".to_owned(),
-            }),
+            Ctx {
+                errs: decorous_errors::stderr(Source {
+                    src: source,
+                    name: "TEST".to_owned(),
+                }),
+                ..Default::default()
+            },
         )
     }
 

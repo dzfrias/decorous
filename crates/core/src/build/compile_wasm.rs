@@ -12,6 +12,7 @@ use std::{
 use anyhow::{bail, Context, Error, Result};
 use decorous_backend::{CodeInfo, JsDecl, JsEnv, WasmCompiler};
 use decorous_errors::{DiagnosticBuilder, Severity};
+use decorous_frontend::{ast::Code, CodeExecutor};
 use itertools::Itertools;
 use scopeguard::defer;
 use tempdir::TempDir;
@@ -278,6 +279,65 @@ impl WasmCompiler for MainCompiler<'_> {
         Ok(out
             .into_iter()
             .map(|(name, value)| JsDecl {
+                name,
+                value: value.to_string(),
+            })
+            .collect())
+    }
+}
+
+impl CodeExecutor for MainCompiler<'_> {
+    fn execute(&self, code: &Code) -> Result<decorous_frontend::JsEnv> {
+        self.comptime.set(true);
+        let info = CodeInfo {
+            lang: code.lang,
+            body: code.body,
+            exports: &[],
+        };
+        self.compile(info)?;
+        self.comptime.set(false);
+
+        let outdir =
+            fs::canonicalize(&self.global_ctx.args.out).expect("outdir should have been created");
+        let wasm_path = fs::read_dir(&outdir)?
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .find(|path| matches!(path.extension(), Some(ext) if ext == OsStr::new("wasm")))
+            .context("no WebAssembly file outputted from static compiler")?;
+
+        // Run wasi module
+        let (stdout, _stderr) = {
+            let engine = Engine::default();
+            let mut linker = Linker::new(&engine);
+            wasmtime_wasi::add_to_linker(&mut linker, |s| s).unwrap();
+            let stdout = WritePipe::new_in_memory();
+            let stderr = WritePipe::new_in_memory();
+            let wasi = WasiCtxBuilder::new()
+                .stdout(Box::new(stdout.clone()))
+                .stderr(Box::new(stderr.clone()))
+                .build();
+            let mut store = Store::new(&engine, wasi);
+            let module = Module::from_file(&engine, wasm_path)?;
+            linker.module(&mut store, "", &module)?;
+            linker
+                .get_default(&mut store, "")?
+                .typed::<(), ()>(&store)?
+                .call(&mut store, ())?;
+            // Dropped so stdout and stderr can be acquired
+            drop(store);
+            (
+                stdout.try_into_inner().unwrap().into_inner(),
+                stderr.try_into_inner().unwrap().into_inner(),
+            )
+        };
+
+        fs::remove_dir_all(outdir).context("error removing outdir")?;
+
+        let out = serde_json::from_slice::<HashMap<String, serde_json::Value>>(&stdout)
+            .context("error deserializing static code block stdout")?;
+
+        Ok(out
+            .into_iter()
+            .map(|(name, value)| decorous_frontend::JsDecl {
                 name,
                 value: value.to_string(),
             })

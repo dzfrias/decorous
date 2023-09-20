@@ -103,10 +103,13 @@ mod tests {
         let parser = Parser::new(input);
         Component::new(
             parser.parse().expect("should be valid input"),
-            decorous_errors::stderr(Source {
-                src: input,
-                name: "TEST".to_owned(),
-            }),
+            decorous_frontend::Ctx {
+                errs: decorous_errors::stderr(Source {
+                    src: input,
+                    name: "TEST".to_owned(),
+                }),
+                ..Default::default()
+            },
         )
     }
 

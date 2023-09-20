@@ -25,8 +25,10 @@ impl UseResolver for Resolver<'_> {
         let stem = path.file_stem().unwrap().to_string_lossy();
 
         let preproc = Preproc::new(self.global_ctx.config, self.global_ctx.args.color);
-        let parser = Parser::new(&contents).with_ctx(ParseCtx {
+        let executor = MainCompiler::new(self.global_ctx);
+        let ctx = ParseCtx {
             preprocessor: &preproc,
+            executor: &executor,
             errs: ErrStream::new(
                 Box::new(io::stderr()),
                 Source {
@@ -34,9 +36,10 @@ impl UseResolver for Resolver<'_> {
                     src: &contents,
                 },
             ),
-        });
+        };
+        let parser = Parser::new(&contents).with_ctx(ctx.clone());
         let ast = parser.parse().map_err(|err| anyhow!(err))?;
-        let component = Component::new(ast, self.global_ctx.errs.clone());
+        let component = Component::new(ast, ctx);
 
         let name: PathBuf = format!("{}_{stem}.mjs", self.global_ctx.args.out).into();
         let mut f = BufWriter::new(File::create(&name)?);

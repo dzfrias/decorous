@@ -111,7 +111,7 @@ impl Pass for DepAnalysisPass {
             .iter()
             .filter(|v| !GLOBALS.contains(&v.as_str()))
         {
-            component.errs.emit(
+            component.ctx.errs.emit(
                 DiagnosticBuilder::new(format!("possibly unbound variable: {unbound}"), 0)
                     .severity(Severity::Warning)
                     .build(),

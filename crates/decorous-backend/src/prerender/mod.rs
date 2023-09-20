@@ -83,17 +83,6 @@ impl RenderBackend for Prerenderer {
             )?;
         }
 
-        if let Some(comptime) = component.comptime() {
-            let env = ctx.wasm_compiler.compile_comptime(CodeInfo {
-                lang: comptime.lang,
-                body: comptime.body,
-                exports: component.exports(),
-            })?;
-            for decl in env.items() {
-                write_js!(out, "const {} = {};", decl.name, decl.value)?;
-            }
-        }
-
         let has_reactive_variables = !component.declared_vars().all_vars().is_empty();
 
         if has_reactive_variables {
@@ -244,13 +233,14 @@ mod tests {
 
     fn make_component(input: &str) -> Component {
         let parser = Parser::new(input);
-        Component::new(
-            parser.parse().expect("should be valid input"),
-            decorous_errors::stderr(Source {
+        let ctx = decorous_frontend::Ctx {
+            errs: decorous_errors::stderr(Source {
                 src: input,
                 name: "TEST".to_owned(),
             }),
-        )
+            ..Default::default()
+        };
+        Component::new(parser.parse().expect("should be valid input"), ctx)
     }
 
     #[derive(Default)]

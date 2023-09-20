@@ -17,10 +17,24 @@ console.log(is_static);
 ---out.html---
 
 ---out.js---
-const is_static = true;
+const dirty = new Uint8Array(new ArrayBuffer(1));
 function __init_ctx() {
+  let is_static = true;
   console.log(is_static);
-  return [];
+  return [is_static];
 }
 const ctx = __init_ctx();
+let updating = false;
+function __schedule_update(ctx_idx, val) {
+  ctx[ctx_idx] = val;
+  dirty[Math.max(Math.ceil(ctx_idx / 8) - 1, 0)] |= 1 << (ctx_idx % 8);
+  if (updating) return;
+  updating = true;
+  Promise.resolve().then(() => {
+    __update(dirty, false);
+    updating = false;
+    dirty.fill(0);
+  });
+}
+
 
