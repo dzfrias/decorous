@@ -38,6 +38,8 @@ pub enum ParseErrorType {
     JavaScriptDiagnostics { title: String },
     #[error("invalid special block type: {0}. Only `for` and `if` are accepted.")]
     InvalidSpecialBlockType(String),
+    #[error("the decorous parser failed with an error")]
+    DidError,
     // Boxed because this enum variant would otherwise be very large.
     #[error("css parsing error: {0}")]
     CssParsingError(Box<css::error::ParseError<Location>>),
@@ -73,6 +75,9 @@ impl From<ParseError<Location>> for Diagnostic {
                     span: span.clone(),
                 });
             }
+        }
+        if value.err_type() == &ParseErrorType::DidError {
+            return diagnostic;
         }
         diagnostic.helpers.push(Helper {
             msg: Cow::Borrowed("here"),

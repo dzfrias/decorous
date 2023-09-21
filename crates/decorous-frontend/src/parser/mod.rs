@@ -28,6 +28,7 @@ pub struct Parser<'src, 'ctx> {
     current_token: Token<'src>,
     code_blocks: CodeBlocks<'src>,
     ctx: Ctx<'ctx>,
+    did_error: bool,
 }
 
 macro_rules! expect {
@@ -66,6 +67,7 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
             },
             code_blocks: CodeBlocks::new(),
             ctx: Ctx::default(),
+            did_error: false,
         };
 
         parser.next_token();
@@ -86,6 +88,14 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
             ))
         })?;
         self.parse_code_blocks()?;
+
+        if self.did_error {
+            return Err(ParseError::new(
+                Location::default(),
+                ParseErrorType::DidError,
+                None,
+            ));
+        }
 
         let (script, css, wasm, comptime) = self.code_blocks.into_parts();
 
@@ -576,6 +586,7 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
                         })
                         .build(),
                 );
+                self.did_error = true;
                 false
             } else {
                 true
