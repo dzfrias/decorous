@@ -257,25 +257,28 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
         self.parse_js_expr(js_text).map(Mustache)
     }
 
-    fn parse_js_expr(&self, js_text: &str) -> Result<SyntaxNode> {
+    fn parse_js_expr(&mut self, js_text: &str) -> Result<SyntaxNode> {
         let parse = rslint_parser::parse_module(js_text, 0);
         if parse.errors().is_empty() {
-            Ok(parse
-                .syntax()
-                .first_child()
-                .map_or(parse.syntax(), |child| child))
+            Ok(parse.syntax().first_child().unwrap_or(parse.syntax()))
         } else {
-            let error = parse.ok().expect_err("should have errors").swap_remove(0);
-            let range = error.primary.unwrap().span.range;
-            Err(ParseError::new(
-                Location::new(self.current_offset() + range.start, range.len()),
-                ParseErrorType::JavaScriptDiagnostics { title: error.title },
-                None,
-            ))
+            let error = &parse.errors()[0];
+            let range = &error.primary.as_ref().unwrap().span.range;
+            let start = self.current_offset() + range.start;
+            self.ctx.errs.emit(
+                Diagnostic::builder(format!("JavaScript error: {}", error.title), start)
+                    .add_helper(decorous_errors::Helper {
+                        msg: "the error occurred here".into(),
+                        span: start..start + range.len(),
+                    })
+                    .build(),
+            );
+            self.did_error = true;
+            Ok(parse.syntax())
         }
     }
 
-    fn parse_js_block(&self, js_text: &str) -> Result<SyntaxNode> {
+    fn parse_js_block(&mut self, js_text: &str) -> Result<SyntaxNode> {
         let res = parse_module(js_text, 0);
         if res.errors().is_empty()
             || (res.errors().len() == 1
@@ -290,18 +293,19 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
         {
             Ok(res.syntax())
         } else {
-            // A bit of a weird way to get owned diagnostics...
-            // We also get the first element error because this parser has a fail-fast strategy
-            let error = res.ok().expect_err("should have errors").swap_remove(0);
-            let range = error
-                .primary
-                .map(|diag| diag.span.range)
-                .unwrap_or_default();
-            Err(ParseError::new(
-                Location::new(self.current_offset() + range.start, range.len()),
-                ParseErrorType::JavaScriptDiagnostics { title: error.title },
-                None,
-            ))
+            let error = &res.errors()[0];
+            let range = &error.primary.as_ref().unwrap().span.range;
+            let start = self.current_offset() + range.start;
+            self.ctx.errs.emit(
+                Diagnostic::builder(format!("JavaScript error: {}", error.title), start)
+                    .add_helper(decorous_errors::Helper {
+                        msg: "the error occurred here".into(),
+                        span: start..start + range.len(),
+                    })
+                    .build(),
+            );
+            self.did_error = true;
+            Ok(res.syntax())
         }
     }
 
