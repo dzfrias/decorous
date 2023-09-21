@@ -8,5 +8,5 @@ pub use isolate_css::*;
 pub use run_static::*;
 
 pub trait Pass {
-    fn run(self, component: &mut Component);
+    fn run(self, component: &mut Component) -> anyhow::Result<()>;
 }

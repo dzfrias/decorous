@@ -285,7 +285,7 @@ fn parse_component<'a>(
     ctx: ParseCtx<'a>,
 ) -> Result<Component<'a>> {
     let parser = Parser::new(input).with_ctx(ctx.clone());
-    let component = match parser.parse() {
+    let mut component = match parser.parse() {
         Ok(ast) => Component::new(ast, ctx),
         Err(err) => {
             let diagnostic = err.into();
@@ -293,6 +293,7 @@ fn parse_component<'a>(
             anyhow::bail!("\nthe decorous parser failed");
         }
     };
+    component.run_passes()?;
     println!(
         "{}",
         FinishLog::default()

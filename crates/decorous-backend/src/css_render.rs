@@ -101,7 +101,7 @@ mod tests {
 
     fn make_component(input: &str) -> Component {
         let parser = Parser::new(input);
-        Component::new(
+        let mut c = Component::new(
             parser.parse().expect("should be valid input"),
             decorous_frontend::Ctx {
                 errs: decorous_errors::stderr(Source {
@@ -110,7 +110,9 @@ mod tests {
                 }),
                 ..Default::default()
             },
-        )
+        );
+        c.run_passes().unwrap();
+        c
     }
 
     #[test]

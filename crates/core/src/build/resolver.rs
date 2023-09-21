@@ -39,7 +39,8 @@ impl UseResolver for Resolver<'_> {
         };
         let parser = Parser::new(&contents).with_ctx(ctx.clone());
         let ast = parser.parse().map_err(|err| anyhow!(err))?;
-        let component = Component::new(ast, ctx);
+        let mut component = Component::new(ast, ctx);
+        component.run_passes()?;
 
         let name: PathBuf = format!("{}_{stem}.mjs", self.global_ctx.args.out).into();
         let mut f = BufWriter::new(File::create(&name)?);

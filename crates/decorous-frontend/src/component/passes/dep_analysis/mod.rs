@@ -22,7 +22,7 @@ impl DepAnalysisPass {
 }
 
 impl Pass for DepAnalysisPass {
-    fn run(self, component: &mut Component) {
+    fn run(self, component: &mut Component) -> anyhow::Result<()> {
         let mut graph = DepGraph::new(
             &component
                 .toplevel_nodes()
@@ -117,5 +117,7 @@ impl Pass for DepAnalysisPass {
                     .build(),
             );
         }
+
+        Ok(())
     }
 }

@@ -68,15 +68,18 @@ impl<'a> Component<'a> {
         };
         c.compute(ast);
 
-        // TODO: move this to separate struct for running passes, should return anyhow::Result
+        c
+    }
+
+    pub fn run_passes(&mut self) -> anyhow::Result<()> {
         let isolate_pass = IsolateCssPass::new();
         let static_pass = StaticPass::new();
         let dep_pass = DepAnalysisPass::new();
-        isolate_pass.run(&mut c);
-        static_pass.run(&mut c);
-        dep_pass.run(&mut c);
+        isolate_pass.run(self)?;
+        static_pass.run(self)?;
+        dep_pass.run(self)?;
 
-        c
+        Ok(())
     }
 
     pub fn declared_vars(&self) -> &DeclaredVariables {
@@ -319,7 +322,7 @@ mod tests {
     fn make_component(source: &str) -> Component<'_> {
         let parser = Parser::new(source);
         let ast = parser.parse().unwrap();
-        Component::new(
+        let mut c = Component::new(
             ast,
             Ctx {
                 errs: decorous_errors::stderr(Source {
@@ -328,7 +331,9 @@ mod tests {
                 }),
                 ..Default::default()
             },
-        )
+        );
+        c.run_passes().unwrap();
+        c
     }
 
     #[test]

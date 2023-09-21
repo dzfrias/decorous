@@ -11,13 +11,12 @@ impl StaticPass {
 }
 
 impl Pass for StaticPass {
-    fn run(self, component: &mut Component) {
+    fn run(self, component: &mut Component) -> anyhow::Result<()> {
         let Some(code) = component.comptime() else {
-            return;
+            return Ok(());
         };
 
-        // TODO: error handling
-        let js_env = component.ctx.executor.execute(code).unwrap();
+        let js_env = component.ctx.executor.execute(code)?;
         for decl in js_env.items() {
             let syntax_node =
                 rslint_parser::parse_text(&format!("let {} = {};", decl.name, decl.value), 0);
@@ -31,5 +30,7 @@ impl Pass for StaticPass {
             );
             component.declared_vars.insert_var(SmolStr::new(&decl.name))
         }
+
+        Ok(())
     }
 }

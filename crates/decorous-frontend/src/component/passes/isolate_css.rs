@@ -117,15 +117,17 @@ impl IsolateCssPass {
 }
 
 impl Pass for IsolateCssPass {
-    fn run(mut self, component: &mut Component) {
+    fn run(mut self, component: &mut Component) -> anyhow::Result<()> {
         {
             let Some(css) = &mut component.css else {
-                return;
+                return Ok(());
             };
             self.component_id = component.component_id;
             self.run_css_passes(&mut css.rules, &mut component.declared_vars);
         }
 
-        self.assign_node_classes(component)
+        self.assign_node_classes(component);
+
+        Ok(())
     }
 }

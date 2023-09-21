@@ -240,7 +240,9 @@ mod tests {
             }),
             ..Default::default()
         };
-        Component::new(parser.parse().expect("should be valid input"), ctx)
+        let mut c = Component::new(parser.parse().expect("should be valid input"), ctx);
+        c.run_passes().unwrap();
+        c
     }
 
     #[derive(Default)]

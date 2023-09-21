@@ -269,7 +269,8 @@ mod tests {
                 errs,
                 ..Default::default()
             };
-            let component = Component::new(parser.parse().expect("should be valid input"), ctx);
+            let mut component = Component::new(parser.parse().expect("should be valid input"), ctx);
+            component.run_passes().unwrap();
             let mut out = TestOut::default();
             let mut renderer = CsrRenderer::new();
             renderer.with_options($opts);
