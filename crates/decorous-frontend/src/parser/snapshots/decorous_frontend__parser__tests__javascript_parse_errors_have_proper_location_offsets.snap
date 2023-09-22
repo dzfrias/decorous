@@ -5,12 +5,10 @@ expression: ast
 Err(
     ParseError {
         fragment: Location {
-            offset: 12,
-            length: 1,
+            offset: 0,
+            length: 0,
         },
         help: None,
-        err_type: JavaScriptDiagnostics {
-            title: "expected an expression, but found `;` instead",
-        },
+        err_type: DidError,
     },
 )
