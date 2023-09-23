@@ -360,3 +360,12 @@ decor_test!(
         assert_all!(dir.path());
     }
 );
+
+decor_test!(
+    does_not_fail_if_out_dir_already_made,
+    STATIC,
+    |dir: &mut TempDir, mut cmd: Command| {
+        fs::create_dir(dir.path().join("out")).unwrap();
+        cmd.assert().success();
+    }
+);
