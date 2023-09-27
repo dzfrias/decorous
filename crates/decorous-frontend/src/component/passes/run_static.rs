@@ -12,7 +12,7 @@ impl StaticPass {
 
 impl Pass for StaticPass {
     fn run(self, component: &mut Component) -> anyhow::Result<()> {
-        let Some(code) = component.comptime() else {
+        let Some(code) = component.comptime.as_ref() else {
             return Ok(());
         };
 

@@ -39,14 +39,14 @@ impl RenderBackend for CsrRenderer {
     }
 
     fn render<T: RenderOut>(&self, component: &Component, mut out: T, ctx: &Ctx) -> Result<()> {
-        if let Some(css) = component.css() {
+        if let Some(css) = component.css.as_ref() {
             let mut css_out = vec![];
             css_render::render_css(css, &mut css_out, component)?;
             out.write_css(&css_out)?;
         }
 
         if let Some(info) = &ctx.index_html {
-            if component.css().is_some() {
+            if component.css.is_some() {
                 write_html!(
                     out,
                     include_str!("./templates/index_css.html"),
@@ -64,16 +64,16 @@ impl RenderBackend for CsrRenderer {
             }
         }
 
-        if let Some(wasm) = component.wasm() {
+        if let Some(wasm) = component.wasm.as_ref() {
             let wasm_prelude = ctx.wasm_compiler.compile(CodeInfo {
                 lang: wasm.lang,
                 body: wasm.body,
-                exports: component.exports(),
+                exports: &component.exports,
             })?;
             out.write_js(wasm_prelude.as_bytes())?;
         };
 
-        for use_decl in component.uses() {
+        for use_decl in &component.uses {
             let Some(stem) = use_decl.file_stem() else {
                 continue;
             };
@@ -87,7 +87,7 @@ impl RenderBackend for CsrRenderer {
         }
 
         // Hoisted syntax nodes should come first
-        for hoist in component.hoist() {
+        for hoist in &component.hoist {
             write_js!(out, "{hoist}")?;
         }
 
@@ -101,7 +101,7 @@ impl RenderBackend for CsrRenderer {
             out,
             "const dirty = new Uint8Array(new ArrayBuffer({}));",
             // Ceiling division to get the amount of bytes needed in the ArrayBuffer
-            ((component.declared_vars().len() + 7) / 8)
+            ((component.declared_vars.len() + 7) / 8)
         )?;
 
         let state = State {
@@ -110,7 +110,7 @@ impl RenderBackend for CsrRenderer {
             root: None,
             uses: vec![],
         };
-        render_fragment(component.fragment_tree(), state, &mut out.js_handle())?;
+        render_fragment(&component.fragment_tree, state, &mut out.js_handle())?;
 
         write_js!(out, "const ctx = __init_ctx();")?;
         if self.opts.modularize {
@@ -152,14 +152,14 @@ fn render_init_ctx<W: io::Write>(out: &mut W, component: &Component<'_>) -> io::
         out,
         "{}",
         component
-            .toplevel_nodes()
+            .toplevel_nodes
             .iter()
             .map(|node| {
                 if node.substitute_assign_refs {
                     codegen_utils::replace_assignments(
                         &node.node,
                         &utils::get_unbound_refs(&node.node),
-                        component.declared_vars(),
+                        &component.declared_vars,
                         None,
                     )
                 } else {
@@ -168,20 +168,20 @@ fn render_init_ctx<W: io::Write>(out: &mut W, component: &Component<'_>) -> io::
             })
             .join("\n")
     )?;
-    for (arrow_expr, (idx, scope)) in component.declared_vars().all_arrow_exprs() {
+    for (arrow_expr, (idx, scope)) in component.declared_vars.all_arrow_exprs() {
         writeln!(
             out,
             "let __closure{idx} = {};",
             codegen_utils::replace_assignments(
                 arrow_expr.syntax(),
                 &utils::get_unbound_refs(arrow_expr.syntax()),
-                component.declared_vars(),
+                &component.declared_vars,
                 *scope
             )
         )?;
     }
-    for (name, id) in component.declared_vars().all_bindings() {
-        if let Some(var_id) = component.declared_vars().get_var(name, None) {
+    for (name, id) in component.declared_vars.all_bindings() {
+        if let Some(var_id) = component.declared_vars.get_var(name, None) {
             writeln!(
                 out,
                 "let __binding{id} = (ev) => __schedule_update({var_id}, {name} = ev.target.value);"
@@ -190,26 +190,26 @@ fn render_init_ctx<W: io::Write>(out: &mut W, component: &Component<'_>) -> io::
             todo!("unbound var lint");
         }
     }
-    for (block, id) in component.declared_vars().all_reactive_blocks() {
+    for (block, id) in component.declared_vars.all_reactive_blocks() {
         let replaced = codegen_utils::replace_assignments(
             block,
             &utils::get_unbound_refs(block),
-            component.declared_vars(),
+            &component.declared_vars,
             None,
         );
         writeln!(out, "let __reactive{id} = () => {{ {replaced} }};")?;
     }
-    let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars().len()];
-    for (name, idx) in component.declared_vars().all_vars() {
+    let mut ctx = vec![Cow::Borrowed("undefined"); component.declared_vars.len()];
+    for (name, idx) in component.declared_vars.all_vars() {
         ctx[*idx as usize] = Cow::Borrowed(name);
     }
-    for (idx, _) in component.declared_vars().all_arrow_exprs().values() {
+    for (idx, _) in component.declared_vars.all_arrow_exprs().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__closure{idx}"));
     }
-    for idx in component.declared_vars().all_bindings().values() {
+    for idx in component.declared_vars.all_bindings().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__binding{idx}"));
     }
-    for idx in component.declared_vars().all_reactive_blocks().values() {
+    for idx in component.declared_vars.all_reactive_blocks().values() {
         ctx[*idx as usize] = Cow::Owned(format!("__reactive{idx}"));
     }
     writeln!(out, "return [{}];", ctx.join(","))?;

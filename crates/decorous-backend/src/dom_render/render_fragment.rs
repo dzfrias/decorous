@@ -62,9 +62,9 @@ fn render_fragment_to_out(
     state: &mut State<'_>,
     out: &mut Output,
 ) {
-    for (block, id) in state.component.declared_vars().all_reactive_blocks() {
+    for (block, id) in state.component.declared_vars.all_reactive_blocks() {
         let unbound = utils::get_unbound_refs(block);
-        let dirty = codegen_utils::calc_dirty(&unbound, state.component.declared_vars(), None);
+        let dirty = codegen_utils::calc_dirty(&unbound, &state.component.declared_vars, None);
         out.write_updateln(format_args!("if ({dirty}) {{ ctx[{id}](); }}"));
     }
 
@@ -164,7 +164,7 @@ impl Render for Mustache {
         let replaced = codegen_utils::replace_namerefs(
             &self.0,
             &unbound,
-            state.component.declared_vars(),
+            &state.component.declared_vars,
             meta.scope(),
         );
         let id = meta.id();
@@ -176,7 +176,7 @@ impl Render for Mustache {
 
         // Update
         let dirty =
-            codegen_utils::calc_dirty(&unbound, state.component.declared_vars(), meta.scope());
+            codegen_utils::calc_dirty(&unbound, &state.component.declared_vars, meta.scope());
         if !dirty.is_empty() {
             out.write_updateln(format_args!("if ({dirty}) e{id}.data = {replaced};"));
         }
@@ -282,12 +282,12 @@ impl Render for ForBlock<'_, FragmentMetadata> {
         let expr = codegen_utils::replace_namerefs(
             &self.expr,
             &unbound,
-            state.component.declared_vars(),
+            &state.component.declared_vars,
             meta.scope(),
         );
         let var_idx = state
             .component
-            .declared_vars()
+            .declared_vars
             .all_scopes()
             .get(&id)
             .unwrap()
@@ -325,7 +325,7 @@ impl Render for IfBlock<'_, FragmentMetadata> {
         let replacement = codegen_utils::replace_namerefs(
             &self.expr,
             &unbound,
-            state.component.declared_vars(),
+            &state.component.declared_vars,
             meta.scope(),
         );
 
@@ -387,7 +387,7 @@ impl Render for Attribute<'_> {
                 let replacement = codegen_utils::replace_namerefs(
                     js,
                     &unbound,
-                    state.component.declared_vars(),
+                    &state.component.declared_vars,
                     meta.scope(),
                 );
                 out.write_declln(format_args!(
@@ -395,7 +395,7 @@ impl Render for Attribute<'_> {
                 ));
                 let dirty = codegen_utils::calc_dirty(
                     &unbound,
-                    state.component.declared_vars(),
+                    &state.component.declared_vars,
                     meta.scope(),
                 );
                 out.write_updateln(format_args!(
@@ -417,7 +417,7 @@ impl Render for Attribute<'_> {
                 let replaced = codegen_utils::replace_namerefs(
                     &event_handler.expr,
                     &unbound,
-                    state.component.declared_vars(),
+                    &state.component.declared_vars,
                     meta.scope(),
                 );
                 // Scope args holds the amount of unbound variables in the expression that
@@ -431,14 +431,14 @@ impl Render for Attribute<'_> {
                         };
                         if !state
                             .component
-                            .declared_vars()
+                            .declared_vars
                             .is_scope_var(tok.text(), scope)
                         {
                             return None;
                         }
                         state
                             .component
-                            .declared_vars()
+                            .declared_vars
                             .get_var(tok.text(), meta.scope())
                     })
                     .collect_vec();
@@ -465,7 +465,7 @@ impl Render for Attribute<'_> {
             Self::Binding(binding) => {
                 state
                     .component
-                    .declared_vars()
+                    .declared_vars
                     .get_var(*binding, None)
                     .map_or_else(
                         || todo!("unbound var lint"),
@@ -481,7 +481,7 @@ impl Render for Attribute<'_> {
                     );
                 let binding_idx = state
                     .component
-                    .declared_vars()
+                    .declared_vars
                     .get_binding(*binding)
                     .expect("BUG: every binding should have a entry in declared vars");
                 out.write_declln(format_args!(
@@ -494,24 +494,24 @@ impl Render for Attribute<'_> {
 
 fn render_reactive_css(state: &mut State, output: &mut Output) {
     // No reactive CSS
-    if state.component.declared_vars().css_mustaches().is_empty() {
+    if state.component.declared_vars.css_mustaches().is_empty() {
         return;
     }
 
     let mut all_unbound = vec![];
     let mut final_attr = "`".to_owned();
     for (mustache, id) in sort_if_testing!(
-        state.component.declared_vars().css_mustaches().iter(),
+        state.component.declared_vars.css_mustaches().iter(),
         |a, b| a.1.cmp(b.1)
     ) {
         let unbound = utils::get_unbound_refs(mustache);
         let replacement =
-            replace_namerefs(mustache, &unbound, state.component.declared_vars(), None);
+            replace_namerefs(mustache, &unbound, &state.component.declared_vars, None);
         all_unbound.extend(unbound);
         force_write!(final_attr, "--decor-{}: ${{{}}}; ", id, replacement);
     }
     final_attr.push('`');
-    let all_dirty = codegen_utils::calc_dirty(&all_unbound, state.component.declared_vars(), None);
+    let all_dirty = codegen_utils::calc_dirty(&all_unbound, &state.component.declared_vars, None);
     output.write_updateln(format_args!(
         "if ({all_dirty}) target.setAttribute(\"style\", {final_attr});"
     ));

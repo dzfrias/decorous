@@ -83,7 +83,7 @@ fn write_value<T: io::Write>(
                 out,
                 "var(--decor-{})",
                 component
-                    .declared_vars()
+                    .declared_vars
                     .css_mustaches()
                     .get(node)
                     .expect("all mustaches should be in css_mustaches variable")
@@ -120,7 +120,7 @@ mod tests {
         let mut out = vec![];
         let input = "---css body { color: {color}; } ---";
         let component = make_component(input);
-        render_css(component.css().unwrap(), &mut out, &component).unwrap();
+        render_css(component.css.as_ref().unwrap(), &mut out, &component).unwrap();
         insta::assert_snapshot!(String::from_utf8(out).unwrap());
     }
 }

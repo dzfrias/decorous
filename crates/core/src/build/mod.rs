@@ -143,21 +143,25 @@ fn watch(args: &Build, config: &Config) -> Result<(), anyhow::Error> {
 }
 
 fn warn_on_unused_wasm(global_ctx: &GlobalCtx, component: &Component<'_>) -> Result<()> {
-    if global_ctx.args.strip && component.wasm().is_none() {
+    if component.wasm.is_some() {
+        return Ok(());
+    }
+
+    if global_ctx.args.strip {
         global_ctx.errs.emit(
             DiagnosticBuilder::new("no WebAssembly to strip", 0)
                 .severity(Severity::Warning)
                 .build(),
         );
     }
-    if !global_ctx.args.build_args.is_empty() && component.wasm().is_none() {
+    if !global_ctx.args.build_args.is_empty() {
         global_ctx.errs.emit(
             DiagnosticBuilder::new("no WebAssembly to compile - build args do nothing", 0)
                 .severity(Severity::Warning)
                 .build(),
         );
     }
-    if global_ctx.args.optimize.is_some() && component.wasm().is_none() {
+    if global_ctx.args.optimize.is_some() {
         global_ctx.errs.emit(
             DiagnosticBuilder::new("no WebAssembly to optimize", 0)
                 .severity(Severity::Warning)

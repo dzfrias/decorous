@@ -63,9 +63,9 @@ impl<'ast> State<'ast> {
                 // The minimum length of each part of the eventual style
                 const MIN_LEN: usize = "--decor-0: ${}; ".len();
                 let mut style = String::with_capacity(
-                    self.component.declared_vars().css_mustaches().len() * MIN_LEN,
+                    self.component.declared_vars.css_mustaches().len() * MIN_LEN,
                 );
-                for (mustache, id) in self.component.declared_vars().css_mustaches() {
+                for (mustache, id) in self.component.declared_vars.css_mustaches() {
                     crate::codegen_utils::force_write!(style, "--decor-{id}: ${{{mustache}}}; ");
                 }
                 style
@@ -165,13 +165,12 @@ impl<'ast> Render<'ast> for Element<'ast, FragmentMetadata> {
                 Attribute::KeyValue(_, None | Some(AttributeValue::Literal(_))) => {}
             }
         }
-        if meta.parent_id().is_none() && !state.component.declared_vars().css_mustaches().is_empty()
-        {
+        if meta.parent_id().is_none() && !state.component.declared_vars.css_mustaches().is_empty() {
             has_dynamic = true;
         }
 
-        let inline_styles_candidate = meta.parent_id().is_none()
-            && !state.component.declared_vars().css_mustaches().is_empty();
+        let inline_styles_candidate =
+            meta.parent_id().is_none() && !state.component.declared_vars.css_mustaches().is_empty();
         if !has_style && inline_styles_candidate {
             let style = state.use_style_cache();
             let new_js = rslint_parser::parse_text(&format!("`{style}`"), 0).syntax();
@@ -210,11 +209,11 @@ impl<'ast> Render<'ast> for Mustache {
 
         let unbound = utils::get_unbound_refs(&self.0);
         let dirty_indices =
-            codegen_utils::calc_dirty(&unbound, state.component.declared_vars(), meta.scope());
+            codegen_utils::calc_dirty(&unbound, &state.component.declared_vars, meta.scope());
         let replaced = codegen_utils::replace_namerefs(
             &self.0,
             &unbound,
-            state.component.declared_vars(),
+            &state.component.declared_vars,
             meta.scope(),
         );
         if dirty_indices.is_empty() {
@@ -269,7 +268,7 @@ impl<'ast> Render<'ast> for IfBlock<'ast, FragmentMetadata> {
         let replaced = codegen_utils::replace_namerefs(
             &self.expr,
             &unbound,
-            state.component.declared_vars(),
+            &state.component.declared_vars,
             meta.scope(),
         );
 
@@ -319,12 +318,12 @@ impl<'ast> Render<'ast> for ForBlock<'ast, FragmentMetadata> {
         let replaced = codegen_utils::replace_namerefs(
             &self.expr,
             &unbound,
-            state.component.declared_vars(),
+            &state.component.declared_vars,
             meta.scope(),
         );
         let var_idx = state
             .component
-            .declared_vars()
+            .declared_vars
             .all_scopes()
             .get(&meta.id())
             .expect("BUG: for block should have an assigned scope")
@@ -355,8 +354,8 @@ impl<'ast> Render<'ast> for Attribute<'ast> {
 
     fn render(&'ast self, state: &mut State<'ast>, out: &mut Output, meta: &Self::Metadata) {
         let id = meta.id();
-        let inline_styles_candidate = meta.parent_id().is_none()
-            && !state.component.declared_vars().css_mustaches().is_empty();
+        let inline_styles_candidate =
+            meta.parent_id().is_none() && !state.component.declared_vars.css_mustaches().is_empty();
 
         match self {
             Attribute::KeyValue(key, Some(AttributeValue::Literal(literal))) => {
@@ -376,7 +375,7 @@ impl<'ast> Render<'ast> for Attribute<'ast> {
                     let replaced = codegen_utils::replace_assignments(
                         &evt_handler.expr,
                         &utils::get_unbound_refs(&evt_handler.expr),
-                        state.component.declared_vars(),
+                        &state.component.declared_vars,
                         None,
                     );
 
@@ -392,11 +391,10 @@ impl<'ast> Render<'ast> for Attribute<'ast> {
                     out.write_element(id, format_args!("document.getElementById(\"{id}\")"));
                     let binding_id = state
                         .component
-                        .declared_vars()
+                        .declared_vars
                         .get_binding(*binding)
                         .expect("BUG: every binding should have an id in declared vars");
-                    let Some(var_id) = state.component.declared_vars().get_var(*binding, None)
-                    else {
+                    let Some(var_id) = state.component.declared_vars.get_var(*binding, None) else {
                         todo!("unbound var lint")
                     };
 
@@ -437,11 +435,11 @@ fn render_dyn_attr(
         out.write_element(id, format_args!("document.getElementById(\"{id}\")"));
         let unbound = utils::get_unbound_refs(js);
         let dirty_indices =
-            codegen_utils::calc_dirty(&unbound, state.component.declared_vars(), meta.scope());
+            codegen_utils::calc_dirty(&unbound, &state.component.declared_vars, meta.scope());
         let replaced = codegen_utils::replace_namerefs(
             js,
             &unbound,
-            state.component.declared_vars(),
+            &state.component.declared_vars,
             meta.scope(),
         );
         if dirty_indices.is_empty() {

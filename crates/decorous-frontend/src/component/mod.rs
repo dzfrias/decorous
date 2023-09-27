@@ -82,48 +82,8 @@ impl<'a> Component<'a> {
         Ok(())
     }
 
-    pub fn declared_vars(&self) -> &DeclaredVariables {
-        &self.declared_vars
-    }
-
-    pub fn fragment_tree(&self) -> &[Node<'a, FragmentMetadata>] {
-        self.fragment_tree.as_ref()
-    }
-
-    pub fn toplevel_nodes(&self) -> &[ToplevelNodeData] {
-        self.toplevel_nodes.as_ref()
-    }
-
-    pub fn hoist(&self) -> &[SyntaxNode] {
-        self.hoist.as_ref()
-    }
-
     pub fn descendents(&'a self) -> NodeIter<'a, FragmentMetadata> {
-        NodeIter::new(self.fragment_tree())
-    }
-
-    pub fn component_id(&self) -> u8 {
-        self.component_id
-    }
-
-    pub fn css(&self) -> Option<&Css> {
-        self.css.as_ref()
-    }
-
-    pub fn wasm(&self) -> Option<&Code<'a>> {
-        self.wasm.as_ref()
-    }
-
-    pub fn exports(&self) -> &[SmolStr] {
-        self.exports.as_ref()
-    }
-
-    pub fn uses(&self) -> &[&Path] {
-        self.uses.as_ref()
-    }
-
-    pub fn comptime(&self) -> Option<&Code<'a>> {
-        self.comptime.as_ref()
+        NodeIter::new(&self.fragment_tree)
     }
 }
 
@@ -364,19 +324,19 @@ mod tests {
     fn can_get_all_declared_items_with_proper_substitution() {
         let component =
             make_component("---js let x = 3; function func() { x = 44; } variable; ---");
-        insta::assert_debug_snapshot!(component.toplevel_nodes());
+        insta::assert_debug_snapshot!(component.toplevel_nodes);
     }
 
     #[test]
     fn hoists_imports() {
         let component = make_component("---js import data from \"data\"---");
-        insta::assert_debug_snapshot!(component.hoist());
+        insta::assert_debug_snapshot!(component.hoist);
     }
 
     #[test]
     fn can_extract_closures_from_html() {
         let component = make_component("#button[@click={() => console.log(\"hello\")}]/button");
-        insta::assert_debug_snapshot!(component.declared_vars());
+        insta::assert_debug_snapshot!(component.declared_vars);
     }
 
     #[test]
@@ -389,7 +349,7 @@ mod tests {
     fn can_extract_scopes() {
         let component =
             make_component("{#for i in [1, 2, 3]} hello {/for} {#for i in [1, 2, 3]} hello {/for}");
-        insta::assert_yaml_snapshot!(component.declared_vars().all_scopes().iter().sorted_by(|(a, _), (b, _)| a.cmp(b)).collect_vec(), {
+        insta::assert_yaml_snapshot!(component.declared_vars.all_scopes().iter().sorted_by(|(a, _), (b, _)| a.cmp(b)).collect_vec(), {
             "[][1].env" => insta::sorted_redaction()
         });
     }
@@ -398,7 +358,7 @@ mod tests {
     fn can_extract_nested_scopes() {
         let component =
             make_component("{#for i in [1, 2, 3]} {#for x in [2, 3, 4]} eee {/for} {/for}");
-        insta::assert_yaml_snapshot!(component.declared_vars().all_scopes().iter().sorted_by(|(a, _), (b, _)| a.cmp(b)).collect_vec(), {
+        insta::assert_yaml_snapshot!(component.declared_vars.all_scopes().iter().sorted_by(|(a, _), (b, _)| a.cmp(b)).collect_vec(), {
             "[][1].env" => insta::sorted_redaction()
         });
     }
@@ -406,62 +366,62 @@ mod tests {
     #[test]
     fn does_not_hoist_var_if_mutated_in_script() {
         let component = make_component("---js let x = 0; let mutate_x = () => x = 4;---");
-        assert!(component.hoist().is_empty());
+        assert!(component.hoist.is_empty());
     }
 
     #[test]
     fn hoists_var_if_never_mutated() {
         let component = make_component("---js let x = 0--- {x}");
-        insta::assert_debug_snapshot!(component.hoist());
+        insta::assert_debug_snapshot!(component.hoist);
     }
 
     #[test]
     fn assigns_classes_to_nodes() {
         let component = make_component("---css p { color: red; } --- #p:Hello!");
-        insta::assert_debug_snapshot!(component.fragment_tree());
+        insta::assert_debug_snapshot!(component.fragment_tree);
     }
 
     #[test]
     fn merges_previously_assigned_class_in_reassignment() {
         let component = make_component("---css p { color: red; } --- #p[class=\"green\"]:Hello!");
-        insta::assert_debug_snapshot!(component.fragment_tree());
+        insta::assert_debug_snapshot!(component.fragment_tree);
     }
 
     #[test]
     fn merges_previously_assigned_class_in_reassignment_with_js() {
         let component = make_component("---css p { color: red; } --- #p[class={\"green\"}]:Hello!");
-        insta::assert_debug_snapshot!(component.fragment_tree());
+        insta::assert_debug_snapshot!(component.fragment_tree);
     }
 
     #[test]
     fn modifies_css_selectors_to_use_component_id() {
         let component = make_component("---css p:has(span) { color: red; } ---");
-        insta::assert_debug_snapshot!(component.css());
+        insta::assert_debug_snapshot!(component.css);
     }
 
     #[test]
     fn assigns_ids_to_mustaches_in_css() {
         let component = make_component("---css p { color: {color}; } ---");
-        insta::assert_debug_snapshot!(component.declared_vars().css_mustaches());
+        insta::assert_debug_snapshot!(component.declared_vars.css_mustaches());
     }
 
     #[test]
     fn does_not_hoist_with_binding() {
         let component = make_component("---js let x = 0; --- #input[:x:]/input");
-        assert!(component.hoist().is_empty())
+        assert!(component.hoist.is_empty())
     }
 
     #[test]
     fn bindings_are_put_into_declared_vars() {
         let component = make_component("---js let x = 0; --- #input[:x:]/input");
-        insta::assert_debug_snapshot!(component.declared_vars())
+        insta::assert_debug_snapshot!(component.declared_vars)
     }
 
     #[test]
     fn hoists_exports() {
         let component = make_component("---js export function x() { console.log(\"hi\") } ---");
-        assert!(component.toplevel_nodes().is_empty());
-        insta::assert_debug_snapshot!(component.hoist())
+        assert!(component.toplevel_nodes.is_empty());
+        insta::assert_debug_snapshot!(component.hoist)
     }
 
     #[test]
@@ -469,19 +429,19 @@ mod tests {
         let component = make_component(
             "---js export function x() { console.log(\"hi\"); }; export let l = 1 ---",
         );
-        insta::assert_debug_snapshot!(component.exports())
+        insta::assert_debug_snapshot!(component.exports)
     }
 
     #[test]
     fn can_extract_reactive_blocks() {
         let component = make_component("---js $: $: { let y = 4; }; ---");
-        insta::assert_debug_snapshot!(component.declared_vars());
+        insta::assert_debug_snapshot!(component.declared_vars);
     }
 
     #[test]
     fn reactive_blocks_are_still_included_as_toplevel_nodes() {
         let component = make_component("---js let z = 0; $: let x = z + 1; $: { let y = 4; } --- #button[@click={() => z = 33}]:hi");
-        insta::assert_debug_snapshot!(component.toplevel_nodes());
+        insta::assert_debug_snapshot!(component.toplevel_nodes);
     }
 
     #[test]
@@ -497,15 +457,15 @@ mod tests {
         let component = make_component(
             "---js let x = 0; let y = x + 1; let z = y + 1; --- #button[@click={() => x = 1}]:Wow!",
         );
-        assert!(component.hoist().is_empty());
+        assert!(component.hoist.is_empty());
     }
 
     #[test]
     fn prunes_unused_variables() {
         let component = make_component("---js let x = 0; let y = x; ---");
-        assert!(component.toplevel_nodes().is_empty());
-        assert!(component.hoist().is_empty());
-        assert!(component.declared_vars().is_empty());
+        assert!(component.toplevel_nodes.is_empty());
+        assert!(component.hoist.is_empty());
+        assert!(component.declared_vars.is_empty());
     }
 
     #[test]
@@ -513,7 +473,7 @@ mod tests {
         let component = make_component(
             "---js let x = 0; function y() { return x; } --- #button[@click={y}]:Hi",
         );
-        assert!(component.toplevel_nodes().is_empty());
-        insta::assert_debug_snapshot!(component.hoist());
+        assert!(component.toplevel_nodes.is_empty());
+        insta::assert_debug_snapshot!(component.hoist);
     }
 }

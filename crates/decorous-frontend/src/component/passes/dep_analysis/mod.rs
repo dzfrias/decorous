@@ -25,7 +25,7 @@ impl Pass for DepAnalysisPass {
     fn run(self, component: &mut Component) -> anyhow::Result<()> {
         let mut graph = DepGraph::new(
             &component
-                .toplevel_nodes()
+                .toplevel_nodes
                 .iter()
                 .filter_map(|toplevel| toplevel.node.try_to::<Decl>())
                 .collect_vec(),
@@ -70,12 +70,12 @@ impl Pass for DepAnalysisPass {
             }
         }
 
-        for mustache in component.declared_vars().css_mustaches().keys() {
+        for mustache in component.declared_vars.css_mustaches().keys() {
             graph.mark_used_from_node(mustache);
             graph.mark_mutated_from_node(mustache);
         }
 
-        for toplevel in component.toplevel_nodes() {
+        for toplevel in &component.toplevel_nodes {
             graph.mark_mutated_from_node(&toplevel.node);
         }
 
@@ -84,7 +84,7 @@ impl Pass for DepAnalysisPass {
                 component.declared_vars.remove_var(var);
             }
             let pos = component
-                .toplevel_nodes()
+                .toplevel_nodes
                 .iter()
                 .position(|node| &node.node == v.decl.syntax())
                 .expect("VarDecl should be in toplevel nodes");
@@ -96,7 +96,7 @@ impl Pass for DepAnalysisPass {
                 component.declared_vars.remove_var(var);
             }
             let Some(pos) = component
-                .toplevel_nodes()
+                .toplevel_nodes
                 .iter()
                 .position(|node| &node.node == v.decl.syntax())
             else {
