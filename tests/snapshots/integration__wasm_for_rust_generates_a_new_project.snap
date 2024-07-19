@@ -2,7 +2,6 @@
 source: tests/tests.rs
 expression: all
 ---
-
 ---input.decor---
 ---rust
 use wasm_bindgen::prelude::*;
@@ -167,20 +166,8 @@ export const memory: WebAssembly.Memory;
 export function add(a: number, b: number): number;
 
 ---package.json---
-{
-  "name": "decor-out",
-  "version": "0.1.0",
-  "files": [
-    "__tmp_bg.wasm",
-    "__tmp.js",
-    "__tmp.d.ts"
-  ],
-  "module": "__tmp.js",
-  "types": "__tmp.d.ts",
-  "sideEffects": [
-    "./snippets/*"
-  ]
-}
+IGNORED
+
 ---out.html---
 
 
@@ -201,4 +188,3 @@ function __init_ctx() {
   return [__closure0];
 }
 const ctx = __init_ctx();
-

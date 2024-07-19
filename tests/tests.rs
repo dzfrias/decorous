@@ -102,7 +102,7 @@ decor_test!(
     WASM,
     |dir: &mut TempDir, mut cmd: Command| {
         cmd.assert().success();
-        assert_all!(dir.path(), ignore: [".git", "target", "Cargo.lock", ".gitignore", "__tmp_bg.wasm"]);
+        assert_all!(dir.path(), ignore: [".git", "target", "Cargo.lock", ".gitignore", "__tmp_bg.wasm", "package.json"]);
     }
 );
 
