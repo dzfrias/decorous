@@ -37,11 +37,10 @@ impl IsolateCssPass {
     fn modify_selectors(&self, rule: &mut RegularRule) {
         for sel in &mut rule.selector {
             for part in &mut sel.parts {
-                let new_text = if let Some(t) = &part.text {
-                    format!("{t}.decor-{}", self.component_id)
-                } else {
-                    format!(".decor-{}", self.component_id)
-                };
+                let new_text = part.text.as_ref().map_or_else(
+                    || format!(".decor-{}", self.component_id),
+                    |t| format!("{t}.decor-{}", self.component_id),
+                );
                 if let Some(s) = &mut part.text {
                     *s = new_text.into();
                 }
@@ -50,6 +49,7 @@ impl IsolateCssPass {
     }
 
     // TODO: Move to somewhere else? declared vars should be formed by now
+    #[allow(clippy::unused_self)]
     fn assign_css_mustaches(&self, rule: &mut RegularRule, declared_vars: &mut DeclaredVariables) {
         for decl in &rule.declarations {
             for mustache in decl.values.iter().filter_map(|val| match val {

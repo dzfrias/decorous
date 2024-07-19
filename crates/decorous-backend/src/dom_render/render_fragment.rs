@@ -426,9 +426,7 @@ impl Render for Attribute<'_> {
                     .iter()
                     .filter_map(|nref| {
                         let tok = nref.ident_token().unwrap();
-                        let Some(scope) = meta.scope() else {
-                            return None;
-                        };
+                        let scope = meta.scope()?;
                         if !state
                             .component
                             .declared_vars
@@ -439,7 +437,7 @@ impl Render for Attribute<'_> {
                         state
                             .component
                             .declared_vars
-                            .get_var(tok.text(), meta.scope())
+                            .get_var(tok.text(), Some(scope))
                     })
                     .collect_vec();
 

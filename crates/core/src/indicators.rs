@@ -17,8 +17,8 @@ pub struct FinishLog {
 }
 
 impl FinishLog {
-    const FINISHED: &str = "DONE";
-    const FINISHED_COLOR: &str = "\x1b[32;1mDONE\x1b[0m";
+    const FINISHED: &'static str = "DONE";
+    const FINISHED_COLOR: &'static str = "\x1b[32;1mDONE\x1b[0m";
 
     pub fn with_main_message<T>(&mut self, msg: T) -> &mut Self
     where

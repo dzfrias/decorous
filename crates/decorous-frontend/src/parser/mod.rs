@@ -427,7 +427,7 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
         let iterator = self.parse_js_expr(js_text)?;
 
         let inner = self.parse_nodes(|tok| match tok.kind {
-            TokenKind::SpecialBlockEnd(end_name) if end_name == "for" => Ok(true),
+            TokenKind::SpecialBlockEnd("for") => Ok(true),
             TokenKind::SpecialBlockEnd(_) => Err(ParseError::new(
                 tok.loc,
                 ParseErrorType::InvalidClosingTag("for".to_owned()),
@@ -450,8 +450,7 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
         let condition = self.parse_js_expr(js_text)?;
 
         let inner = self.parse_nodes(|tok| match tok.kind {
-            TokenKind::SpecialBlockEnd(end_name) if end_name == "if" => Ok(true),
-            TokenKind::SpecialExtender(extender) if extender == "else" => Ok(true),
+            TokenKind::SpecialBlockEnd("if") | TokenKind::SpecialExtender("else") => Ok(true),
             TokenKind::SpecialBlockEnd(_) => Err(ParseError::new(
                 tok.loc,
                 ParseErrorType::InvalidClosingTag("if".to_owned()),
@@ -468,7 +467,7 @@ impl<'src, 'ctx> Parser<'src, 'ctx> {
         let else_block = if matches!(self.current_token.kind, TokenKind::SpecialExtender(_)) {
             self.next_token();
             let inner = self.parse_nodes(|tok| match tok.kind {
-                TokenKind::SpecialBlockEnd(end_name) if end_name == "if" => Ok(true),
+                TokenKind::SpecialBlockEnd("if") => Ok(true),
                 TokenKind::SpecialBlockEnd(_) => Err(ParseError::new(
                     tok.loc,
                     ParseErrorType::InvalidClosingTag("if".to_owned()),

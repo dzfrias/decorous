@@ -108,7 +108,7 @@ impl<'a> Parser<'a> {
                 parts.push(self.parse_selector_part()?);
                 self.skip_whitespace();
             }
-            selectors.push(Selector { parts })
+            selectors.push(Selector { parts });
         }
         while self.harpoon.peek_is(',') {
             debug_assert_eq!(Some(','), self.harpoon.consume());
@@ -117,7 +117,7 @@ impl<'a> Parser<'a> {
                 parts.push(self.parse_selector_part()?);
                 self.skip_whitespace();
             }
-            selectors.push(Selector { parts })
+            selectors.push(Selector { parts });
         }
 
         Ok(selectors)

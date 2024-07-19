@@ -111,7 +111,8 @@ impl WasmCompiler for MainCompiler<'_> {
             Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
                 fs::remove_dir_all(&self.global_ctx.args.out)
                     .context("error removing previous outdir")?;
-                fs::create_dir(&self.global_ctx.args.out).context("error creating out directory")?
+                fs::create_dir(&self.global_ctx.args.out)
+                    .context("error creating out directory")?;
             }
             Err(err) => bail!(err),
         }

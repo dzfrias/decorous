@@ -28,7 +28,7 @@ impl Pass for StaticPass {
                     substitute_assign_refs: true,
                 },
             );
-            component.declared_vars.insert_var(SmolStr::new(&decl.name))
+            component.declared_vars.insert_var(SmolStr::new(&decl.name));
         }
 
         Ok(())

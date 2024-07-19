@@ -153,7 +153,7 @@ impl<'a> Harpoon<'a> {
 impl Clone for Harpoon<'_> {
     fn clone(&self) -> Self {
         Self {
-            source: self.source().clone(),
+            source: self.source(),
             chars: self.source()[self.offset()..].chars(),
             peek_buf: VecDeque::new(),
             current: self.current(),
