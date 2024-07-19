@@ -19,6 +19,7 @@ decorous-errors = { path = "../decorous-errors" }
 heck = "0.4.1"
 bitflags = "2.4.0"
 anyhow = { workspace = true }
+rand = "0.8.5"
 
 [dev-dependencies]
 insta = { workspace = true }
