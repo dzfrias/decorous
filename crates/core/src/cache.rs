@@ -19,6 +19,11 @@ pub fn cache(args: &Cache) -> Result<()> {
         return Ok(());
     }
 
+    if args.print {
+        println!("{}", loc.display());
+        return Ok(());
+    }
+
     if let Some(dur) = args.evict {
         let mut evicted = 0;
         for entry in fs::read_dir(&loc).context("error reading cache dir")? {

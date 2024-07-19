@@ -68,13 +68,16 @@ pub struct Build {
 #[derive(Debug, Args)]
 pub struct Cache {
     /// Clean the cache.
-    #[arg(short = 'x', long)]
+    #[arg(short = 'x', long, exclusive = true)]
     pub clean: bool,
+    /// Print the location of the cache.
+    #[arg(short, long, exclusive = true)]
+    pub print: bool,
     /// Evict cache entries that are older than the given time.
     #[arg(long,
           value_name = "TIME",
           value_parser = parse_duration,
-          conflicts_with = "clean"
+          exclusive = true,
     )]
     pub evict: Option<Duration>,
 }
