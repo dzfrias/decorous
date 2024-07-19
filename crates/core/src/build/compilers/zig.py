@@ -15,11 +15,12 @@ def main():
     subprocess.run(
         [
             "zig",
-            "build-lib",
+            "build-exe",
             input,
             "-target",
             "wasm32-freestanding",
-            "-dynamic",
+            "-rdynamic",
+            "-fno-entry",
             "--color",
             "on",
             *sys.argv[1:],
